@@ -3,6 +3,7 @@
 #include "Thread.h"
 #include "Mutex.h"
 #include "Condition.h"
+#include "UserProcess.h"
 
 class ProcessRegistry : public Thread
 {
@@ -35,6 +36,16 @@ class ProcessRegistry : public Thread
      */
     size_t processCount();
 
+    /**
+     * Creates the child process and returns the pid
+     */
+    size_t processFork();
+
+    /**
+     * Generates the userprocess ID for the new process
+     */
+    size_t createUID();
+
     static ProcessRegistry* instance();
     void createProcess(const char* path);
 
@@ -45,5 +56,11 @@ class ProcessRegistry : public Thread
     Mutex counter_lock_;
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
+
+    size_t process_pids_ = 0;
+    ustl::map<long int, UserProcess*> processes_running_;
+
+    // Mutexes
+
 };
 

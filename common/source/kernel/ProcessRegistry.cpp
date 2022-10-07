@@ -5,7 +5,9 @@
 #include "kprintf.h"
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
+#include "ArchThreads.h"
 
+Mutex m_process_running("ProcessRegistry::running_processes");
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
 
@@ -93,6 +95,34 @@ size_t ProcessRegistry::processCount()
   ScopeLock lock(counter_lock_);
   return progs_running_;
 }
+
+size_t ProcessRegistry::createUID()
+{
+  ArchThreads::atomic_add(process_pids_,1);
+  return process_pids_;
+}
+
+size_t ProcessRegistry::processFork()
+{
+  size_t pid = createUID();
+
+  auto process = new UserProcess(currentThread->"process",pid);
+
+  if (!process|| process->pid_==0)
+  {
+    delete process;
+    return -1;
+  }
+
+  m_process_running.acquire();
+  processes_running_.insert({pid,process});
+  m_process_running.release();
+
+  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
+  return pid;
+}
+
+
 
 void ProcessRegistry::createProcess(const char* path)
 {

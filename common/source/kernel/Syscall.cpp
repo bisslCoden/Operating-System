@@ -44,6 +44,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
     case sc_outline:
       outline(arg1, arg2);
       break;
+    case sc_fork:
+      return_value = fork();
+      break;
     case sc_trace:
       trace();
       break;
@@ -177,5 +180,10 @@ size_t Syscall::createprocess(size_t path, size_t sleep)
 void Syscall::trace()
 {
   currentThread->printBacktrace();
+}
+
+int Syscall::fork()
+{
+  return ProcessRegistry::instance()->processFork();
 }
 
