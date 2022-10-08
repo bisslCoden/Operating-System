@@ -12,8 +12,11 @@ ProcessRegistry* ProcessRegistry::instance_ = 0;
 ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs[]) :
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
-    all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_")
+    all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
+    next_pid_lock_("ProcessRegistry::next_pid_lock_"),
+    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
 {
+  debug(X_PROCESS_REG, "instance created\n");
   instance_ = this; // instance_ is static! -> Singleton-like behaviour
 }
 
@@ -85,6 +88,7 @@ void ProcessRegistry::processStart()
 {
   counter_lock_.acquire();
   ++progs_running_;
+  debug(X_PROCESS_REG, "processStart(): progs_running_ %d\n", progs_running_);
   counter_lock_.release();
 }
 
@@ -97,8 +101,20 @@ size_t ProcessRegistry::processCount()
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "create process %s\n", path);
-  Thread* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
-  debug(PROCESS_REG, "created userprocess %s\n", path);
-  Scheduler::instance()->addNewThread(process);
-  debug(PROCESS_REG, "added thread %s\n", path);
+  UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
+  assert(process && "Process creation failed miserably o_O");
+
+  // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
+  list_of_processes_lock_.acquire();
+  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
+  list_of_processes_lock_.release();
+  debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
+}
+
+size_t ProcessRegistry::createPID()
+{
+  next_pid_lock_.acquire();
+  size_t tmp = next_pid_++;
+  next_pid_lock_.release();
+  return tmp; 
 }

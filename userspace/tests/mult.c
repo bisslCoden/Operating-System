@@ -1,4 +1,5 @@
 #include "../../common/include/kernel/syscall-definitions.h"
+#include <stdio.h>
 
 
 /* the result should be 1237619379 for size of 100 */
@@ -49,6 +50,6 @@ int main()
     for (y=0;y<ARRAY_SIZE;++y)
       sum += cxc[x][y];
   
- // printf("Result is %d",sum);
+  printf("Result is %d",sum);
   return sum;
 }

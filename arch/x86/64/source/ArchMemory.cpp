@@ -15,10 +15,12 @@ PageTableEntry kernel_page_table[8 * PAGE_TABLE_ENTRIES] __attribute__((aligned(
 
 ArchMemory::ArchMemory()
 {
+  debug(X_ARCHMEM, "Archmemory constructor\n");
   page_map_level_4_ = PageManager::instance()->allocPPN();
   PageMapLevel4Entry* new_pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   memcpy((void*) new_pml4, (void*) kernel_page_map_level_4, PAGE_SIZE);
   memset(new_pml4, 0, PAGE_SIZE / 2); // should be zero, this is just for safety
+  debug(X_ARCHMEM, "PPN %ld | pml4 lies at %p\n", page_map_level_4_, new_pml4);
 }
 
 template<typename T>
