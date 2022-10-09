@@ -27,6 +27,7 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       return_value = -1;
       break;
     case sc_pthread_exit:
+      pthread_exit(arg1);
       break; 
     case sc_pthread_join:
       break;
@@ -207,4 +208,14 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
     return -1;
 
   return 0;
+}
+
+void Syscall::pthread_exit(size_t value){
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t my_tid = callingthread->getTID();
+  if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
+  {
+    debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+  }
+  return;
 }

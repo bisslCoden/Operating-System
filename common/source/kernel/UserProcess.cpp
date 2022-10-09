@@ -17,7 +17,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     fd_(VfsSyscall::open(filename, O_RDONLY)), 
     fs_info_(fs_info),
     name_(filename.c_str()),
-    threads_lock_("UserProcess::threads_lock_")
+    threads_lock_("UserProcess::threads_lock_"),
+    returnvalue_lock_("UserProcess::retvallock")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
@@ -69,7 +70,7 @@ bool UserProcess::addToThreadList(UserThread* thread)
     debug(USERPROCESS, "SHIT: addToThreadList() already has thread with tid [%ld] in list\n", tid);
     threads_lock_.release();
 
-    assert(false); // assert or not? 
+    assert(false); // assert or not? - lets leave them in for now :D 
     return false; 
   }
 
@@ -79,6 +80,23 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+
+bool UserProcess::addToRetvalList(size_t tid, size_t value){
+  returnvalue_lock_.acquire();
+  if (returnvalues_.find(tid) != returnvalues_.end())
+  {
+    returnvalue_lock_.release();
+    debug(USERPROCESS, "how did that thread [%ld] exit twice??\n", tid);
+    assert(false);
+    return false;
+  }
+
+  returnvalues_.insert(ustl::make_pair(tid, value));
+  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list", pid_, value, tid);
+  returnvalue_lock_.release();
+  return true;
+}
+
 
 bool UserProcess::removeFromThreadList(UserThread* thread)
 {

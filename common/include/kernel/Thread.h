@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "fs/FileSystemInfo.h"
+#define USERSTACK_SIZE 1
 
 #define STACK_CANARY ((uint32)0xDEADDEAD ^ (uint32)(size_t)this)
 
@@ -127,15 +128,17 @@ class Thread
     Thread(Thread const &src);
     Thread &operator=(Thread const &src);
 
-    volatile ThreadState state_;
 
+
+    
+  protected:
+    ThreadState getState() const;
+    //set these to protected to children can access aswell
+    volatile ThreadState state_;
     size_t tid_;
 
     Terminal* my_terminal_;
     TYPE type_;
-
-  protected:
-    ThreadState getState() const;
 
     FileSystemInfo* working_dir_;
 

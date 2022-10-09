@@ -32,15 +32,24 @@ class UserThread : public Thread
     bool isLast() { return last_; }
     // return process of thread
     UserProcess* getParentProcess() { return parent_process_; }
-
+    
+    //checks for stack over/underflows
+    bool isUserStackCanaryOK();
 
     // setters
     void setLast() { last_ = true; }
   private:
+
+    size_t vpns_for_userstack_[USERSTACK_SIZE];
+    size_t ppns_for_userstack_[USERSTACK_SIZE];
     // the process that contains this thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
+    size_t* userstack_start_;
+    size_t* userstack_end_;
+    
+
 
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 
