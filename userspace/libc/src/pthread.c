@@ -171,3 +171,6 @@ int pthread_spin_unlock(pthread_spinlock_t *lock)
   return -1;
 }
 
+int get_thread_count(void) {
+  return __syscall(sc_threadcount, 0x0, 0x0, 0x0, 0x0, 0x0);
+}
