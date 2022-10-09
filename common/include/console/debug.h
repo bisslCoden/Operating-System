@@ -44,6 +44,7 @@ const size_t SCHEDULER          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t SYSCALL            = Ansi_Blue    | OUTPUT_ENABLED;
 const size_t MAIN               = Ansi_Red     | OUTPUT_ENABLED;
 const size_t THREAD             = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t USERTHREAD         = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t USERPROCESS        = Ansi_Cyan    | OUTPUT_ENABLED;
 const size_t PROCESS_REG        = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t BACKTRACE          = Ansi_Cyan    | OUTPUT_ENABLED;

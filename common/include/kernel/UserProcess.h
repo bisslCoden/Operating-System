@@ -44,15 +44,14 @@ class UserProcess
     Loader* getLoader() { return loader_; }
     
     /**
-     * @brief Get the nr of threads in list_of_threads_
-     * IMPORTANT: NOT LOCKED, USE list_of_threads_lock_ AROUND FUNCTION CALL
+     * @brief returns threads_.size() but threadsafe
      * 
      * @return size_t the numer of threads
      */
-    size_t getNrOfThreads() { return threads_.size(); }
+    size_t getNrOfThreads();
 
     // called for pthread_create(). returns tid. obviously missing arguments.
-    size_t createNewThread();
+    size_t createNewThread(size_t start_routine);
 
   private:
     // the process ID

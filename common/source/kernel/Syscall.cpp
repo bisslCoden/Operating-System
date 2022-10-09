@@ -77,7 +77,7 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 
 void Syscall::exit(size_t exit_code)
 {
-  debug(SYSCALL, "Syscall::EXIT: called, exit_code: %zd\n", exit_code);
+  debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %zd\n", currentThread->getTID(), exit_code);
   currentThread->kill();
 }
 
@@ -199,7 +199,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
     assert(false && "how tf did that happen?");
 
   // calling thread creation and settind return value to user's pthread_t thread adress 
-  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread();
+  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread(start_routine);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
   *(size_t*)thread = tid;
 
