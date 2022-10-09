@@ -192,22 +192,19 @@ void Syscall::trace()
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
-  size_t* tid_ptr = (size_t*)thread;
-  *tid_ptr = 0;
 
   // add as much parameter checking as possible and return -1
 
   if(currentThread->getType() != Thread::TYPE::USER_THREAD)
     assert(false && "how tf did that happen?");
 
-  // tid holds the tid of the newly created thread or 0 if an error occured
+  // calling thread creation and settind return value to user's pthread_t thread adress 
   size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread();
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
+  *(size_t*)thread = tid;
 
-
-  if(tid == 0) 
+  if(tid == 0)
     return -1;
 
-  *tid_ptr = tid;
   return 0;
 }
