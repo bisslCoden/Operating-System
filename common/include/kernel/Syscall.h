@@ -22,5 +22,7 @@ class Syscall
 
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
+
+  static uint32 get_thread_count();
 };
 
