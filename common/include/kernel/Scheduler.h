@@ -26,6 +26,7 @@ class Scheduler
     bool isCurrentlyCleaningUp();
     void incTicks();
     uint32 getTicks();
+    uint32 getThreadCount();
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
