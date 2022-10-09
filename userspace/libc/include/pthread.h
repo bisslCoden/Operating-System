@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types.h"
+#include "sys/syscall.h"
+#include "../../../common/include/kernel/syscall-definitions.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,8 +54,8 @@ extern int pthread_cond_broadcast(pthread_cond_t *cond);
 
 extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 
+extern int get_thread_count(void);
+
 #ifdef __cplusplus
 }
 #endif
-
-
