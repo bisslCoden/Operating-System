@@ -20,30 +20,61 @@ class UserProcess
 
     ~UserProcess();
 
+    /**
+     * @brief safely adds a userthread to threads
+     * 
+     * @param thread the userthread
+     * @return true if successful
+     * @return false if already found in list
+     */
+    bool addToThreadList(UserThread* thread);
+
+    /**
+     * @brief safely removes userthread from threads_
+     * 
+     * @param thread the userthread
+     * @return true if found in list
+     * @return false if not found
+     */
+    bool removeFromThreadList(UserThread* thread);
+
     size_t getPID(){ return pid_; }
     Loader* getLoader() { return loader_; }
+
+    /**
+     * @brief Get the nr of threads in list_of_threads_
+     * IMPORTANT: NOT LOCKED, USE list_of_threads_lock_ AROUND FUNCTION CALL
+     * 
+     * @return size_t the numer of threads
+     */
+    size_t getNrOfThreads() { return threads_.size(); }
 
   private:
     // the process ID
     size_t const pid_;
+
     // the process' fd. see "FileDescriptor.h"
     ssize_t const fd_;
-    // i guess this is needed
+
+    // information about the program. path...
     FileSystemInfo* const fs_info_;
-    // loader loads programms
+
+    // loader loads the program
     Loader* loader_;
+
     // the directory
     FileSystemInfo* working_dir_;
+
     // tells us which terminal is used. i think not relevant for now
     Terminal* my_terminal_;
+
     // name of the process.
     ustl::string name_;
 
-    /* 
-    IMPORTANT: this list gets an insert in the UserProcess constructor after constructing the first_thread
-    */
     // a list containing TIDs and their appropriate UserThread*
-    ustl::map<size_t, UserThread*> list_of_threads_;
-    Mutex list_of_threads_lock_;
+    ustl::map<size_t, UserThread*> threads_;
+    Mutex threads_lock_;
+
+    // map with tid + return value for join
 };
 

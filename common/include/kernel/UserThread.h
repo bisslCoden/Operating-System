@@ -22,12 +22,24 @@ class UserThread : public Thread
     ~UserThread();
 
     /**
-     * doesn't do much. 
+     * only asserts if called. 
      * "object of abstract class type "UserThread" is not allowed:C/C++(322)
      * UserProcess.cpp(56, 34): function "UserThread::Run" is a pure virtual function"
      */
     void Run() override { assert(false && "UserThread::Run() was called...\n"); }
 
+    // tells if thread is the last thread of its process
+    bool isLast() { return last_; }
+
+    // setters
+    void setLast() { last_ = true; }
   private:
+    // the process that contains this thread
     UserProcess* parent_process_;
+
+    // safe stack start + end ppn
+
+    // only true if removeFromThreadList() detects last thread
+    bool last_ = false; 
 };
+

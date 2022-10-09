@@ -45,20 +45,20 @@ class ProcessRegistry : public Thread
     void createProcess(const char* path);
 
     /**
-     * creates an unique PID for every process
+     * creates an unique ID for every process OR thread ID
      * 
-     * @return size_t the PID
+     * @return size_t the ID
      */
-    size_t createPID();
+    size_t createID();
   private:
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
-    // ensures unique PIDs via createPID()
-    size_t next_pid_ = 0;
-    Mutex next_pid_lock_;
+    // ensures unique IDs for TID AND PID
+    size_t next_id_ = 1;
+    Mutex next_id_lock_;
     // keeping track of processes alive
     ustl::map<size_t, UserProcess*> list_of_processes_;
     Mutex list_of_processes_lock_;
