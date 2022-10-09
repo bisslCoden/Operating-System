@@ -58,10 +58,9 @@ class Thread
     bool isStackCanaryOK();
 
     const char* getName();
-
     size_t getTID();
-
     Terminal* getTerminal();
+    TYPE getType() { return type_; }
 
     void setTerminal(Terminal *my_term);
 
@@ -133,6 +132,7 @@ class Thread
     size_t tid_;
 
     Terminal* my_terminal_;
+    TYPE type_;
 
   protected:
     ThreadState getState() const;

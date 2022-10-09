@@ -20,6 +20,16 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
 
   switch (syscall_number)
   {
+    case sc_pthread_create:
+      return_value = pthread_create(arg1, arg2, arg3, arg4);
+      break;
+    case sc_pthread_cancel:
+      return_value = -1;
+      break;
+    case sc_pthread_exit:
+      break; 
+    case sc_pthread_join:
+      break;
     case sc_sched_yield:
       Scheduler::instance()->yield();
       break;
@@ -179,3 +189,25 @@ void Syscall::trace()
   currentThread->printBacktrace();
 }
 
+size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg)
+{
+  debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
+  size_t* tid_ptr = (size_t*)thread;
+  *tid_ptr = 0;
+
+  // add as much parameter checking as possible and return -1
+
+  if(currentThread->getType() != Thread::TYPE::USER_THREAD)
+    assert(false && "how tf did that happen?");
+
+  // tid holds the tid of the newly created thread or 0 if an error occured
+  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread();
+  debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
+
+
+  if(tid == 0) 
+    return -1;
+
+  *tid_ptr = tid;
+  return 0;
+}

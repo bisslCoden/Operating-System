@@ -20,6 +20,8 @@ class UserProcess
 
     ~UserProcess();
 
+
+
     /**
      * @brief safely adds a userthread to threads
      * 
@@ -40,7 +42,7 @@ class UserProcess
 
     size_t getPID(){ return pid_; }
     Loader* getLoader() { return loader_; }
-
+    
     /**
      * @brief Get the nr of threads in list_of_threads_
      * IMPORTANT: NOT LOCKED, USE list_of_threads_lock_ AROUND FUNCTION CALL
@@ -48,6 +50,9 @@ class UserProcess
      * @return size_t the numer of threads
      */
     size_t getNrOfThreads() { return threads_.size(); }
+
+    // called for pthread_create(). returns tid. obviously missing arguments.
+    size_t createNewThread();
 
   private:
     // the process ID

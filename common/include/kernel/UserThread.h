@@ -11,7 +11,7 @@ class UserThread : public Thread
 {
   public:
     /**
-     * Constructor
+     * Constructor for first_thread
      * @param minixfs_filename filename of the file in minixfs to execute
      * @param fs_info filesysteminfo-object to be used
      * @param terminal_number the terminal to run in (default 0)
@@ -30,6 +30,9 @@ class UserThread : public Thread
 
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }
+    // return process of thread
+    UserProcess* getParentProcess() { return parent_process_; }
+
 
     // setters
     void setLast() { last_ = true; }

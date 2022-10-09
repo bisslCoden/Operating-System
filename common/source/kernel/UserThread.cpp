@@ -13,11 +13,12 @@
 #include "ArchThreads.h"
 #include "offsets.h"
 
+// first thread
 UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
   parent_process_(parent_process) // UserThread's members
 {
-  debug(X_USERTHREAD, "TID [%ld]: Constructor called.\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: first thread constructor called.\n", getTID());
   loader_ = parent_process_->getLoader();
   // gets thread's stack a ppn and a mapped vpn
   size_t page_for_stack = PageManager::instance()->allocPPN();
@@ -45,7 +46,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   list_of_threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
   list_of_threads_lock_.release();*/
 
-  debug(X_USERTHREAD, "TID [%ld]: constructor finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 

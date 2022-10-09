@@ -104,3 +104,11 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+
+size_t UserProcess::createNewThread()
+{
+  // here the UserThread should be created with a new constructor that's not implemented yet.
+  size_t tid = 123;
+
+  return tid; // must be 0 if fail, TID on success!
+}
