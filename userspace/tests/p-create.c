@@ -3,7 +3,7 @@
 
 int simple_routine()
 {
-
+  printf("Hallo, ich bin's. Dein Pthread\n");
   return 0;
 }
 
