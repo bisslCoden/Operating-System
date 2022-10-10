@@ -6,6 +6,6 @@ int global = 4;
 int main()
 {
   printf("this is a VERRRY simple program to test p_exit!\n");
-  pthread_exit(9);
+  pthread_exit((void*)9);
   return 1;
 }

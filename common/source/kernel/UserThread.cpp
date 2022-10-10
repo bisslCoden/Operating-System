@@ -18,6 +18,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
   parent_process_(parent_process) // UserThread's members
 {
+  //dont switch to userspace during creation
+
   size_t offset = 1;
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor called.\n", getTID());
   loader_ = parent_process_->getLoader();
@@ -28,24 +30,25 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   bool vpn_mapped = loader_->arch_memory_.mapPage(vpns_for_userstack_[0], ppns_for_userstack_[0], 1);
   
   //set stack start and stack end in Adressspace and set to Stack Canary
-  userstack_start_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE);
-  userstack_end_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE - USERSTACK_SIZE * PAGE_SIZE); //currently 1 as our stack is ownly 1 Page!
-  // *userstack_start_ = STACK_CANARY;
-  // *userstack_end_ = STACK_CANARY;
+  userstack_start_ = (size_t*) (USER_BREAK - (offset - 1) * PAGE_SIZE - sizeof(size_t*));
+  userstack_end_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE - sizeof(size_t*)); //currently 1 as our stack is ownly 1 Page!
 
 
   assert(vpn_mapped && "Virtual page for stack was already mapped - this should never happen");
   debug(X_USERTHREAD, "TID [%ld]: PPN (%ld) for stack set and mapped to VPN (%ld)\n", getTID(), ppns_for_userstack_[0], vpns_for_userstack_[0]);
 
+  debug(X_USERTHREAD, "STACK first:this woud be giving stack adress of: %p", (void*) userstack_start_);
   //set to custom userstack start as created befroe... somehow makes no sense 
-  // ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-  //                                  (void*) (userstack_start_ - sizeof(size_t)),
-  //                                  getKernelStackStartPointer());
-  
-  //this was this funct before
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   (void*) (USER_BREAK - sizeof(pointer)),
+                                   (void*) userstack_start_,
                                    getKernelStackStartPointer());
+  
+  void* stackstart = (void*)(USER_BREAK - sizeof(pointer));
+  debug(X_USERTHREAD, "STACK second: this would be giving stack adress of: %p", stackstart);
+  //this was this funct before
+  // ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
+  //                                  (void*) (USER_BREAK - sizeof(pointer)),
+  //                                  getKernelStackStartPointer());
 
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
@@ -61,6 +64,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   list_of_threads_lock_.acquire();
   list_of_threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
   list_of_threads_lock_.release();*/
+  *(userstack_start_ + sizeof(size_t*)) = STACK_CANARY;
+  *userstack_end_ = STACK_CANARY;
 
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
@@ -68,7 +73,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 
 UserThread::~UserThread()
 {
-  //race conditionnn!
+  switch_to_userspace_ = 0;
+  //race conditionnn! because when exit is called during pthread exit page get freed 2 times
   debug(X_USERTHREAD, "~UserThread called.\n");
   //can be used if we find our Userstack :S
   //if (!isUserStackCanaryOK())
@@ -79,10 +85,10 @@ UserThread::~UserThread()
   //free Stack Pages
   for (size_t i = 0; i < USERSTACK_SIZE; i++)
   {
-    debug(USER_THREAD, "freeing Stack pages for thread [%ld]\n", tid_);
+    debug(X_USERTHREAD, "freeing Stack pages for thread [%ld]\n", tid_);
     PageManager::instance()->freePPN(ppns_for_userstack_[i]);
     if(!loader_->arch_memory_.unmapPage(vpns_for_userstack_[i]))
-      debug(USER_THREAD, "coul not free vpn :?\n");
+      debug(X_USERTHREAD, "coul not free vpn :?\n");
   }
 
   //delete Thread from Process and sheduler
@@ -93,7 +99,8 @@ UserThread::~UserThread()
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
-  state_ = ToBeDestroyed;
+  this->kill();
+  switch_to_userspace_ = 1;
 }
 
 bool UserThread::isUserStackCanaryOK(){
