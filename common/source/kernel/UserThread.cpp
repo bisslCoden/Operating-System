@@ -24,9 +24,9 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   // fill UserProcess::threads_
   parent_process_->addToThreadList(this);
   // gets thread's stack a ppn and a mapped vpn
-  size_t stack_page_offset = parent_process_->getNrOfThreads();
-  size_t stack_ptr = USER_BREAK - stack_page_offset * PAGE_SIZE;
-  size_t vpn_for_stack = stack_ptr / PAGE_SIZE; 
+  /*size_t stack_page_offset = getTID();
+  size_t stack_ptr = USER_BREAK - stack_page_offset * PAGE_SIZE;*/
+  size_t vpn_for_stack = USER_BREAK / PAGE_SIZE - 1;
   size_t page_for_stack = PageManager::instance()->allocPPN();
   bool vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, page_for_stack, 1);
   assert(vpn_mapped && "Virtual page for stack was already mapped - this should never happen");
@@ -34,7 +34,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 
   // set up user registers and adressspace
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   (void*) (vpn_for_stack * PAGE_SIZE),
+                                   (void*) (USER_BREAK - sizeof(pointer)),
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
@@ -65,7 +65,7 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
   // add to UserProcess::threads_
   parent_process_->addToThreadList(this);
   // gets thread's stack a ppn and a mapped vpn
-  size_t stack_page_offset = parent_process_->getNrOfThreads();
+  size_t stack_page_offset = getTID();
   size_t stack_ptr = USER_BREAK - stack_page_offset * PAGE_SIZE;
   size_t vpn_for_stack = stack_ptr / PAGE_SIZE; 
   size_t page_for_stack = PageManager::instance()->allocPPN();

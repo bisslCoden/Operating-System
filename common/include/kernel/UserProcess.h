@@ -50,8 +50,23 @@ class UserProcess
      */
     size_t getNrOfThreads();
 
-    // called for pthread_create(). returns tid. obviously missing arguments.
+    /**
+     * @brief Create a New Thread object (pthread_create)
+     * 
+     * @param start_routine which thread should execute
+     * @return size_t thread ID
+     */
     size_t createNewThread(size_t start_routine);
+
+    /**
+     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * 
+     * @param exit_code 
+     * @return size_t 
+     */
+    void exit(size_t exit_code);
+
+    void killThread(UserThread* thread);
 
   private:
     // the process ID

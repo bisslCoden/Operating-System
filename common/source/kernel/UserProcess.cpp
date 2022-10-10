@@ -122,3 +122,22 @@ size_t UserProcess::createNewThread(size_t start_routine)
   
   return 0;
 }
+
+void UserProcess::exit(size_t exit_code)
+{
+  debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  ustl::vector<UserThread*> to_kill;
+  for(auto thread : threads_) // first = tid, secons = *Thread
+  {
+    if(unlikely(thread.first = currentThread->getTID()))
+      killThread(thread.second);
+  }
+  debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
+  killThread((UserThread*)currentThread);
+}
+
+void UserProcess::killThread(UserThread* thread)
+{
+  debug(USERPROCESS, "PID: [%ld] killThread() called for tid [%ld]\n", pid_, thread->getTID());
+  thread->kill();
+}

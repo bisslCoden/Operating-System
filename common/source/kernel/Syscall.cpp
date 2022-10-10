@@ -78,7 +78,8 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 void Syscall::exit(size_t exit_code)
 {
   debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %zd\n", currentThread->getTID(), exit_code);
-  currentThread->kill();
+  ((UserThread*)currentThread)->getParentProcess()->exit(exit_code);
+  // currentThread->kill();
 }
 
 size_t Syscall::write(size_t fd, pointer buffer, size_t size)
