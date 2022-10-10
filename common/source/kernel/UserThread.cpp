@@ -30,8 +30,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   bool vpn_mapped = loader_->arch_memory_.mapPage(vpns_for_userstack_[0], ppns_for_userstack_[0], 1);
   
   //set stack start and stack end in Adressspace and set to Stack Canary
-  userstack_start_ = (size_t*) (USER_BREAK - (offset - 1) * PAGE_SIZE - sizeof(size_t*));
-  userstack_end_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE - sizeof(size_t*)); //currently 1 as our stack is ownly 1 Page!
+  userstack_start_ = (size_t*) (USER_BREAK - (offset - 1) * PAGE_SIZE - 2 * sizeof(size_t*));
+  userstack_end_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE - 2 * sizeof(size_t*)); //currently 1 as our stack is ownly 1 Page!
 
 
   assert(vpn_mapped && "Virtual page for stack was already mapped - this should never happen");
@@ -64,8 +64,10 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   list_of_threads_lock_.acquire();
   list_of_threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
   list_of_threads_lock_.release();*/
-  *(userstack_start_ + sizeof(size_t*)) = STACK_CANARY;
-  *userstack_end_ = STACK_CANARY;
+
+  //Stack Canary setting somehow breaks EVERYTHING for now
+  // *(userstack_start_ + 2 * sizeof(size_t*)) = STACK_CANARY;
+  // *(userstack_end_ + 2 * sizeof(size_t*)) = STACK_CANARY;
 
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
@@ -75,7 +77,7 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //race conditionnn! because when exit is called during pthread exit page get freed 2 times
-  debug(X_USERTHREAD, "~UserThread called.\n");
+  debug(X_USERTHREAD, "~UserThread called for thread [%ld] %s.\n", tid_, name_);
   //can be used if we find our Userstack :S
   //if (!isUserStackCanaryOK())
   //{
@@ -83,10 +85,11 @@ UserThread::~UserThread()
     //kill progamm then 
   //}
   //free Stack Pages
+  //debug(X_USERTHREAD, "freeing Stack page: %ld for thread [%ld]: %s\n", ppns_for_userstack_[0] ,tid_, name_);
+  PageManager::instance()->freePPN(ppns_for_userstack_[0]);
   for (size_t i = 0; i < USERSTACK_SIZE; i++)
   {
-    debug(X_USERTHREAD, "freeing Stack pages for thread [%ld]: %s\n", tid_, name_);
-    PageManager::instance()->freePPN(ppns_for_userstack_[i]);
+
     if(!loader_->arch_memory_.unmapPage(vpns_for_userstack_[i]))
       debug(X_USERTHREAD, "coul not free vpn :?\n");
   }

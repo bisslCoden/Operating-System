@@ -21,6 +21,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     returnvalue_lock_("UserProcess::retvallock")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
+  debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
   if (fd_ >= 0)

@@ -134,6 +134,7 @@ size_t Syscall::close(size_t fd)
 
 size_t Syscall::open(size_t path, size_t flags)
 {
+  debug(SYSCALL, "open called!\n");
   if (path >= USER_BREAK)
   {
     return -1U;
