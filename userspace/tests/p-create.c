@@ -3,15 +3,15 @@
 
 int simple_routine()
 {
-  printf("Hallo, ich bin's. Dein Pthread\n");
+  printf("2 - pthread: Hallo, ich bin's. Dein Pthread\n");
   return 0;
 }
 
 int main()
 {
-  printf("Hello!\n");
+  printf("1 - main: Hello!\n");
   pthread_t tid; 
   int ret = pthread_create(&tid, NULL, (void*)simple_routine, NULL);
-  printf("pthread_create() returned %d and tid %ld\n", ret, tid);
+  printf("3 - main again: pthread_create() returned %d and tid %ld\n", ret, tid);
   return 0;
 }

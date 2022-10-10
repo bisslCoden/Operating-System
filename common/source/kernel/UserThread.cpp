@@ -115,7 +115,7 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //race conditionnn! because when exit is called during pthread exit page get freed 2 times
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] %s.\n", tid_, name_);
+  debug(X_USERTHREAD, "~UserThread called for thread [%ld] %s.\n", tid_, name_.c_str());
   //can be used if we find our Userstack :S
   //if (!isUserStackCanaryOK())
   //{
