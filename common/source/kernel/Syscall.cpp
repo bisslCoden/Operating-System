@@ -27,6 +27,7 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       return_value = -1;
       break;
     case sc_pthread_exit:
+      pthread_exit(arg1);
       break; 
     case sc_pthread_join:
       break;
@@ -134,6 +135,7 @@ size_t Syscall::close(size_t fd)
 
 size_t Syscall::open(size_t path, size_t flags)
 {
+  debug(SYSCALL, "open called!\n");
   if (path >= USER_BREAK)
   {
     return -1U;
@@ -209,3 +211,31 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
 
   return 0;
 }
+
+void Syscall::pthread_exit(size_t value){
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t my_tid = callingthread->getTID();
+  if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
+  {
+    debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+  }
+  if(currentThread->getTID() == my_tid)
+  {
+    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    currentThread->kill();
+  }
+  return;
+}
+
+size_t Syscall::pthread_join(size_t thread, size_t value_ptr){
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t retval;
+  while (!callingthread->getParentProcess()->getRetVal(thread, &retval))
+  {
+    Scheduler::instance()->yield();
+  }
+  *(size_t*) value_ptr = retval;
+  return 0;
+  
+}
+

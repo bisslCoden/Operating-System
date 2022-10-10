@@ -101,9 +101,12 @@ size_t ProcessRegistry::processCount()
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "create process %s\n", path);
+  FileSystemInfo test = *working_dir_;
+  debug(PROCESS_REG, "was able to deref that\n");
   UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
   assert(process && "Process creation failed miserably o_O");
 
+  debug(PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));

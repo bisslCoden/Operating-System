@@ -27,6 +27,8 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
  */
 void pthread_exit(void *value_ptr)
 {
+  __syscall(sc_pthread_exit, (size_t) value_ptr, 0x0, 0x0, 0x0, 0x0);
+  return;
 }
 
 /**
@@ -44,7 +46,8 @@ int pthread_cancel(pthread_t thread)
  */
 int pthread_join(pthread_t thread, void **value_ptr)
 {
-  return -1;
+  return __syscall(sc_pthread_join, (size_t) thread, (size_t) value_ptr, 0x0, 0x0, 0x0);
+  
 }
 
 /**
