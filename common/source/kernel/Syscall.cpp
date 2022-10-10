@@ -78,7 +78,7 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 
 void Syscall::exit(size_t exit_code)
 {
-  debug(SYSCALL, "Syscall::EXIT: called, exit_code: %zd\n", exit_code);
+  debug(SYSCALL, "Syscall::EXIT: called, exit_code: %zd by thread: %ld\n", exit_code, currentThread->getTID());
   currentThread->kill();
 }
 
@@ -216,6 +216,11 @@ void Syscall::pthread_exit(size_t value){
   if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
   {
     debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+  }
+  if(currentThread->getTID() == my_tid)
+  {
+    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    currentThread->kill();
   }
   return;
 }

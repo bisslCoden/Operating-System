@@ -85,7 +85,7 @@ UserThread::~UserThread()
   //free Stack Pages
   for (size_t i = 0; i < USERSTACK_SIZE; i++)
   {
-    debug(X_USERTHREAD, "freeing Stack pages for thread [%ld]\n", tid_);
+    debug(X_USERTHREAD, "freeing Stack pages for thread [%ld]: %s\n", tid_, name_);
     PageManager::instance()->freePPN(ppns_for_userstack_[i]);
     if(!loader_->arch_memory_.unmapPage(vpns_for_userstack_[i]))
       debug(X_USERTHREAD, "coul not free vpn :?\n");
@@ -99,7 +99,6 @@ UserThread::~UserThread()
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
-  this->kill();
   switch_to_userspace_ = 1;
 }
 
