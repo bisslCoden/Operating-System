@@ -225,3 +225,16 @@ void Syscall::pthread_exit(size_t value){
   }
   return;
 }
+
+size_t Syscall::pthread_join(size_t thread, size_t value_ptr){
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t retval;
+  while (!callingthread->getParentProcess()->getRetVal(thread, &retval))
+  {
+    Scheduler::instance()->yield();
+  }
+  *(size_t*) value_ptr = retval;
+  return 0;
+  
+}
+

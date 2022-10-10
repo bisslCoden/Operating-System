@@ -56,6 +56,8 @@ class UserProcess
     // called for pthread_create(). returns tid. obviously missing arguments.
     size_t createNewThread();
 
+    bool getRetVal(size_t tid, size_t* value);
+
   private:
     // the process ID
     size_t const pid_;

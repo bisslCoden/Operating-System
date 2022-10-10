@@ -25,5 +25,6 @@ class Syscall
 
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg);
   static void pthread_exit(size_t value);
+  static size_t pthread_join(size_t thread, size_t value_ptr);
 };
 

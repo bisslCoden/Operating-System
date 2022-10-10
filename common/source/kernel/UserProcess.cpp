@@ -131,3 +131,17 @@ size_t UserProcess::createNewThread()
 
   return tid; // must be 0 if fail, TID on success!
 }
+
+bool UserProcess::getRetVal(size_t tid, size_t* value){
+  returnvalue_lock_.acquire();
+  if (returnvalues_.find(tid) != returnvalues_.end())
+  {
+    *value = returnvalues_[tid];
+    returnvalue_lock_.release();
+    return true;
+  }
+  returnvalue_lock_.release();
+  return false;
+  
+
+}
