@@ -20,60 +20,24 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
-  // fill UserProcess::threads_
-  parent_process_->addToThreadList(this);
-
-
-  /*
-  size_t stack_page_offset = getTID();
-  size_t stack_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset * PAGE_SIZE;
-  size_t vpn_for_stack = stack_ptr / PAGE_SIZE; 
-  size_t page_for_stack = PageManager::instance()->allocPPN();
-  bool vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, page_for_stack, 1);
-  */
-  // gets thread's stack a ppn and a vpn mapped;
-  size_t stack_ptr = USER_BREAK - sizeof(size_t); 
-  size_t vpn_for_stack = stack_ptr / PAGE_SIZE; 
-  size_t page_for_stack = PageManager::instance()->allocPPN();
-  bool vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, page_for_stack, 1);
   
-  //set stack start and stack end in Adressspace and set to Stack Canary
-  //userstack_start_ = (size_t*) (USER_BREAK - (offset - 1) * PAGE_SIZE - 2 * sizeof(size_t*));
-  //userstack_end_ = (size_t*) (USER_BREAK - offset * PAGE_SIZE - 2 * sizeof(size_t*)); //currently 1 as our stack is ownly 1 Page!
-
-  assert(vpn_mapped && "Virtual page for stack was already mapped - this should never happen");
-  //debug(X_USERTHREAD, "TID [%ld]: PPN (%lx) for stack set and mapped to VPN (%ld)\n", getTID(), ppns_for_userstack_[0], vpns_for_userstack_[0]);
-
-  //debug(X_USERTHREAD, "STACK first:this woud be giving stack adress of: %p\n", (void*) userstack_start_);
-  //set to custom userstack start as created befroe... somehow makes no sense 
+  // setup stack, UserRegisters and address space
+  setupStack(THREADSETUP_FIRST);
+  
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   (void*) stack_ptr,
+                                   getUserstackStart(),
                                    getKernelStackStartPointer());
-  
-  // void* stackstart = (void*)(USER_BREAK - sizeof(pointer));
-  // debug(X_USERTHREAD, "STACK second: this would be giving stack adress of: %p\n", stackstart);
-  //this was this funct before
-  // ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-  //                                  (void*) (USER_BREAK - sizeof(pointer)),
-  //                                  getKernelStackStartPointer());
 
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: Stack, Registers and AddressSpace set.\n", getTID());
 
   // set terminal
   if (main_console->getTerminal(terminal_number))
     setTerminal(main_console->getTerminal(terminal_number));
 
-  // add Thread to Scheduler
+  // add Thread to process and LATER to Scheduler
+  parent_process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
-  /*
-  list_of_threads_lock_.acquire();
-  list_of_threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
-  list_of_threads_lock_.release();*/
-
-  //Stack Canary setting somehow breaks EVERYTHING for now
-  // *(userstack_start_ + 2 * sizeof(size_t*)) = STACK_CANARY;
-  // *(userstack_end_ + 2 * sizeof(size_t*)) = STACK_CANARY;
 
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
@@ -88,19 +52,10 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
   debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
 
-  // add to UserProcess::threads_
-  parent_process_->addToThreadList(this);
-  // gets thread's stack a ppn and a mapped vpn
-  size_t stack_page_offset = getTID() * PAGE_SIZE;
-  size_t stack_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
-  size_t vpn_for_stack = stack_ptr / PAGE_SIZE; 
-  size_t page_for_stack = PageManager::instance()->allocPPN();
-  bool vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, page_for_stack, 1);
-  assert(vpn_mapped && "Virtual page for stack was already mapped - this should never happen");
-  debug(X_USERTHREAD, "TID [%ld]: PPN (%lx) for stack set and mapped to VPN (%lx)\n", getTID(), page_for_stack, vpn_for_stack);
-
   // set up user registers and adressspace
-  ArchThreads::createUserRegisters(user_registers_, (void*)start_routine, (void*)stack_ptr, getKernelStackStartPointer());
+  setupStack(THREADSETUP_PTHREAD);
+  ArchThreads::createUserRegisters(user_registers_, (void*)start_routine, 
+                                   getUserstackStart(), getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
@@ -108,12 +63,9 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
   if (main_console->getTerminal(terminal_number))
     setTerminal(main_console->getTerminal(terminal_number));
 
-  // add Thread to Scheduler
+  // add Thread to process and LATER to scheduler
+  parent_process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
-  /*
-  list_of_threads_lock_.acquire();
-  list_of_threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
-  list_of_threads_lock_.release();*/
 
   debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
@@ -122,39 +74,53 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
-  //race conditionnn! because when exit is called during pthread exit page get freed 2 times
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] %s.\n", tid_, name_.c_str());
-  //can be used if we find our Userstack :S
-  //if (!isUserStackCanaryOK())
-  //{
-    //debug(USER_THREAD, "Stack got corrupted!\n");
-    //kill progamm then 
-  //}
-  //free Stack Pages
-  //debug(X_USERTHREAD, "freeing Stack page: %ld for thread [%ld]: %s\n", ppns_for_userstack_[0] ,tid_, name_);
-  debug(X_USERTHREAD, "calling freePPN(%lx) in ~UserThread for thread %ld\n", ppns_for_userstack_[0], getTID());
-  // PageManager::instance()->freePPN(ppns_for_userstack_[0]);
-  
-  /* vpns_for_userstack currently not set
-  for (size_t i = 0; i < USERSTACK_SIZE; i++)
-  {
-    if(!loader_->arch_memory_.unmapPage(vpns_for_userstack_[i]))
-      debug(X_USERTHREAD, "could not free vpn :?\n");
-  }
-  */
-
-  //delete Thread from Process and sheduler
-  // calls delete for process if the thread is the last thread
+  debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
   parent_process_->removeFromThreadList(this);
   if(isLast())
   {
-    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]\n", getTID(), parent_process_->getPID());
+    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
+  debug(X_USERTHREAD, "~UserThread called for thread [%ld] parent process died.\n", tid_);
   switch_to_userspace_ = 1;
 }
 
 bool UserThread::isUserStackCanaryOK()
 {
-  return (*userstack_start_ == STACK_CANARY && *userstack_end_ == STACK_CANARY);
+  return (userstack_start_ == STACK_CANARY && userstack_end_ == STACK_CANARY);
+}
+
+bool UserThread::setupStack(int first_thread)
+{
+  debug(USERTHREAD, "setupStack(first_thread = %d)\n", first_thread);
+  size_t vpn_for_stack = 0;
+  size_t ppn_for_stack = 0;
+  bool vpn_mapped = false;
+  if(first_thread == THREADSETUP_FIRST)
+  {
+    userstack_start_= USER_BREAK - sizeof(size_t); 
+    vpn_for_stack = userstack_start_ / PAGE_SIZE; 
+    ppn_for_stack = PageManager::instance()->allocPPN();
+    vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
+  }
+  else if(first_thread == THREADSETUP_PTHREAD)
+  {
+    size_t stack_page_offset = getTID() * PAGE_SIZE;
+    userstack_start_ = USER_BREAK - sizeof(size_t) - stack_page_offset;
+    vpn_for_stack = userstack_start_ / PAGE_SIZE; 
+    ppn_for_stack = PageManager::instance()->allocPPN();
+    vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
+  }
+
+  // worked? 
+  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx\n", vpn_for_stack, ppn_for_stack);
+  assert(vpn_for_stack && ppn_for_stack);
+  if(!vpn_mapped)
+  {
+    debug(USERTHREAD, "setupStack() RIP. returning false\n");
+    PageManager::instance()->freePPN(ppn_for_stack);
+    return false;
+  }
+  debug(USERTHREAD, "setupStack() success. returning true\n");
+  return true;
 }

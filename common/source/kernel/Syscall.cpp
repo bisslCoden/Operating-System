@@ -224,6 +224,7 @@ void Syscall::pthread_exit(size_t value)
   if(currentThread->getTID() == my_tid)
   {
     debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    // self killing pls lock threads_
     currentThread->kill();
   }
   return;

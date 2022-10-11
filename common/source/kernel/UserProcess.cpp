@@ -102,14 +102,13 @@ bool UserProcess::addToRetvalList(size_t tid, size_t value){
 bool UserProcess::removeFromThreadList(UserThread* thread)
 {
   threads_lock_.acquire();
-
   // checks if the thread is in list
   size_t tid = thread->getTID();
   if(threads_.find(tid) == threads_.end())
   {
     debug(USERPROCESS, "SHIT: removeFromThreadList() could not find thread with tid [%ld] in list\n", tid);
     threads_lock_.release();
-    assert(false); // assert or not? 
+    //assert(false); // assert or not? 
     return false; 
   }
 
@@ -120,7 +119,7 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   threads_.erase(tid);
   debug(X_USERPROCESS, "removed TID: [%ld] from UserProcess::threads_\n", tid);
 
-  threads_lock_.release();
+  threads_lock_.acquire();
   return true;
 }
 
@@ -144,6 +143,8 @@ size_t UserProcess::createNewThread(size_t start_routine)
 
 void UserProcess::exit(size_t exit_code)
 {
+  threads_lock_.acquire();
+
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
   ustl::vector<UserThread*> to_kill;
   for(auto thread : threads_) // first = tid, secons = *Thread
@@ -154,8 +155,12 @@ void UserProcess::exit(size_t exit_code)
       removeFromThreadList(thread.second);
     }
   }
+
+  
   debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
   killThread((UserThread*)currentThread);
+
+  threads_lock_.acquire();
 }
 
 void UserProcess::killThread(UserThread* thread)

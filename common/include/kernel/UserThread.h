@@ -7,6 +7,10 @@
 
 class UserProcess;
 
+#define THREADSETUP_FIRST 0
+#define THREADSETUP_PTHREAD 1
+#define THREADSETUP_FORK 2
+
 class UserThread : public Thread
 {
   public:
@@ -30,6 +34,17 @@ class UserThread : public Thread
      */
     void Run() override { assert(false && "UserThread::Run() was called...\n"); }
 
+    /**
+     * @brief sets up stack for a thread. 
+     * 
+     * @param first_thread set to #define "THREADSETUP_XXX"
+     * @return true stack set successfully
+     * @return false stack not setup
+     */
+    bool setupStack(int first_thread);
+
+    void* getUserstackStart() { return (void*)userstack_start_; }
+
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }
     // return process of thread
@@ -41,18 +56,13 @@ class UserThread : public Thread
     // setters
     void setLast() { last_ = true; }
   private:
-
-    size_t vpns_for_userstack_[USERSTACK_SIZE];
-    size_t ppns_for_userstack_[USERSTACK_SIZE];
     // the process that contains this thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
-    size_t* userstack_start_;
-    size_t* userstack_end_;
+    size_t userstack_start_;
+    size_t userstack_end_;
     
-
-
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 
 };
