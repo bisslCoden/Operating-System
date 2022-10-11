@@ -149,7 +149,10 @@ void UserProcess::exit(size_t exit_code)
   for(auto thread : threads_) // first = tid, secons = *Thread
   {
     if(unlikely(thread.first = currentThread->getTID()))
+    {
       killThread(thread.second);
+      removeFromThreadList(thread.second);
+    }
   }
   debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
   killThread((UserThread*)currentThread);
