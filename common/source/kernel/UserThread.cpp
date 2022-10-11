@@ -66,8 +66,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   list_of_threads_lock_.release();*/
 
   //Stack Canary setting somehow breaks EVERYTHING for now
-  // *(userstack_start_ + 2 * sizeof(size_t*)) = STACK_CANARY;
-  // *(userstack_end_ + 2 * sizeof(size_t*)) = STACK_CANARY;
+  *(userstack_start_ + 2 * sizeof(size_t*)) = STACK_CANARY;
+  *(userstack_end_ + 2 * sizeof(size_t*)) = STACK_CANARY;
 
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;

@@ -11,7 +11,7 @@ int main()
 {
   printf("Hello!\n");
   pthread_t tid; 
-  int ret = pthread_create(&tid, NULL, (void*)simple_routine, NULL);
+  int ret = pthread_create(&tid, NULL, (void* (*)(void*)) &simple_routine, NULL);
   printf("pthread_create() returned %d and tid %ld\n", ret, tid);
   return 0;
 }
