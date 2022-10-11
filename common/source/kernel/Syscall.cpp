@@ -30,6 +30,7 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       pthread_exit(arg1);
       break; 
     case sc_pthread_join:
+      return_value = pthread_join(arg1, arg2);
       break;
     case sc_sched_yield:
       Scheduler::instance()->yield();
@@ -78,8 +79,9 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 
 void Syscall::exit(size_t exit_code)
 {
-  debug(SYSCALL, "Syscall::EXIT: called, exit_code: %zd by thread: %ld\n", exit_code, currentThread->getTID());
-  currentThread->kill();
+  debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %ld\n", currentThread->getTID(), exit_code);
+  ((UserThread*)currentThread)->getParentProcess()->exit(exit_code);
+  // currentThread->kill();
 }
 
 size_t Syscall::write(size_t fd, pointer buffer, size_t size)
@@ -201,7 +203,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
     assert(false && "how tf did that happen?");
 
   // calling thread creation and settind return value to user's pthread_t thread adress 
-  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread();
+  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread(start_routine);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
   *(size_t*)thread = tid;
 
@@ -211,7 +213,8 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
   return 0;
 }
 
-void Syscall::pthread_exit(size_t value){
+void Syscall::pthread_exit(size_t value)
+{
   UserThread* callingthread = (UserThread*)currentThread;
   size_t my_tid = callingthread->getTID();
   if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
@@ -226,7 +229,8 @@ void Syscall::pthread_exit(size_t value){
   return;
 }
 
-size_t Syscall::pthread_join(size_t thread, size_t value_ptr){
+size_t Syscall::pthread_join(size_t thread, size_t value_ptr)
+{
   UserThread* callingthread = (UserThread*)currentThread;
   size_t retval;
   while (!callingthread->getParentProcess()->getRetVal(thread, &retval))

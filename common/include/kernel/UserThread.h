@@ -19,6 +19,8 @@ class UserThread : public Thread
      */
     UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number);
     
+    UserThread(size_t start_routine, uint32_t terminal_number = 0);
+
     ~UserThread();
 
     /**

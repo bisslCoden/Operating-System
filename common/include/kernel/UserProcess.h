@@ -46,15 +46,29 @@ class UserProcess
     Loader* getLoader() { return loader_; }
     
     /**
-     * @brief Get the nr of threads in list_of_threads_
-     * IMPORTANT: NOT LOCKED, USE list_of_threads_lock_ AROUND FUNCTION CALL
+     * @brief returns threads_.size() but threadsafe
      * 
      * @return size_t the numer of threads
      */
-    size_t getNrOfThreads() { return threads_.size(); }
+    size_t getNrOfThreads();
 
-    // called for pthread_create(). returns tid. obviously missing arguments.
-    size_t createNewThread();
+    /**
+     * @brief Create a New Thread object (pthread_create)
+     * 
+     * @param start_routine which thread should execute
+     * @return size_t thread ID
+     */
+    size_t createNewThread(size_t start_routine);
+
+    /**
+     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * 
+     * @param exit_code 
+     * @return size_t 
+     */
+    void exit(size_t exit_code);
+
+    void killThread(UserThread* thread);
 
     bool getRetVal(size_t tid, size_t* value);
 

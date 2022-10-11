@@ -124,12 +124,44 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
-size_t UserProcess::createNewThread()
+size_t UserProcess::getNrOfThreads()
+{
+  threads_lock_.acquire();
+  size_t number = threads_.size();
+  threads_lock_.release();
+  return number;
+}
+
+size_t UserProcess::createNewThread(size_t start_routine)
 {
   // here the UserThread should be created with a new constructor that's not implemented yet.
-  size_t tid = 123;
+  UserThread* thread = new UserThread(start_routine);
+  if(thread)
+    return thread->getTID();
+  
+  return 0;
+}
 
-  return tid; // must be 0 if fail, TID on success!
+void UserProcess::exit(size_t exit_code)
+{
+  debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  ustl::vector<UserThread*> to_kill;
+  for(auto thread : threads_) // first = tid, secons = *Thread
+  {
+    if(unlikely(thread.first = currentThread->getTID()))
+    {
+      killThread(thread.second);
+      removeFromThreadList(thread.second);
+    }
+  }
+  debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
+  killThread((UserThread*)currentThread);
+}
+
+void UserProcess::killThread(UserThread* thread)
+{
+  debug(USERPROCESS, "PID: [%ld] killThread() called for tid [%ld]\n", pid_, thread->getTID());
+  thread->kill();
 }
 
 bool UserProcess::getRetVal(size_t tid, size_t* value){
