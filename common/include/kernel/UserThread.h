@@ -7,6 +7,14 @@
 
 class UserProcess;
 
+typedef struct Threadflags
+{
+  bool cancelable = true;
+  bool deferred = true;
+  bool joinable = true;
+}Threadflags;
+
+
 class UserThread : public Thread
 {
   public:
@@ -40,6 +48,8 @@ class UserThread : public Thread
 
     // setters
     void setLast() { last_ = true; }
+
+    const Threadflags* getflags(){return &myflags_;}
   private:
 
     size_t vpns_for_userstack_[USERSTACK_SIZE];
@@ -50,6 +60,8 @@ class UserThread : public Thread
     // safe stack start + end ppn
     size_t* userstack_start_;
     size_t* userstack_end_;
+
+    Threadflags myflags_;
     
 
 

@@ -109,7 +109,7 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   {
     debug(USERPROCESS, "SHIT: removeFromThreadList() could not find thread with tid [%ld] in list\n", tid);
     threads_lock_.release();
-    assert(false); // assert or not? 
+    //assert(false); // assert or not? 
     return false; 
   }
 
@@ -123,6 +123,14 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+
+//caution! aquire lock before!!!
+Thread* UserProcess::findInThreadList(size_t tid){
+  if(threads_.find(tid) == threads_.end())
+    return (Thread*) 0x00;
+  return threads_[tid];
+}
+
 
 size_t UserProcess::getNrOfThreads()
 {
