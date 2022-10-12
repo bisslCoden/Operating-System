@@ -198,6 +198,10 @@ uint32 Scheduler::getThreadCount() {
   return threads_.size();
 }
 
+size_t Scheduler::doFork(){
+  return threads_.size();
+}
+
 void Scheduler::printStackTraces()
 {
   lockScheduling();
