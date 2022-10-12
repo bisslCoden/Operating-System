@@ -198,11 +198,6 @@ uint32 Scheduler::getThreadCount() {
   return threads_.size();
 }
 
-size_t Scheduler::doFork(){
-  debug(DB_FORK, " FORK IN SCHEDUELR.CPP");
-  
-  return threads_.size();
-}
 
 void Scheduler::printStackTraces()
 {

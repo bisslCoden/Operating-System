@@ -67,7 +67,7 @@ uint32 Syscall::get_thread_count() {
 }
 
 size_t Syscall::fork(){
-  return Scheduler::instance()->doFork();
+  return Scheduler::instance()->getThreadCount();//placeholder
 }
 
 void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
