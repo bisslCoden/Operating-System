@@ -6,6 +6,10 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
+#define PTHREAD_CANCELED ((void *) -1)
+
+
+
 class Syscall
 {
   public:
@@ -24,9 +28,9 @@ class Syscall
   static void trace();
 
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg);
-  static void pthread_exit(size_t value);
-  static size_t pthread_join(size_t thread, size_t value_ptr);
-  static size_t pthread_cancel(size_t thread);
+  static void pthread_exit(void* value);
+  static size_t pthread_join(size_t thread, void** value_ptr);
+  static int32 pthread_cancel(size_t thread);
 
 };
 

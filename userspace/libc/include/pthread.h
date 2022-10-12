@@ -14,6 +14,8 @@ typedef unsigned int pthread_attr_t;
 typedef unsigned int pthread_mutex_t;
 typedef unsigned int pthread_mutexattr_t;
 
+#define PTHREAD_CANCELED ((void *) -1)
+
 //pthread spinlock typedefs
 typedef unsigned int pthread_spinlock_t;
 

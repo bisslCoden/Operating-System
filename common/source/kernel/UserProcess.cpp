@@ -82,7 +82,7 @@ bool UserProcess::addToThreadList(UserThread* thread)
   return true;
 }
 
-bool UserProcess::addToRetvalList(size_t tid, size_t value){
+bool UserProcess::addToRetvalList(size_t tid, void* value){
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -172,7 +172,7 @@ void UserProcess::killThread(UserThread* thread)
   thread->kill();
 }
 
-bool UserProcess::getRetVal(size_t tid, size_t* value){
+bool UserProcess::getRetVal(size_t tid, void** value){
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {

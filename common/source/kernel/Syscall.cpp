@@ -22,6 +22,12 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
           syscall_number, arg1, arg1, arg2, arg2, arg3, arg3, arg4, arg4, arg5, arg5);
   }
 
+  //call exit with phthread cancelled if the thread can be cancelled
+  UserThread* caller = callingThread;
+  if (caller->getflags()->cancelreq && caller->getflags()->cancelable)
+    Syscall::pthread_exit(PTHREAD_CANCELED);
+  
+
   switch (syscall_number)
   {
     case sc_pthread_create:
@@ -31,10 +37,10 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       return_value = pthread_cancel(arg1);
       break;
     case sc_pthread_exit:
-      pthread_exit(arg1);
+      pthread_exit((void*)arg1);
       break; 
     case sc_pthread_join:
-      return_value = pthread_join(arg1, arg2);
+      return_value = pthread_join(arg1, (void**) arg2);
       break;
     case sc_sched_yield:
       Scheduler::instance()->yield();
@@ -217,7 +223,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
   return 0;
 }
 
-void Syscall::pthread_exit(size_t value)
+void Syscall::pthread_exit(void* value)
 {
   UserThread* callingthread = (UserThread*)currentThread;
   size_t my_tid = callingthread->getTID();
@@ -240,19 +246,29 @@ void Syscall::pthread_exit(size_t value)
   return;
 }
 
-size_t Syscall::pthread_join(size_t thread, size_t value_ptr)
+      //  EDEADLK
+      //         A  deadlock  was  detected (e.g., two threads tried to join with
+      //         each other); or thread specifies the calling thread.
+
+      //  EINVAL thread is not a joinable thread.
+
+      //  EINVAL Another thread is already waiting to join with this thread.
+
+      //  ESRCH  No thread with the ID thread could be found.
+
+size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
   UserThread* callingthread = (UserThread*)currentThread;
-  size_t retval;
+  void* retval;
   while (!callingthread->getParentProcess()->getRetVal(thread, &retval))
   {
     Scheduler::instance()->yield();
   }
-  *(size_t*) value_ptr = retval;
+  *value_ptr = retval;
   return 0;
 }
 
-size_t Syscall::pthread_cancel(size_t thread)
+int32 Syscall::pthread_cancel(size_t thread)
 {
   //TODO:
   //write easy implementation for kernel semaphores
@@ -261,18 +277,24 @@ size_t Syscall::pthread_cancel(size_t thread)
 
   UserThread* current = callingThread;
   current->getParentProcess()->lockThreadMutex();
-  UserThread* cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread);
+  UserThread* cancel_victim;
+  if(! (cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread)))
+    return -1;
   const Threadflags* its_flags = cancel_victim->getflags();
   
-  
-  
-  if (!its_flags->cancelable) //queue cancellation request
+  if (its_flags->cancelable && !its_flags->deferred) //queue cancellation request
   {
+    if(!current->getParentProcess()->addToRetvalList(cancel_victim->getTID(), PTHREAD_CANCELED))
+    {
+      debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+    }
+    cancel_victim->kill();
+    debug(X_USERTHREAD, "Thread [%ld] could be cancelled right away and is now killed!\n", cancel_victim->getTID());
     current->getParentProcess()->unLockThreadMutex();
-    return -1;
+    return 0;
   }
-  
   current->getParentProcess()->unLockThreadMutex();
-
+  cancel_victim->sendCancelRequest();
+  return 0;
 }
 

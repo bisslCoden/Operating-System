@@ -12,6 +12,7 @@ typedef struct Threadflags
   bool cancelable = true;
   bool deferred = true;
   bool joinable = true;
+  bool cancelreq = false;
 }Threadflags;
 
 
@@ -48,6 +49,8 @@ class UserThread : public Thread
 
     // setters
     void setLast() { last_ = true; }
+
+    void sendCancelRequest(){ myflags_.cancelreq = true; }
 
     const Threadflags* getflags(){return &myflags_;}
   private:
