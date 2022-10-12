@@ -71,6 +71,27 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
   switch_to_userspace_ = 1;
 }
 
+UserThread::UserThread(UserProcess *parent) :
+  Thread(parent->getWorkingDir(), parent->getName(), Thread::USER_THREAD,ProcessRegistry::instance()->createID()),
+  parent_process_(parent)
+{
+  loader_ = parent->getLoader();
+
+  ArchThreads::createUserRegisters(user_registers_,
+                                   loader_->getEntryFunction(),
+                                   NULL,
+                                   getKernelStackStartPointer());
+
+  *user_registers_ = *currentThread->user_registers_;
+  user_registers_->rax = 0;
+  user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
+
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+
+  switch_to_userspace_ = 1;
+  ArchThreads::printThreadRegisters(this);
+}
+
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;

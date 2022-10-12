@@ -7,7 +7,7 @@
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
 
-Mutex m_process_running("ProcessRegistry::running_processes");
+
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
 
@@ -100,27 +100,29 @@ size_t ProcessRegistry::processCount()
   return progs_running_;
 }
 
+/* Used to create PIDs
 size_t ProcessRegistry::createUID()
 {
   ArchThreads::atomic_add(process_pids_,1);
   return process_pids_;
 }
+*/
 
 size_t ProcessRegistry::processFork()
 {
-  size_t pid = createUID();
+  size_t pid = createID();
 
-  auto process = new UserProcess(currentThread->"process",pid);
+  auto process = new UserProcess(((UserThread*)currentThread)->getParentProcess(),pid);
 
-  if (!process|| process->pid_==0)
+  if (!process|| process->getPID()==0)
   {
     delete process;
     return -1;
   }
 
-  m_process_running.acquire();
-  processes_running_.insert({pid,process});
-  m_process_running.release();
+  list_of_processes_lock_.acquire();
+  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_lock_.release();
 
   debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
   return pid;

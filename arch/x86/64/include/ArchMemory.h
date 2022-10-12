@@ -3,6 +3,7 @@
 #include "types.h"
 #include "offsets.h"
 #include "paging-definitions.h"
+#include "Mutex.h"
 
 class ArchMemoryMapping
 {
@@ -116,6 +117,8 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
+  void copyVirtualMem(ArchMemory* destination);
+  Mutex arch_memory_lock_;
 private:
 
 /** 

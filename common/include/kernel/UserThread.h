@@ -25,6 +25,8 @@ class UserThread : public Thread
     
     UserThread(size_t start_routine, uint32_t terminal_number = 0);
 
+    UserThread(UserProcess* parent);
+
     ~UserThread();
 
     /**
@@ -55,6 +57,7 @@ class UserThread : public Thread
 
     // setters
     void setLast() { last_ = true; }
+
   private:
     // the process that contains this thread
     UserProcess* parent_process_;

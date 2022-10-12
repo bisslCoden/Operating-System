@@ -13,7 +13,8 @@ PageDirEntry kernel_page_directory[2 * PAGE_DIR_ENTRIES] __attribute__((aligned(
 PageTableEntry kernel_page_table[8 * PAGE_TABLE_ENTRIES] __attribute__((aligned(0x1000)));
 
 
-ArchMemory::ArchMemory()
+ArchMemory::ArchMemory() :
+    arch_memory_lock_("Locks the arch memory")
 {
   debug(X_ARCHMEM, "Archmemory constructor\n");
   page_map_level_4_ = PageManager::instance()->allocPPN();
@@ -308,4 +309,54 @@ uint64 ArchMemory::getRootOfPagingStructure()
 PageMapLevel4Entry* ArchMemory::getRootOfKernelPagingStructure()
 {
   return kernel_page_map_level_4;
+}
+
+void ArchMemory::copyVirtualMem(ArchMemory *destination)
+{
+  arch_memory_lock_.acquire();
+  PageMapLevel4Entry *pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
+  PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination->page_map_level_4_);
+  memcpy((void*) pml4_dest, (void*) pml4, PAGE_SIZE);
+  for(size_t pml4i = 0; pml4i < PAGE_MAP_LEVEL_4_ENTRIES/2; pml4i++)
+  {
+    if(pml4[pml4i].present)
+    {
+      pml4_dest[pml4i].page_ppn = PageManager::instance()->allocPPN();
+
+      PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
+      PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
+      memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
+      for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
+      {
+        if(pdpt[pdpti].pd.present)
+        {
+          pdpt_dest[pdpti].pd.page_ppn = PageManager::instance()->allocPPN();
+          PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
+          PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
+          memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
+          for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
+          {
+            if(pd[pdi].pt.present)
+            {
+              PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
+              PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
+              memcpy((void*) pt_dest, (void*) pt, PAGE_SIZE);
+              for (size_t pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
+              {
+                if(pt[pti].present)
+                {
+                  pt_dest[pti].page_ppn = PageManager::instance()->allocPPN();
+                  void* page = (void*)getIdentAddressOfPPN(pt[pti].page_ppn);
+                  void* page_dest = (void*)getIdentAddressOfPPN(pt_dest[pti].page_ppn);
+                  memcpy(page_dest, page, PAGE_SIZE);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+  }
+  arch_memory_lock_.release();
 }

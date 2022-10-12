@@ -10,6 +10,7 @@
 #include "PageManager.h"
 #include "ArchThreads.h"
 #include "offsets.h"
+#include "VfsSyscall.h"
 
 
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
@@ -42,6 +43,58 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   threads_lock_.acquire();
   threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
   threads_lock_.release();*/
+}
+
+UserProcess::UserProcess(UserProcess *parent, size_t pid) :
+  pid_(pid),
+  fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
+  fs_info_(new FileSystemInfo(*parent->working_dir_)),
+  name_(parent->name_),
+  threads_lock_("UserProcess::threads_lock_"),
+  returnvalue_lock_("UserProcess::retvallock")
+{
+  if(!working_dir_)
+  {
+    //pid_=0;
+    return;
+  }
+
+  if(fd_ >= 0)
+  {
+    loader_ = new Loader(fd_);
+  }
+
+  if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
+  {
+    //pid_=0;
+    return;
+  }
+
+  currentThread->loader_->arch_memory_.copyVirtualMem(&loader_->arch_memory_);
+
+  if(!loader_->loadExecutableAndInitProcess())
+  {
+    //pid_=0;
+    return;
+  }
+
+  //local fd
+
+  auto thread = new UserThread(this);
+  if(!thread || thread->getTID()==0)
+  {
+    delete thread;
+    //pid_=0;
+    return;
+  }
+  threads_lock_.acquire();
+  threads_.insert({thread->getTID(),thread});
+  threads_lock_.release();
+
+  ProcessRegistry::instance()->processStart();
+  Scheduler::instance()->addNewThread(thread);
+  Scheduler::instance()->printThreadList();
+
 }
 
 UserProcess::~UserProcess()

@@ -42,11 +42,6 @@ class ProcessRegistry : public Thread
     size_t processFork();
 
     /**
-     * Generates the userprocess ID for the new process
-     */
-    size_t createUID();
-
-    /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
      *
      * @return ProcessRegistry* to access membermethods
@@ -68,8 +63,9 @@ class ProcessRegistry : public Thread
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
 
-    size_t process_pids_ = 0;
-    ustl::map<long int, UserProcess*> processes_running_;
+    //prevous ID creation for fork for fork
+    //size_t process_pids_ = 0;
+    //ustl::map<long int, UserProcess*> processes_running_;
 
     // Mutexes
 
