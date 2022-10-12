@@ -50,8 +50,8 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 {
   if (PAGEFAULT & OUTPUT_ENABLED)
     kprintfd("\n");
-  debug(PAGEFAULT, "Address: %18zx - Thread %zu: %s (%p)\n",
-        address, currentThread->getTID(), currentThread->getName(), currentThread);
+  debug(PAGEFAULT, "TID: [%zu], Address: %18zx - name: %s (%p)\n",
+        currentThread->getTID(), address, currentThread->getName(), currentThread);
   debug(PAGEFAULT, "Flags: %spresent, %s-mode, %s, %s-fetch, switch to userspace: %1d\n",
         present ? "    " : "not ",
         user ? "  user" : "kernel",

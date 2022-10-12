@@ -58,7 +58,7 @@ class UserProcess
      * @param start_routine which thread should execute
      * @return size_t thread ID
      */
-    size_t createNewThread(size_t start_routine);
+    size_t createNewThread(size_t start_routine, size_t args, size_t wrapper);
 
     /**
      * @brief pushes all threads of process onto list and destroys (currentThread last)

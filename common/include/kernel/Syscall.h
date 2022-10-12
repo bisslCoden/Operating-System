@@ -23,7 +23,7 @@ class Syscall
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
 
-  static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg);
+  static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
   static void pthread_exit(size_t value);
   static size_t pthread_join(size_t thread, size_t value_ptr);
 };

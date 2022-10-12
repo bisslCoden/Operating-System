@@ -131,10 +131,12 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-size_t UserProcess::createNewThread(size_t start_routine)
+size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
 {
-  // here the UserThread should be created with a new constructor that's not implemented yet.
-  UserThread* thread = new UserThread(start_routine);
+  // pthread
+  UserThread* thread = new UserThread(wrapper);
+  thread->user_registers_->rdi = start_routine;
+  thread->user_registers_->rsi = args;
   if(thread)
     return thread->getTID();
   
@@ -149,7 +151,7 @@ void UserProcess::exit(size_t exit_code)
   ustl::vector<UserThread*> to_kill;
   for(auto thread : threads_) // first = tid, secons = *Thread
   {
-    if(unlikely(thread.first = currentThread->getTID()))
+    if(unlikely(thread.first == currentThread->getTID()))
     {
       killThread(thread.second);
       removeFromThreadList(thread.second);

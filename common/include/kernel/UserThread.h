@@ -7,9 +7,7 @@
 
 class UserProcess;
 
-#define THREADSETUP_FIRST 0
-#define THREADSETUP_PTHREAD 1
-#define THREADSETUP_FORK 2
+#define STACK_SIZE_MAX_IN_MB 8
 
 class UserThread : public Thread
 {
@@ -23,7 +21,7 @@ class UserThread : public Thread
      */
     UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number);
     
-    UserThread(size_t start_routine, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, uint32_t terminal_number = 0);
 
     ~UserThread();
 
@@ -35,13 +33,12 @@ class UserThread : public Thread
     void Run() override { assert(false && "UserThread::Run() was called...\n"); }
 
     /**
-     * @brief sets up stack for a thread. 
+     * @brief sets up rsp, allocates ppn, finds vpn,
      * 
-     * @param first_thread set to #define "THREADSETUP_XXX"
      * @return true stack set successfully
-     * @return false stack not setup
+     * @return false stack not setup.
      */
-    bool setupStack(int first_thread);
+    bool setupStack();
 
     void* getUserstackStart() { return (void*)userstack_start_; }
 
@@ -60,8 +57,8 @@ class UserThread : public Thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
-    size_t userstack_start_;
-    size_t userstack_end_;
+    size_t userstack_start_ = 0;
+    size_t userstack_end_ = 0;
     
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 

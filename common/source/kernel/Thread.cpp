@@ -61,13 +61,17 @@ Thread::~Thread()
 // DO NOT use new / delete in this Method, as it is sometimes called from an Interrupt Handler with Interrupts disabled
 void Thread::kill()
 {
-  debug(THREAD, "kill: Called by <%s (%p)>. Preparing Thread <%s (%p)> for destruction\n", currentThread->getName(),
-        currentThread, getName(), this);
+  /* debug(THREAD, "kill called by currentThread->TID: [%ld] lies at: %lx called: <%s>. killing TID: [%ld] at: %lx called: <%s>.\n", 
+                 currentThread->getTID(), (size_t)currentThread, currentThread->getName().c_str(), 
+                 getTID(), (size_t)this, getName().c_str()); */
+
+  debug(THREAD, "kill called by currentThread-> TID: [%ld]. killing TID: [%ld]\n", getTID(), currentThread->getTID());
 
   setState(ToBeDestroyed); // vvv Code below this line may not be executed vvv
 
   if (currentThread == this)
   {
+    debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
     ArchInterrupts::enableInterrupts();
     Scheduler::instance()->yield();
   }
