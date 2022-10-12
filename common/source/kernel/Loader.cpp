@@ -29,7 +29,7 @@ Loader::~Loader()
 
 void Loader::loadPage(pointer virtual_address)
 {
-  debug(LOADER, "Loader:loadPage: Request to load the page for address %p.\n", (void*)virtual_address);
+  debug(LOADER, "Loader:loadPage: Request to load the page for address %p. currentThread: [%ld]\n", (void*)virtual_address, currentThread->getTID());
   const pointer virt_page_start_addr = virtual_address & ~(PAGE_SIZE - 1);
   const pointer virt_page_end_addr = virt_page_start_addr + PAGE_SIZE;
   bool found_page_content = false;
@@ -54,6 +54,7 @@ void Loader::loadPage(pointer virtual_address)
         if(readFromBinary((char *)ArchMemory::getIdentAddressOfPPN(ppn) + virt_offs_on_page, bin_start_addr, bytes_to_load))
         {
           program_binary_lock_.release();
+          debug(X_LOADER, "loadPage() calling freePPN(%ld)\n", ppn);
           PageManager::instance()->freePPN(ppn);
           debug(LOADER, "ERROR! Some parts of the content could not be loaded from the binary.\n");
           Syscall::exit(999);

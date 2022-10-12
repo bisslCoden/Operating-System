@@ -1,8 +1,12 @@
 #pragma once
 
 #include "Thread.h"
+#include "umap.h"
+#include "UserThread.h"
 
-class UserProcess : public Thread
+class UserThread;
+
+class UserProcess
 {
   public:
     /**
@@ -14,11 +18,88 @@ class UserProcess : public Thread
      */
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
 
-    virtual ~UserProcess();
+    ~UserProcess();
 
-    virtual void Run(); // not used
+
+
+    /**
+     * @brief safely adds a userthread to threads
+     * 
+     * @param thread the userthread
+     * @return true if successful
+     * @return false if already found in list
+     */
+    bool addToThreadList(UserThread* thread);
+
+    /**
+     * @brief safely removes userthread from threads_
+     * 
+     * @param thread the userthread
+     * @return true if found in list
+     * @return false if not found
+     */
+    bool removeFromThreadList(UserThread* thread);
+    
+    bool addToRetvalList(size_t tid, size_t value);
+
+    size_t getPID(){ return pid_; }
+    Loader* getLoader() { return loader_; }
+    
+    /**
+     * @brief returns threads_.size() but threadsafe
+     * 
+     * @return size_t the numer of threads
+     */
+    size_t getNrOfThreads();
+
+    /**
+     * @brief Create a New Thread object (pthread_create)
+     * 
+     * @param start_routine which thread should execute
+     * @return size_t thread ID
+     */
+    size_t createNewThread(size_t start_routine);
+
+    /**
+     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * 
+     * @param exit_code 
+     * @return size_t 
+     */
+    void exit(size_t exit_code);
+
+    void killThread(UserThread* thread);
+
+    bool getRetVal(size_t tid, size_t* value);
 
   private:
-    int32 fd_;
+    // the process ID
+    size_t const pid_;
+
+    // the process' fd. see "FileDescriptor.h"
+    ssize_t const fd_;
+
+    // information about the program. path...
+    FileSystemInfo* const fs_info_;
+
+    // loader loads the program
+    Loader* loader_;
+
+    // the directory
+    FileSystemInfo* working_dir_;
+
+    // tells us which terminal is used. i think not relevant for now
+    Terminal* my_terminal_;
+
+    // name of the process.
+    ustl::string name_;
+
+    // a list containing TIDs and their appropriate UserThread*
+    ustl::map<size_t, UserThread*> threads_;
+    Mutex threads_lock_;
+    ustl::map<size_t, size_t> returnvalues_;
+    Mutex returnvalue_lock_;
+
+    // map with tid + return value for join
 };
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Thread.h"
-#include "Mutex.h"
 #include "Condition.h"
+#include "Mutex.h"
+#include "Thread.h"
 #include "UserProcess.h"
 
 class ProcessRegistry : public Thread
@@ -46,9 +46,20 @@ class ProcessRegistry : public Thread
      */
     size_t createUID();
 
+    /**
+     * @brief The instance of the ProcessRegistry. inherits from Thread
+     *
+     * @return ProcessRegistry* to access membermethods
+     */
     static ProcessRegistry* instance();
     void createProcess(const char* path);
 
+    /**
+     * creates an unique ID for every process OR thread ID
+     *
+     * @return size_t the ID
+     */
+    size_t createID();
   private:
 
     char const **progs_;
@@ -62,5 +73,11 @@ class ProcessRegistry : public Thread
 
     // Mutexes
 
+    // ensures unique IDs for TID AND PID
+    size_t next_id_ = 1;
+    Mutex next_id_lock_;
+    // keeping track of processes alive
+    ustl::map<size_t, UserProcess*> list_of_processes_;
+    Mutex list_of_processes_lock_;
 };
 

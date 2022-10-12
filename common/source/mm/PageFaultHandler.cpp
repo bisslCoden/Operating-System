@@ -14,6 +14,7 @@ const size_t PageFaultHandler::null_reference_check_border_ = PAGE_SIZE;
 inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
                                                     bool present, bool switch_to_us)
 {
+  debug(X_PAGEFAULT, "Entered checkPageFaultIsValid(). CurrentThread %p: with name %s\n", currentThread, currentThread->getName());
   assert((user == switch_to_us) && "Thread is in user mode even though is should not be.");
   assert(!(address < USER_BREAK && currentThread->loader_ == 0) && "Thread accesses the user space, but has no loader.");
   assert(!(user && currentThread->user_registers_ == 0) && "Thread is in user mode, but has no valid registers.");
@@ -39,6 +40,7 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
     // everything seems to be okay
     return true;
   }
+  debug(PAGEFAULT, "OH NO... pagefault invalid?!?!?\n");
   return false;
 }
 

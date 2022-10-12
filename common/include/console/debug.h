@@ -44,6 +44,7 @@ const size_t SCHEDULER          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t SYSCALL            = Ansi_Blue    | OUTPUT_ENABLED;
 const size_t MAIN               = Ansi_Red     | OUTPUT_ENABLED;
 const size_t THREAD             = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t USERTHREAD         = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t USERPROCESS        = Ansi_Cyan    | OUTPUT_ENABLED;
 const size_t PROCESS_REG        = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t BACKTRACE          = Ansi_Cyan    | OUTPUT_ENABLED;
@@ -64,7 +65,7 @@ const size_t MMC_DRIVER         = Ansi_Yellow;
 //group arch
 const size_t A_BOOT             = Ansi_Yellow | OUTPUT_ENABLED;
 const size_t A_COMMON           = Ansi_Yellow;
-const size_t A_MEMORY           = Ansi_Yellow;
+const size_t A_MEMORY           = Ansi_Yellow | OUTPUT_ENABLED;
 const size_t A_SERIALPORT       = Ansi_Yellow;
 const size_t A_KB_MANAGER       = Ansi_Yellow;
 const size_t A_INTERRUPTS       = Ansi_Yellow;
@@ -86,3 +87,12 @@ const size_t M_STORAGE_MANAGER  = Ansi_Yellow;
 const size_t M_INODE            = Ansi_Yellow;
 const size_t M_SB               = Ansi_Yellow;
 const size_t M_ZONE             = Ansi_Yellow;
+
+// add your debug message-categories here. pls also use a X_ as prefix as it indicates to X-treme debugging
+const size_t X_PROCESS_REG      = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t X_USERPROCESS      = Ansi_Cyan    | OUTPUT_ENABLED;
+const size_t X_USERTHREAD       = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_PAGEFAULT        = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t X_PAGEMANAGER      = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_LOADER           = Ansi_Green   | OUTPUT_ENABLED;

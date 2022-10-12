@@ -20,6 +20,18 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
 
   switch (syscall_number)
   {
+    case sc_pthread_create:
+      return_value = pthread_create(arg1, arg2, arg3, arg4);
+      break;
+    case sc_pthread_cancel:
+      return_value = -1;
+      break;
+    case sc_pthread_exit:
+      pthread_exit(arg1);
+      break;
+    case sc_pthread_join:
+      return_value = pthread_join(arg1, arg2);
+      break;
     case sc_sched_yield:
       Scheduler::instance()->yield();
       break;
@@ -70,8 +82,9 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 
 void Syscall::exit(size_t exit_code)
 {
-  debug(SYSCALL, "Syscall::EXIT: called, exit_code: %zd\n", exit_code);
-  currentThread->kill();
+  debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %ld\n", currentThread->getTID(), exit_code);
+  ((UserThread*)currentThread)->getParentProcess()->exit(exit_code);
+  // currentThread->kill();
 }
 
 size_t Syscall::write(size_t fd, pointer buffer, size_t size)
@@ -126,6 +139,7 @@ size_t Syscall::close(size_t fd)
 
 size_t Syscall::open(size_t path, size_t flags)
 {
+  debug(SYSCALL, "open called!\n");
   if (path >= USER_BREAK)
   {
     return -1U;
@@ -180,6 +194,56 @@ size_t Syscall::createprocess(size_t path, size_t sleep)
 void Syscall::trace()
 {
   currentThread->printBacktrace();
+}
+
+size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg)
+{
+  debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
+
+  // add as much parameter checking as possible and return -1
+
+  if(currentThread->getType() != Thread::TYPE::USER_THREAD)
+    assert(false && "how tf did that happen?");
+
+  // calling thread creation and settind return value to user's pthread_t thread adress
+  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread(start_routine);
+  debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
+  *(size_t*)thread = tid;
+
+  if(tid == 0)
+    return -1;
+
+  return 0;
+}
+
+void Syscall::pthread_exit(size_t value)
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t my_tid = callingthread->getTID();
+  if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
+  {
+    debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+  }
+  if(currentThread->getTID() == my_tid)
+  {
+    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    // self killing pls lock threads_
+    currentThread->kill();
+  }
+  return;
+}
+
+size_t Syscall::pthread_join(size_t thread, size_t value_ptr)
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  size_t retval;
+  while (!callingthread->getParentProcess()->getRetVal(thread, &retval))
+  {
+    Scheduler::instance()->yield();
+  }
+  *(size_t*) value_ptr = retval;
+  return 0;
+
 }
 
 int Syscall::fork()

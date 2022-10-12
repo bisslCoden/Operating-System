@@ -18,3 +18,7 @@
 #define sc_trace 252
 #define sc_fork 262
 
+#define sc_pthread_create 400
+#define sc_pthread_cancel 401
+#define sc_pthread_exit 402
+#define sc_pthread_join 403
