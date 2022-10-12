@@ -27,6 +27,7 @@ class Scheduler
     void incTicks();
     uint32 getTicks();
     uint32 getThreadCount();
+    size_t doFork();
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
