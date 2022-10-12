@@ -51,7 +51,7 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       pseudols((const char*) arg1, (char*) arg2, arg3);
       break;
     case sc_fork:
-      return_value = createprocess(arg1, arg2);
+      return_value = fork();
       break; 
     case sc_threadcount: 
       return_value = get_thread_count(); 

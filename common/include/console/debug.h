@@ -1,4 +1,4 @@
-#pragma once
+  #pragma once
 
 #include "kprintf.h"
 
@@ -94,3 +94,6 @@ const size_t X_USERTHREAD       = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_PAGEFAULT        = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t X_PAGEMANGER       = Ansi_Green   | OUTPUT_ENABLED;
+
+
+const size_t DB_FORK            = Ansi_Magenta | OUTPUT_ENABLED;

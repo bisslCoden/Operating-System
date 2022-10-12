@@ -18,6 +18,15 @@ class UserProcess
      */
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
 
+     /**
+     * CopyConstructor
+     * @param parent_process
+     *
+     */
+
+    UserProcess(const UserProcess& parent_process);
+
+
     ~UserProcess();
 
     /**
@@ -52,6 +61,9 @@ class UserProcess
   private:
     // the process ID
     size_t const pid_;
+
+    // the parent  process ID
+    //size_t const ppid_;
 
     // the process' fd. see "FileDescriptor.h"
     ssize_t const fd_;

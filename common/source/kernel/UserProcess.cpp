@@ -42,6 +42,16 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   threads_lock_.release();*/
 }
 
+UserProcess::UserProcess(const UserProcess& parent_process) : 
+  pid_(parent_process.pid_),
+  fd_(parent_process.fd_),
+  fs_info_(parent_process.fs_info_),  
+  name_(parent_process.name_),
+  threads_lock_("UserProcess::threads_lock_")
+{
+  debug(DB_FORK, " ENTERING CONSTRUCTOR");
+}
+
 UserProcess::~UserProcess()
 {
   debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
