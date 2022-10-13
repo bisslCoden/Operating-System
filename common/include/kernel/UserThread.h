@@ -15,6 +15,7 @@ typedef struct Threadflags
   bool cancelable = true;
   bool deferred = true;
   bool joinable = true;
+  bool cancelreq = false;
 }Threadflags;
 
 
@@ -59,8 +60,18 @@ class UserThread : public Thread
     //checks for stack over/underflows
     bool isUserStackCanaryOK();
 
+    void lockFlagMutex(){ flag_mutex_.acquire();}
+    void unlockFlagMutex(){ flag_mutex_.release();}
+
+    void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
+    void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
+
+
+
     // setters
     void setLast() { last_ = true; }
+
+    void sendCancelRequest(){ myflags_.cancelreq = true; }
 
     const Threadflags* getflags(){return &myflags_;}
   private:
@@ -70,6 +81,8 @@ class UserThread : public Thread
     // safe stack start + end ppn
     size_t userstack_start_ = 0;
     size_t userstack_end_ = 0;
+
+    Mutex flag_mutex_;
 
     Threadflags myflags_;
 

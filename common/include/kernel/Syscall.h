@@ -6,6 +6,18 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
+#define PTHREAD_CANCELED ((void *) -1)
+
+enum cancelstate {
+    PTHREAD_CANCEL_ENABLE,
+    PTHREAD_CANCEL_DISABLE
+};
+
+enum canceltype {
+    PTHREAD_CANCEL_DEFERRED, 
+    PTHREAD_CANCEL_ASYNCHRONOUS
+};
+
 class Syscall
 {
   public:
@@ -23,10 +35,13 @@ class Syscall
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
 
+  // pthreads
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
-  static void pthread_exit(size_t value);
-  static size_t pthread_join(size_t thread, size_t value_ptr);
-  static size_t pthread_cancel(size_t thread);
+  static void pthread_exit(void* value);
+  static size_t pthread_join(size_t thread, void** value_ptr);
+  static int32 pthread_cancel(size_t thread);
+  static int32 pthread_setcancelstate(int state, int *oldstate);
+  static int32 pthread_setcanceltype(int type, int *oldtype);
 
 };
 

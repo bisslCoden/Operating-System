@@ -81,8 +81,8 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
-
-bool UserProcess::addToRetvalList(size_t tid, size_t value){
+//this function locks internally!
+bool UserProcess::addToRetvalList(size_t tid, void* value){
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -98,16 +98,14 @@ bool UserProcess::addToRetvalList(size_t tid, size_t value){
   return true;
 }
 
-
+//not threadsafe: acquire before
 bool UserProcess::removeFromThreadList(UserThread* thread)
 {
-  threads_lock_.acquire();
   // checks if the thread is in list
   size_t tid = thread->getTID();
   if(threads_.find(tid) == threads_.end())
   {
     debug(USERPROCESS, "SHIT: removeFromThreadList() could not find thread with tid [%ld] in list\n", tid);
-    threads_lock_.release();
     //assert(false); // assert or not? 
     return false; 
   }
@@ -118,8 +116,7 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
 
   threads_.erase(tid);
   debug(X_USERPROCESS, "removed TID: [%ld] from UserProcess::threads_\n", tid);
-
-  threads_lock_.acquire();
+  
   return true;
 }
 
@@ -186,7 +183,7 @@ void UserProcess::killThread(UserThread* thread)
   thread->kill();
 }
 
-bool UserProcess::getRetVal(size_t tid, size_t* value){
+bool UserProcess::getRetVal(size_t tid, void** value){
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {

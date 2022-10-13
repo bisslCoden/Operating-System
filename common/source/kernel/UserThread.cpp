@@ -16,7 +16,7 @@
 // first thread
 UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process) // UserThread's members
+  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}// UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
@@ -48,7 +48,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_)
+  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"}
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
@@ -79,7 +79,11 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
+
+  parent_process_->lockThreadMutex();
   parent_process_->removeFromThreadList(this);
+  parent_process_->unLockThreadMutex();
+
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());

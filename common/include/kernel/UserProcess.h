@@ -42,7 +42,7 @@ class UserProcess
 
     Thread* findInThreadList(size_t tid);
     
-    bool addToRetvalList(size_t tid, size_t value);
+    bool addToRetvalList(size_t tid, void* value);
 
     size_t getPID(){ return pid_; }
     Loader* getLoader() { return loader_; }
@@ -76,7 +76,7 @@ class UserProcess
 
     void killThread(UserThread* thread);
 
-    bool getRetVal(size_t tid, size_t* value);
+    bool getRetVal(size_t tid, void** value);
 
   private:
     // the process ID
@@ -103,7 +103,7 @@ class UserProcess
     // a list containing TIDs and their appropriate UserThread*
     ustl::map<size_t, UserThread*> threads_;
     Mutex threads_lock_;
-    ustl::map<size_t, size_t> returnvalues_;
+    ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
     // map with tid + return value for join
