@@ -40,13 +40,14 @@ int main()
   int retvals[11];
 
   //int ret = pthread_create(&tid, NULL, (void*(*)(void*))++i&simple_routine, NULL);
+  int ret = 0;
   for(size_t i = 0; i < 5; ++i){
-    int ret = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
+    ret = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
   }
   for(size_t i = 5; i < 9; ++i){
-    int ret = pthread_create(&tids[i], NULL, (void*)&simple_routine2, NULL);
+    ret = pthread_create(&tids[i], NULL, (void*)&simple_routine2, NULL);
   }
-  int ret = pthread_create(&tids[10], NULL, (void*)&simple_routine3, NULL);
+  ret = pthread_create(&tids[10], NULL, (void*)&simple_routine3, NULL);
 
   pthread_join(tids[10], (void**)&retvals[10]);
   printf("3 - main again: pthread_create() returned;\n");
@@ -59,5 +60,7 @@ int main()
   for(size_t i = 0; i < 10; ++i){
     printf("thread %ld\treturns: %d\n", tids[i], retvals[i]);
   }
+  // anti warinign
+  printf("%d\n", ret);
   return 0;
 }

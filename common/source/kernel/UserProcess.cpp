@@ -93,7 +93,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
   }
 
   returnvalues_.insert(ustl::make_pair(tid, value));
-  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, value, tid);
+  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
   returnvalue_lock_.release();
   return true;
 }
@@ -116,7 +116,7 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
 
   threads_.erase(tid);
   debug(X_USERPROCESS, "removed TID: [%ld] from UserProcess::threads_\n", tid);
-  
+
   return true;
 }
 
