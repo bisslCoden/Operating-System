@@ -21,6 +21,13 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
   return -1;
 }
 
+int pthread_setcancelstate(int state, int *oldstate){
+  return __syscall(sc_pthread_setcancelstate, (size_t) state, (size_t) oldstate, 0x0, 0x0, 0x0);
+}
+int pthread_setcanceltype(int type, int *oldtype){
+  return __syscall(sc_pthread_setcanceltype, (size_t) type, (size_t) oldtype, 0x0, 0x0, 0x0);
+}
+
 /**
  * function stub
  * posix compatible signature - do not change the signature!

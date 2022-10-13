@@ -47,6 +47,14 @@ class UserThread : public Thread
     //checks for stack over/underflows
     bool isUserStackCanaryOK();
 
+    void lockFlagMutex(){ flag_mutex_.acquire();}
+    void unlockFlagMutex(){ flag_mutex_.release();}
+
+    void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
+    void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
+
+
+
     // setters
     void setLast() { last_ = true; }
 
@@ -63,6 +71,8 @@ class UserThread : public Thread
     // safe stack start + end ppn
     size_t* userstack_start_;
     size_t* userstack_end_;
+
+    Mutex flag_mutex_;
 
     Threadflags myflags_;
     

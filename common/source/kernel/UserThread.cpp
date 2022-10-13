@@ -16,7 +16,7 @@
 // first thread
 UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process) // UserThread's members
+  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}// UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
@@ -83,7 +83,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_)
+  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"}
 {
   debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
@@ -132,7 +132,7 @@ UserThread::~UserThread()
   //}
   //free Stack Pages
   //debug(X_USERTHREAD, "freeing Stack page: %ld for thread [%ld]: %s\n", ppns_for_userstack_[0] ,tid_, name_);
-  debug(X_USERTHREAD, "calling freePPN(%lx) in ~UserThread for thread %ld\n", ppns_for_userstack_[0], getTID());
+  //debug(X_USERTHREAD, "calling freePPN(%lx) in ~UserThread for thread %ld\n", ppns_for_userstack_[0], getTID());
   // PageManager::instance()->freePPN(ppns_for_userstack_[0]);
   
   /* vpns_for_userstack currently not set
@@ -145,7 +145,10 @@ UserThread::~UserThread()
 
   //delete Thread from Process and sheduler
   // calls delete for process if the thread is the last thread
+  parent_process_->lockThreadMutex();
   parent_process_->removeFromThreadList(this);
+  parent_process_->unLockThreadMutex();
+
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]\n", getTID(), parent_process_->getPID());

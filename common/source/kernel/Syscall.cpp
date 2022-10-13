@@ -24,8 +24,14 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
 
   //call exit with phthread cancelled if the thread can be cancelled
   UserThread* caller = callingThread;
+  caller->lockFlagMutex();
   if (caller->getflags()->cancelreq && caller->getflags()->cancelable)
+  {
+    caller->unlockFlagMutex();
     Syscall::pthread_exit(PTHREAD_CANCELED);
+  }
+  caller->unlockFlagMutex();
+
   
 
   switch (syscall_number)
@@ -71,6 +77,12 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       break;
     case sc_pseudols:
       pseudols((const char*) arg1, (char*) arg2, arg3);
+      break;
+    case sc_pthread_setcancelstate:
+      return_value = pthread_setcancelstate((int) arg1, (int*) arg2);
+      break;
+    case sc_pthread_setcanceltype:
+      return_value = pthread_setcanceltype((int) arg1, (int*) arg2);
       break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
@@ -227,24 +239,53 @@ void Syscall::pthread_exit(void* value)
 {
   UserThread* callingthread = (UserThread*)currentThread;
   size_t my_tid = callingthread->getTID();
+  
+  callingthread->getParentProcess()->lockThreadMutex();
+  
   if(!callingthread->getParentProcess()->addToRetvalList(my_tid, value))
+    debug(USERPROCESS, "UserThread retval already in list: This should already have been thrown!\n");
+  if (callingthread->getParentProcess()->findInThreadList(my_tid) != 0x00)
   {
-    debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
+    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    callingthread->getParentProcess()->unLockThreadMutex();
+    currentThread->kill();
   }
-  if(currentThread->getTID() == my_tid)
+  else
   {
-    callingthread->getParentProcess()->lockThreadMutex();
-    if (callingthread->getParentProcess()->findInThreadList(my_tid) != 0x00)
-    {
-      debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
-      currentThread->kill();
-    }
-    else
-      debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
+    debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
     callingthread->getParentProcess()->unLockThreadMutex();
   }
   return;
 }
+
+int32 Syscall::pthread_setcancelstate(int state, int *oldstate)
+{
+  if((state != 1) && (state != 0))
+  {
+    debug(X_USERTHREAD, "got a wrong arg as cancelstate!\n");
+    return -1;
+  }
+  UserThread* callingthread = (UserThread*)currentThread;
+  callingthread->lockFlagMutex();
+  *oldstate = (int) !callingthread->getflags()->cancelable;
+  callingthread->setCancelState(state);
+  callingthread->unlockFlagMutex();
+  return 0;
+};
+int32 Syscall::pthread_setcanceltype(int type, int *oldtype){
+   if((type != 1) && (type != 0))
+  {
+    debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
+    return -1;
+  }
+  UserThread* callingthread = (UserThread*)currentThread;
+  callingthread->lockFlagMutex();
+  *oldtype = (int) !callingthread->getflags()->cancelable;
+  callingthread->setCancelState(type);
+  callingthread->unlockFlagMutex();
+  return 0;
+}
+
 
       //  EDEADLK
       //         A  deadlock  was  detected (e.g., two threads tried to join with
@@ -260,11 +301,32 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
   UserThread* callingthread = (UserThread*)currentThread;
   void* retval;
+
+  //catch edgecases
+  if(thread == callingthread->getTID())
+    return -1;
+  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before threadlock\n", callingthread->getTID(), thread);
+  callingthread->getParentProcess()->lockThreadMutex();
+  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; afeter threadlock\n", callingthread->getTID(), thread);
+
+  debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before retvallock\n", callingthread->getTID(), thread);
+  if (!callingthread->getParentProcess()->getRetVal(thread, &retval) && !callingthread->getParentProcess()->findInThreadList(thread))
+  {
+    debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock AND thread didnt exist\n", callingthread->getTID(), thread);
+    callingthread->getParentProcess()->unLockThreadMutex();
+    return -1;
+  }
+  debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock\n", callingthread->getTID(), thread);
   while (!callingthread->getParentProcess()->getRetVal(thread, &retval))
   {
+    debug(X_USERTHREAD, "[%ld] didn't find retval yet!\n", callingthread->getTID());
+    callingthread->getParentProcess()->unLockThreadMutex();
     Scheduler::instance()->yield();
+    callingthread->getParentProcess()->lockThreadMutex();
   }
+  callingthread->getParentProcess()->unLockThreadMutex();
   *value_ptr = retval;
+  debug(X_USERTHREAD, "[%ld]MANAGED to join [%ld]\n", callingthread->getTID(), thread);
   return 0;
 }
 
@@ -279,7 +341,11 @@ int32 Syscall::pthread_cancel(size_t thread)
   current->getParentProcess()->lockThreadMutex();
   UserThread* cancel_victim;
   if(! (cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread)))
+  {
+    current->getParentProcess()->unLockThreadMutex();
     return -1;
+  }
+  cancel_victim->lockFlagMutex();
   const Threadflags* its_flags = cancel_victim->getflags();
   
   if (its_flags->cancelable && !its_flags->deferred) //queue cancellation request
@@ -288,11 +354,14 @@ int32 Syscall::pthread_cancel(size_t thread)
     {
       debug(USERPROCESS, "Userproc retval already in list: This should already have been thrown!\n");
     }
-    cancel_victim->kill();
     debug(X_USERTHREAD, "Thread [%ld] could be cancelled right away and is now killed!\n", cancel_victim->getTID());
+    
+    cancel_victim->unlockFlagMutex();
     current->getParentProcess()->unLockThreadMutex();
+    cancel_victim->kill();
     return 0;
   }
+  cancel_victim->unlockFlagMutex();
   current->getParentProcess()->unLockThreadMutex();
   cancel_victim->sendCancelRequest();
   return 0;
