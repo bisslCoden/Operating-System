@@ -56,17 +56,12 @@ class UserThread : public Thread
     bool isLast() { return last_; }
     // return process of thread
     UserProcess* getParentProcess() { return parent_process_; }
-    
-    //checks for stack over/underflows
-    bool isUserStackCanaryOK();
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
 
     void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
     void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
-
-
 
     // setters
     void setLast() { last_ = true; }

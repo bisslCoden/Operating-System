@@ -93,11 +93,6 @@ UserThread::~UserThread()
   switch_to_userspace_ = 1;
 }
 
-bool UserThread::isUserStackCanaryOK()
-{
-  return (userstack_start_ == STACK_CANARY && userstack_end_ == STACK_CANARY);
-}
-
 bool UserThread::setupStack()
 {
   debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
