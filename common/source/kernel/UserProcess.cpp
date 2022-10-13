@@ -146,7 +146,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
   }
 
   returnvalues_.insert(ustl::make_pair(tid, value));
-  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list", pid_, value, tid);
+  //debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list", pid_, value, tid);
   returnvalue_lock_.release();
   return true;
 }

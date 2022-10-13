@@ -73,7 +73,7 @@ UserThread::UserThread(size_t start_routine, uint32_t terminal_number) :
 
 UserThread::UserThread(UserProcess *parent) :
   Thread(parent->getWorkingDir(), parent->getName(), Thread::USER_THREAD,ProcessRegistry::instance()->createID()),
-  parent_process_(parent)
+  parent_process_(parent),flag_mutex_{"thread::flag_mutex_"}
 {
   loader_ = parent->getLoader();
 
@@ -133,7 +133,7 @@ UserThread::~UserThread()
 
 bool UserThread::isUserStackCanaryOK()
 {
-  return (userstack_start_ == STACK_CANARY && userstack_end_ == STACK_CANARY);
+  return ((size_t) userstack_start_ == STACK_CANARY && (size_t) userstack_end_ == STACK_CANARY);
 }
 
 bool UserThread::setupStack(int first_thread)
@@ -144,16 +144,16 @@ bool UserThread::setupStack(int first_thread)
   bool vpn_mapped = false;
   if(first_thread == THREADSETUP_FIRST)
   {
-    userstack_start_= USER_BREAK - sizeof(size_t);
-    vpn_for_stack = userstack_start_ / PAGE_SIZE;
+    userstack_start_= (size_t*)(USER_BREAK - sizeof(size_t));
+    vpn_for_stack = ((size_t)userstack_start_) / PAGE_SIZE;
     ppn_for_stack = PageManager::instance()->allocPPN();
     vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
   }
   else if(first_thread == THREADSETUP_PTHREAD)
   {
     size_t stack_page_offset = getTID() * PAGE_SIZE;
-    userstack_start_ = USER_BREAK - sizeof(size_t) - stack_page_offset;
-    vpn_for_stack = userstack_start_ / PAGE_SIZE;
+    userstack_start_ =(size_t*) (USER_BREAK - sizeof(size_t) - stack_page_offset);
+    vpn_for_stack = ((size_t)userstack_start_) / PAGE_SIZE;
     ppn_for_stack = PageManager::instance()->allocPPN();
     vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
   }
