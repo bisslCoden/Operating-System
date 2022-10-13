@@ -11,6 +11,15 @@ class UserProcess;
 #define THREADSETUP_PTHREAD 1
 #define THREADSETUP_FORK 2
 
+typedef struct Threadflags
+{
+  bool cancelable = true;
+  bool deferred = true;
+  bool joinable = true;
+  bool cancelreq = false;
+}Threadflags;
+
+
 class UserThread : public Thread
 {
   public:
@@ -37,8 +46,8 @@ class UserThread : public Thread
     void Run() override { assert(false && "UserThread::Run() was called...\n"); }
 
     /**
-     * @brief sets up stack for a thread. 
-     * 
+     * @brief sets up stack for a thread.
+     *
      * @param first_thread set to #define "THREADSETUP_XXX"
      * @return true stack set successfully
      * @return false stack not setup
@@ -55,17 +64,37 @@ class UserThread : public Thread
     //checks for stack over/underflows
     bool isUserStackCanaryOK();
 
+    void lockFlagMutex(){ flag_mutex_.acquire();}
+    void unlockFlagMutex(){ flag_mutex_.release();}
+
+    void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
+    void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
+
+
+
     // setters
     void setLast() { last_ = true; }
 
+    void sendCancelRequest(){ myflags_.cancelreq = true; }
+
+    const Threadflags* getflags(){return &myflags_;}
   private:
+
+    size_t vpns_for_userstack_[USERSTACK_SIZE];
+    size_t ppns_for_userstack_[USERSTACK_SIZE];
     // the process that contains this thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
-    size_t userstack_start_;
-    size_t userstack_end_;
+    size_t* userstack_start_;
+    size_t* userstack_end_;
+
+    Mutex flag_mutex_;
+
+    Threadflags myflags_;
     
+
+
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 
 };
