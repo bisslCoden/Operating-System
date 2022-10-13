@@ -93,7 +93,7 @@ bool UserProcess::addToRetvalList(size_t tid, size_t value){
   }
 
   returnvalues_.insert(ustl::make_pair(tid, value));
-  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list", pid_, value, tid);
+  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, value, tid);
   returnvalue_lock_.release();
   return true;
 }
@@ -135,6 +135,13 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
 {
   // pthread
   UserThread* thread = new UserThread(wrapper);
+  /*First Argument: RDI
+    Second Argument: RSI
+    Third Argument: RDX
+    Fourth Argument: RCX
+    Fifth Argument: R8
+    Sixth Argument: R9
+  */
   thread->user_registers_->rdi = start_routine;
   thread->user_registers_->rsi = args;
   if(thread)
@@ -149,7 +156,7 @@ void UserProcess::exit(size_t exit_code)
 
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
   ustl::vector<UserThread*> to_kill;
-  for(auto thread : threads_) // first = tid, secons = *Thread
+  for(auto thread : threads_) // first = tid, second = *Thread
   {
     if(unlikely(thread.first == currentThread->getTID()))
     {
