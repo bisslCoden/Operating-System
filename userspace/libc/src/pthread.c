@@ -49,7 +49,7 @@ void pthread_exit(void *value_ptr)
  */
 int pthread_cancel(pthread_t thread)
 {
-  return -1;
+  return __syscall(sc_pthread_cancel, (size_t) thread, 0x0, 0x0, 0x0, 0x0);
 }
 
 /**

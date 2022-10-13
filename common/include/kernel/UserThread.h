@@ -7,7 +7,16 @@
 
 class UserProcess;
 
+
 #define STACK_SIZE_MAX_IN_MB 8
+
+typedef struct Threadflags
+{
+  bool cancelable = true;
+  bool deferred = true;
+  bool joinable = true;
+}Threadflags;
+
 
 class UserThread : public Thread
 {
@@ -52,6 +61,8 @@ class UserThread : public Thread
 
     // setters
     void setLast() { last_ = true; }
+
+    const Threadflags* getflags(){return &myflags_;}
   private:
     // the process that contains this thread
     UserProcess* parent_process_;
@@ -59,6 +70,9 @@ class UserThread : public Thread
     // safe stack start + end ppn
     size_t userstack_start_ = 0;
     size_t userstack_end_ = 0;
+
+    Threadflags myflags_;
+
     
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 

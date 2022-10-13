@@ -4,6 +4,10 @@
 #include "offsets.h"
 #include "paging-definitions.h"
 
+//vpn to adress shift by 12 or divide through Page size
+//userbreak ends 0x8000000
+// vadress % Page size : get offset
+
 class ArchMemoryMapping
 {
   public:

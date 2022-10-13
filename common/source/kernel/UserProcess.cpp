@@ -123,6 +123,14 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
+//caution! aquire lock before!!!
+Thread* UserProcess::findInThreadList(size_t tid){
+  if(threads_.find(tid) == threads_.end())
+    return (Thread*) 0x00;
+  return threads_[tid];
+}
+
+
 size_t UserProcess::getNrOfThreads()
 {
   threads_lock_.acquire();

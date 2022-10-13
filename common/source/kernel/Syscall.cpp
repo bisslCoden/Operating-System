@@ -8,6 +8,10 @@
 #include "ProcessRegistry.h"
 #include "File.h"
 
+
+#define callingThread (UserThread*) currentThread 
+
+
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
   size_t return_value = 0;
@@ -24,7 +28,7 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
       return_value = pthread_create(arg1, arg2, arg3, arg4, arg5);
       break;
     case sc_pthread_cancel:
-      return_value = -1;
+      return_value = pthread_cancel(arg1);
       break;
     case sc_pthread_exit:
       pthread_exit(arg1);
@@ -223,9 +227,15 @@ void Syscall::pthread_exit(size_t value)
   }
   if(currentThread->getTID() == my_tid)
   {
-    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
-    // self killing pls lock threads_
-    currentThread->kill();
+    callingthread->getParentProcess()->lockThreadMutex();
+    if (callingthread->getParentProcess()->findInThreadList(my_tid) != 0x00)
+    {
+      debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+      currentThread->kill();
+    }
+    else
+      debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
+    callingthread->getParentProcess()->unLockThreadMutex();
   }
   return;
 }
@@ -240,6 +250,29 @@ size_t Syscall::pthread_join(size_t thread, size_t value_ptr)
   }
   *(size_t*) value_ptr = retval;
   return 0;
+}
+
+size_t Syscall::pthread_cancel(size_t thread)
+{
+  //TODO:
+  //write easy implementation for kernel semaphores
+  //post on that sem whenever syscall entry
+  //find out which case it is and do the apropriate thing :D
+
+  UserThread* current = callingThread;
+  current->getParentProcess()->lockThreadMutex();
+  UserThread* cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread);
+  const Threadflags* its_flags = cancel_victim->getflags();
   
+  
+  
+  if (!its_flags->cancelable) //queue cancellation request
+  {
+    current->getParentProcess()->unLockThreadMutex();
+    return -1;
+  }
+  
+  current->getParentProcess()->unLockThreadMutex();
+  return 0;
 }
 

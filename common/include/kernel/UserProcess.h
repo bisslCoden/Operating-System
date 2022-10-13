@@ -39,6 +39,8 @@ class UserProcess
      * @return false if not found
      */
     bool removeFromThreadList(UserThread* thread);
+
+    Thread* findInThreadList(size_t tid);
     
     bool addToRetvalList(size_t tid, size_t value);
 
@@ -51,6 +53,10 @@ class UserProcess
      * @return size_t the numer of threads
      */
     size_t getNrOfThreads();
+
+    void lockThreadMutex(){threads_lock_.acquire();}
+    void unLockThreadMutex(){threads_lock_.release();}
+
 
     /**
      * @brief Create a New Thread object (pthread_create)
