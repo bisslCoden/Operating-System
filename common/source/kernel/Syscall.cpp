@@ -25,8 +25,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
   //call exit with phthread cancelled if the thread can be cancelled
   UserThread* caller = callingThread;
   caller->lockFlagMutex();
-  if (caller->getflags()->cancelreq && caller->getflags()->cancelable)
+  if (caller->getflags()->cancelreq && (caller->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
   {
+    debug(X_USERTHREAD, "Thread[%ld]: canceling on a deferr point\n", caller->getTID());
     caller->unlockFlagMutex();
     Syscall::pthread_exit(PTHREAD_CANCELED);
   }
@@ -258,7 +259,7 @@ void Syscall::pthread_exit(void* value)
   return;
 }
 
-int32 Syscall::pthread_setcancelstate(int state, int *oldstate)
+int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
 {
   if((state != 1) && (state != 0))
   {
@@ -267,12 +268,19 @@ int32 Syscall::pthread_setcancelstate(int state, int *oldstate)
   }
   UserThread* callingthread = (UserThread*)currentThread;
   callingthread->lockFlagMutex();
-  *oldstate = (int) !callingthread->getflags()->cancelable;
+  *oldstate = callingthread->getflags()->cancelable;
   callingthread->setCancelState(state);
+
+  debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", callingthread->getTID(), state);
+  if(state == PTHREAD_CANCEL_ENABLE && callingthread->getflags()->cancelreq)
+  {
+    callingthread->unlockFlagMutex();
+    pthread_exit(PTHREAD_CANCELED);
+  }
   callingthread->unlockFlagMutex();
   return 0;
 };
-int32 Syscall::pthread_setcanceltype(int type, int *oldtype){
+int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
    if((type != 1) && (type != 0))
   {
     debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
@@ -280,8 +288,17 @@ int32 Syscall::pthread_setcanceltype(int type, int *oldtype){
   }
   UserThread* callingthread = (UserThread*)currentThread;
   callingthread->lockFlagMutex();
-  *oldtype = (int) !callingthread->getflags()->cancelable;
-  callingthread->setCancelState(type);
+  *oldtype = callingthread->getflags()->cancelable;
+  callingthread->setCancelType(type);
+  //debug(X_USERTHREAD, "[%ld]: just changed my type from %d to: %d!\n" ,callingthread->getTID(), *oldtype, type);
+  //debug(X_USERTHREAD, "[%ld]: now my flags are: state: %d type: %d\n", callingthread->getTID(),
+  //callingthread->getflags()->cancelable, callingthread->getflags()->deferred);
+  if(type == PTHREAD_CANCEL_ASYNCHRONOUS && callingthread->getflags()->cancelreq
+  && callingthread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE)
+  {
+    callingthread->unlockFlagMutex();
+    pthread_exit(PTHREAD_CANCELED);
+  }
   callingthread->unlockFlagMutex();
   return 0;
 }
@@ -330,12 +347,14 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   return 0;
 }
 
+
 int32 Syscall::pthread_cancel(size_t thread)
 {
   //TODO:
   //write easy implementation for kernel semaphores
   //post on that sem whenever syscall entry
   //find out which case it is and do the apropriate thing :D
+
 
   UserThread* current = callingThread;
   current->getParentProcess()->lockThreadMutex();
@@ -345,10 +364,12 @@ int32 Syscall::pthread_cancel(size_t thread)
     current->getParentProcess()->unLockThreadMutex();
     return -1;
   }
+  debug(X_USERTHREAD, "Thread [%ld] is tryin' to cancel [%ld]!\n",current->getTID(), cancel_victim->getTID());
   cancel_victim->lockFlagMutex();
-  const Threadflags* its_flags = cancel_victim->getflags();
+  Threadflags* its_flags = cancel_victim->getflags();
   
-  if (its_flags->cancelable && !its_flags->deferred) //queue cancellation request
+  if ((its_flags->cancelable == PTHREAD_CANCEL_ENABLE) && 
+    its_flags->deferred == PTHREAD_CANCEL_ASYNCHRONOUS) //queue cancellation request
   {
     if(!current->getParentProcess()->addToRetvalList(cancel_victim->getTID(), PTHREAD_CANCELED))
     {
@@ -361,6 +382,10 @@ int32 Syscall::pthread_cancel(size_t thread)
     cancel_victim->kill();
     return 0;
   }
+  else
+    debug(X_USERTHREAD, "Thread [%ld]: could not kill bc its flags were state: %d type: %d!\n", current->getTID(), cancel_victim->getflags()->cancelable,
+    cancel_victim->getflags()->deferred);
+
   cancel_victim->unlockFlagMutex();
   current->getParentProcess()->unLockThreadMutex();
   cancel_victim->sendCancelRequest();

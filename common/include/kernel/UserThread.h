@@ -5,16 +5,31 @@
 #include "Condition.h"
 #include "UserProcess.h"
 
+#define PTHREAD_CANCELED ((void *) -1)
+#define STACK_SIZE_MAX_IN_MB 8
+
 class UserProcess;
 
+enum cancelstate {
+    PTHREAD_CANCEL_ENABLE,
+    PTHREAD_CANCEL_DISABLE
+};
 
-#define STACK_SIZE_MAX_IN_MB 8
+enum canceltype {
+    PTHREAD_CANCEL_DEFERRED, 
+    PTHREAD_CANCEL_ASYNCHRONOUS
+};
+
+
+
+
 
 typedef struct Threadflags
 {
-  bool cancelable = true;
-  bool deferred = true;
-  bool joinable = true;
+  int cancelable = PTHREAD_CANCEL_ENABLE;
+  int deferred = PTHREAD_CANCEL_DEFERRED;
+  //TODO joinable
+  int joinable = true;
   bool cancelreq = false;
 }Threadflags;
 
@@ -60,15 +75,16 @@ class UserThread : public Thread
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
 
-    void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
-    void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
+    void setCancelState(int state){ myflags_.cancelable = state; return;}
+    void setCancelType(int type) { myflags_.deferred = type; return; }
 
     // setters
     void setLast() { last_ = true; }
 
     void sendCancelRequest(){ myflags_.cancelreq = true; }
 
-    const Threadflags* getflags(){return &myflags_;}
+    Threadflags* getflags(){return &myflags_;}
+  
   private:
     // the process that contains this thread
     UserProcess* parent_process_;

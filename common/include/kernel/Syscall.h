@@ -6,17 +6,6 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
-#define PTHREAD_CANCELED ((void *) -1)
-
-enum cancelstate {
-    PTHREAD_CANCEL_ENABLE,
-    PTHREAD_CANCEL_DISABLE
-};
-
-enum canceltype {
-    PTHREAD_CANCEL_DEFERRED, 
-    PTHREAD_CANCEL_ASYNCHRONOUS
-};
 
 class Syscall
 {
@@ -41,8 +30,8 @@ class Syscall
   static size_t pthread_join(size_t thread, void** value_ptr);
   // cancel not 100% working
   static int32 pthread_cancel(size_t thread);
-  static int32 pthread_setcancelstate(int state, int *oldstate);
-  static int32 pthread_setcanceltype(int type, int *oldtype);
+  static int32 pthread_setcancelstate(int32 state, int32* oldstate);
+  static int32 pthread_setcanceltype(int32 type, int32* oldtype);
 
 };
 
