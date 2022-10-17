@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <pthread.h>
+#include "pthread.h"
 #include <unistd.h>
 
 pthread_t tids[12];
@@ -9,14 +9,16 @@ int fastroutine()
     int old;
    // pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
     printf("graceful exit!\n");
-    pthread_exit(99);
+    pthread_exit((void*)99);
+    return 1;
 }
 
 int stupidroutine(){
     int retval;
+    int ret;
     for (size_t i = 0; i < 12; i++)
     {
-        int ret = pthread_join(tids[i], retval);
+        ret = pthread_join(tids[i], (void**)&retval);
         printf("ret stupid: %d for joining %ld\n", ret, tids[i]);
     }
     return 1;
@@ -25,7 +27,8 @@ int stupidroutine(){
 
 int main()
 {
-    int retvals[10];
+    int ret;
+    int retvals[12];
     for (size_t i = 0; i < 10; i++)
     {
         pthread_create(&tids[i], NULL, (void* (*)(void*))&fastroutine, NULL);
@@ -34,9 +37,9 @@ int main()
     {
         pthread_create(&tids[i+10], NULL, (void* (*)(void*))&stupidroutine, NULL);
     }
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 12; i++)
     {
-        int ret = pthread_join(tids[i], &retvals[i]);
+        ret =  pthread_join(tids[i], (void**)&retvals[i]);
         printf("join returned: %d was able to join %ld got val %d\n",ret, i, retvals[i]);
     }
     return 0;
