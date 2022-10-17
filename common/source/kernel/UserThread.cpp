@@ -86,8 +86,12 @@ UserThread::~UserThread()
   parent_process_->removeFromThreadList(this);
   parent_process_->addToRetvalList(tid_, myret_);
   parent_process_->unLockThreadMutex();
+  debug(X_USERTHREAD, "signaling join now!\n");
+  condition_mutex_.acquire();
   join_cond_.signal();
+  condition_mutex_.release();
 
+  debug(X_USERTHREAD, "after join now!\n");
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());

@@ -321,6 +321,7 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
       //  EINVAL Another thread is already waiting to join with this thread.
 
       //  ESRCH  No thread with the ID thread could be found.
+  //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
@@ -358,7 +359,9 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     }
     callingthread->unlockJoin();
     callingthread->getParentProcess()->unLockThreadMutex();
+    debug(X_USERTHREAD, "thread [%ld] now trying to wait\n", callingthread->getTID());
     join_victim->waitJoin();
+    debug(X_USERTHREAD, "thread [%ld] got OUT of wait\n", callingthread->getTID());
     if (!callingthread->getParentProcess()->getRetVal(thread, &retval))
       debug(X_USERTHREAD, "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
     join_victim->unlockJoin();

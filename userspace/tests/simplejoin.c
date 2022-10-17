@@ -16,13 +16,10 @@ int fastroutine()
 
 int main()
 {
-    int retval;
+    int ret;
+    int returner;
     pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
-    //sleep(1);
-    
-    if(pthread_cancel(tid) != 0)
-        printf("cancel didnt work!\n");
-    pthread_join(tid, (void**) &retval);
-    printf("got the retval: %d\n", retval);
+    returner =  pthread_join(tid, (void**)&ret);
+    printf("join returned: %d got val %d\n",returner, ret);
     return 0;
 }
