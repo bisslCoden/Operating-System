@@ -6,17 +6,20 @@
 
 int main(int argc, char** argv)
 {
+  printf("Call to Fork!\n");
   int pid = fork();
-  printf("Hello there\n");
   printf("pid: %d\n", pid);
-  if (pid == 0)
+  if (!pid)
   {
-    printf("[%d] Hello from Child!\n", pid);
+    printf("[%d] I am the Child!\n", pid);
   }
-  else
+  else if (pid > 0)
   {
-    printf("[%d] Hello from Parent!\n", pid);
+    printf("[%d] I am the Parent!\n", pid);
     assert (pid != 0);  // hello
+  }else
+  {
+    printf("Error while forking!");
   }
   return 0;
 }

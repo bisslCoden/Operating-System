@@ -33,7 +33,7 @@ typedef struct Threadflags
   bool cancelreq = false;
 }Threadflags;
 
->>>>>>>>> Temporary merge branch 2
+//>>>>>>>>> Temporary merge branch 2
 
 class UserThread : public Thread
 {
@@ -49,7 +49,7 @@ class UserThread : public Thread
     
     UserThread(size_t wrapper, uint32_t terminal_number = 0);
 
-    UserThread(UserProcess* parent);
+    UserThread(UserProcess* child, UserThread* parent_thread);
 
     ~UserThread();
 
@@ -100,7 +100,7 @@ class UserThread : public Thread
 
     Threadflags myflags_;
 
->>>>>>>>> Temporary merge branch 2
+//>>>>>>>>> Temporary merge branch 2
 
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 

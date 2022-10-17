@@ -75,22 +75,22 @@ UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
   switch_to_userspace_ = 1;
 }
 
-UserThread::UserThread(UserProcess *parent) :
-  Thread(parent->getWorkingDir(), parent->getName(), Thread::USER_THREAD,ProcessRegistry::instance()->createID()),
-  parent_process_(parent),flag_mutex_{"thread::flag_mutex_"}
+UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
+  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
+  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}
 {
-  loader_ = parent->getLoader();
+  loader_ = child->getLoader();
 
   ArchThreads::createUserRegisters(user_registers_,
-                                   loader_->getEntryFunction(),
-                                   NULL,
+                                   (void*) parent_thread,
+                                   (void*) userstack_start_,
                                    getKernelStackStartPointer());
 
-  *user_registers_ = *currentThread->user_registers_;
+  memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
   switch_to_userspace_ = 1;
   ArchThreads::printThreadRegisters(this);

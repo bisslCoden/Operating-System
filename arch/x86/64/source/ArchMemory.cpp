@@ -311,12 +311,14 @@ PageMapLevel4Entry* ArchMemory::getRootOfKernelPagingStructure()
   return kernel_page_map_level_4;
 }
 
-void ArchMemory::copyVirtualMem(ArchMemory *destination)
+void ArchMemory::copyVirtualMem(ArchMemory &destination)
 {
+  debug(A_MEMORY, "Entering copyVirtualMem function!\n");
   arch_memory_lock_.acquire();
   PageMapLevel4Entry *pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
-  PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination->page_map_level_4_);
+  PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
   memcpy((void*) pml4_dest, (void*) pml4, PAGE_SIZE);
+  debug(A_MEMORY, "Copying the pml4!\n");
   for(size_t pml4i = 0; pml4i < PAGE_MAP_LEVEL_4_ENTRIES/2; pml4i++)
   {
     if(pml4[pml4i].present)
@@ -326,6 +328,7 @@ void ArchMemory::copyVirtualMem(ArchMemory *destination)
       PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
       memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
+      debug(A_MEMORY, "Copying the pdpt!\n");
       for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
       {
         if(pdpt[pdpti].pd.present)
@@ -334,6 +337,7 @@ void ArchMemory::copyVirtualMem(ArchMemory *destination)
           PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
           PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
           memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
+          debug(A_MEMORY, "Copying the pd!\n");
           for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
           {
             if(pd[pdi].pt.present)
@@ -341,6 +345,7 @@ void ArchMemory::copyVirtualMem(ArchMemory *destination)
               PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
               memcpy((void*) pt_dest, (void*) pt, PAGE_SIZE);
+              debug(A_MEMORY, "Copying the pt!\n");
               for (size_t pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
               {
                 if(pt[pti].present)
@@ -349,6 +354,7 @@ void ArchMemory::copyVirtualMem(ArchMemory *destination)
                   void* page = (void*)getIdentAddressOfPPN(pt[pti].page_ppn);
                   void* page_dest = (void*)getIdentAddressOfPPN(pt_dest[pti].page_ppn);
                   memcpy(page_dest, page, PAGE_SIZE);
+                  debug(A_MEMORY, "Copying the page!\n");
                 }
               }
             }

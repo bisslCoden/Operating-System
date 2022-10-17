@@ -398,6 +398,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 
 int Syscall::fork()
 {
+  debug(SYSCALL, "Calling Syscall Fork!\n");
   return ProcessRegistry::instance()->processFork();
 }
 

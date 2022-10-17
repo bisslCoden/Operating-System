@@ -45,48 +45,57 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   threads_lock_.release();*/
 }
 
+// User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   pid_(pid),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
-  fs_info_(new FileSystemInfo(*parent->working_dir_)),
-  name_(parent->name_),
+  fs_info_(parent->fs_info_),
+  working_dir_(new FileSystemInfo(*parent->working_dir_)),
+  my_terminal_(parent->my_terminal_),
+  name_("Process!"),
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock")
 {
   if(!working_dir_)
   {
-    //pid_=0;
+    debug(USERPROCESS, "Failed to obtain working directory!\n");
     return;
   }
 
-  if(fd_ >= 0)
+  loader_ = new Loader(fd_);
+  if(fd_ < 0)
   {
-    loader_ = new Loader(fd_);
+    debug(USERPROCESS, "Failed to create Loader!\n");
   }
 
   if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
   {
-    //pid_=0;
+    debug(USERPROCESS, "Failed to create Loader!\n");
     return;
   }
-
-  currentThread->loader_->arch_memory_.copyVirtualMem(&loader_->arch_memory_);
 
   if(!loader_->loadExecutableAndInitProcess())
   {
-    //pid_=0;
+    debug(USERPROCESS, "Failed to init Process\n");
     return;
   }
+
+  debug(USERPROCESS, "Start copying virtual memory!\n");
+  ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
+
+
 
   //local fd
 
-  auto thread = new UserThread(this);
+  debug(USERPROCESS, "Creating new Thread for Fork\n");
+  auto thread = new UserThread(this,(UserThread*) currentThread);
   if(!thread || thread->getTID()==0)
   {
+    debug(USERPROCESS, "Failed to create Thread for Fork!\n");
     delete thread;
-    //pid_=0;
     return;
   }
+
   threads_lock_.acquire();
   threads_.insert({thread->getTID(),thread});
   threads_lock_.release();
@@ -94,7 +103,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   ProcessRegistry::instance()->processStart();
   Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
-
 }
 
 UserProcess::~UserProcess()
