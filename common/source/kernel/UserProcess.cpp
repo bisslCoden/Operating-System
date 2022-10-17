@@ -17,6 +17,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     pid_(ProcessRegistry::instance()->createID()), 
     fd_(VfsSyscall::open(filename, O_RDONLY)), 
     fs_info_(fs_info),
+    working_dir_(fs_info),
     name_(filename.c_str()),
     threads_lock_("UserProcess::threads_lock_"),
     returnvalue_lock_("UserProcess::retvallock")
@@ -50,12 +51,14 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   pid_(pid),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
   fs_info_(parent->fs_info_),
-  working_dir_(new FileSystemInfo(*parent->working_dir_)),
+  //loader_(new Loader(fd_)),
+  working_dir_(new FileSystemInfo(*parent->fs_info_)),
   my_terminal_(parent->my_terminal_),
-  name_("Process!"),
+  name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock")
 {
+  debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
   if(!working_dir_)
   {
     debug(USERPROCESS, "Failed to obtain working directory!\n");

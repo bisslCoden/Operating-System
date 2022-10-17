@@ -100,22 +100,26 @@ size_t ProcessRegistry::processCount()
   return progs_running_;
 }
 
-/* Used to create PIDs
-size_t ProcessRegistry::createUID()
+size_t ProcessRegistry::createID()
 {
-  ArchThreads::atomic_add(process_pids_,1);
-  return process_pids_;
+  /*next_id_lock_.acquire();
+  size_t tmp = next_id_++;
+  next_id_lock_.release();
+  return tmp; */
+  ArchThreads::atomic_add(next_id_,1);
+  return next_id_;
 }
-*/
 
 size_t ProcessRegistry::processFork()
 {
   size_t pid = createID();
 
   debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
-  auto process = new UserProcess(((UserThread*)currentThread)->getParentProcess(),pid);
-
-  if (!process|| process->getPID()==0)
+  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "After parent read %p\n", parent);
+  auto process = new UserProcess(parent,pid);
+  debug(PROCESS_REG, "After new UserProcess\n");
+  if (!process || process->getPID()==0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
     delete process;
@@ -149,10 +153,3 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-size_t ProcessRegistry::createID()
-{
-  next_id_lock_.acquire();
-  size_t tmp = next_id_++;
-  next_id_lock_.release();
-  return tmp; 
-}

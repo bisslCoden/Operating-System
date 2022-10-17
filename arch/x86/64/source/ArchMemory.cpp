@@ -353,8 +353,8 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
                   pt_dest[pti].page_ppn = PageManager::instance()->allocPPN();
                   void* page = (void*)getIdentAddressOfPPN(pt[pti].page_ppn);
                   void* page_dest = (void*)getIdentAddressOfPPN(pt_dest[pti].page_ppn);
-                  memcpy(page_dest, page, PAGE_SIZE);
-                  debug(A_MEMORY, "Copying the page!\n");
+                  //memcpy(page_dest, page, PAGE_SIZE);
+                  debug(A_MEMORY, "Copying the page! %p %p\n", page, page_dest);
                 }
               }
             }
