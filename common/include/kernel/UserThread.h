@@ -5,20 +5,35 @@
 #include "Condition.h"
 #include "UserProcess.h"
 
+#define PTHREAD_CANCELED ((void *) -1)
+#define STACK_SIZE_MAX_IN_MB 8
+
 class UserProcess;
 
-#define THREADSETUP_FIRST 0
-#define THREADSETUP_PTHREAD 1
-#define THREADSETUP_FORK 2
+enum cancelstate {
+    PTHREAD_CANCEL_ENABLE,
+    PTHREAD_CANCEL_DISABLE
+};
+
+enum canceltype {
+    PTHREAD_CANCEL_DEFERRED,
+    PTHREAD_CANCEL_ASYNCHRONOUS
+};
+
+
+
+
 
 typedef struct Threadflags
 {
-  bool cancelable = true;
-  bool deferred = true;
-  bool joinable = true;
+  int cancelable = PTHREAD_CANCEL_ENABLE;
+  int deferred = PTHREAD_CANCEL_DEFERRED;
+  //TODO joinable
+  int joinable = true;
   bool cancelreq = false;
 }Threadflags;
 
+>>>>>>>>> Temporary merge branch 2
 
 class UserThread : public Thread
 {
@@ -32,7 +47,7 @@ class UserThread : public Thread
      */
     UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number);
     
-    UserThread(size_t start_routine, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, uint32_t terminal_number = 0);
 
     UserThread(UserProcess* parent);
 
@@ -46,13 +61,12 @@ class UserThread : public Thread
     void Run() override { assert(false && "UserThread::Run() was called...\n"); }
 
     /**
-     * @brief sets up stack for a thread.
+     * @brief sets up rsp, allocates ppn, finds vpn,
      *
-     * @param first_thread set to #define "THREADSETUP_XXX"
      * @return true stack set successfully
-     * @return false stack not setup
+     * @return false stack not setup.
      */
-    bool setupStack(int first_thread);
+    bool setupStack();
 
     void* getUserstackStart() { return (void*)userstack_start_; }
 
@@ -60,40 +74,33 @@ class UserThread : public Thread
     bool isLast() { return last_; }
     // return process of thread
     UserProcess* getParentProcess() { return parent_process_; }
-    
-    //checks for stack over/underflows
-    bool isUserStackCanaryOK();
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
 
-    void setCancelState(bool notcancelable){ myflags_.cancelable = !notcancelable; }
-    void setCancelType(bool asynchronous) { myflags_.deferred = !asynchronous; }
-
-
+    void setCancelState(int state){ myflags_.cancelable = state; return;}
+    void setCancelType(int type) { myflags_.deferred = type; return; }
 
     // setters
     void setLast() { last_ = true; }
 
     void sendCancelRequest(){ myflags_.cancelreq = true; }
 
-    const Threadflags* getflags(){return &myflags_;}
-  private:
+    Threadflags* getflags(){return &myflags_;}
 
-    size_t vpns_for_userstack_[USERSTACK_SIZE];
-    size_t ppns_for_userstack_[USERSTACK_SIZE];
+  private:
     // the process that contains this thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
-    size_t* userstack_start_;
-    size_t* userstack_end_;
+    size_t userstack_start_ = 0;
+    size_t userstack_end_ = 0;
 
     Mutex flag_mutex_;
 
     Threadflags myflags_;
-    
 
+>>>>>>>>> Temporary merge branch 2
 
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 

@@ -146,7 +146,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
   }
 
   returnvalues_.insert(ustl::make_pair(tid, value));
-  //debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list", pid_, value, tid);
+  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
   returnvalue_lock_.release();
   return true;
 }
@@ -154,13 +154,11 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
 //not threadsafe: acquire before
 bool UserProcess::removeFromThreadList(UserThread* thread)
 {
-  threads_lock_.acquire();
   // checks if the thread is in list
   size_t tid = thread->getTID();
   if(threads_.find(tid) == threads_.end())
   {
     debug(USERPROCESS, "SHIT: removeFromThreadList() could not find thread with tid [%ld] in list\n", tid);
-    threads_lock_.release();
     //assert(false); // assert or not?
     return false; 
   }
@@ -172,7 +170,6 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   threads_.erase(tid);
   debug(X_USERPROCESS, "removed TID: [%ld] from UserProcess::threads_\n", tid);
 
-  threads_lock_.release();
   return true;
 }
 
@@ -192,10 +189,19 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-size_t UserProcess::createNewThread(size_t start_routine)
+size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
 {
-  // here the UserThread should be created with a new constructor that's not implemented yet.
-  UserThread* thread = new UserThread(start_routine);
+  // pthread
+  UserThread* thread = new UserThread(wrapper);
+  /*First Argument: RDI
+    Second Argument: RSI
+    Third Argument: RDX
+    Fourth Argument: RCX
+    Fifth Argument: R8
+    Sixth Argument: R9
+  */
+  thread->user_registers_->rdi = start_routine;
+  thread->user_registers_->rsi = args;
   if(thread)
     return thread->getTID();
   
@@ -204,24 +210,24 @@ size_t UserProcess::createNewThread(size_t start_routine)
 
 void UserProcess::exit(size_t exit_code)
 {
-  threads_lock_.acquire();
-
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
-  ustl::vector<UserThread*> to_kill;
-  for(auto thread : threads_) // first = tid, secons = *Thread
+  threads_lock_.acquire();
+  for(auto thread : threads_) // first = tid, second = *Thread
   {
-    if(unlikely(thread.first = currentThread->getTID()))
+    if(unlikely(thread.first == currentThread->getTID()))
     {
+      threads_lock_.release();
       killThread(thread.second);
+      threads_lock_.acquire();
       removeFromThreadList(thread.second);
     }
   }
 
-
+  
   debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
   killThread((UserThread*)currentThread);
 
-  threads_lock_.acquire();
+  threads_lock_.release();
 }
 
 void UserProcess::killThread(UserThread* thread)

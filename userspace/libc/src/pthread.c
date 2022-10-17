@@ -3,13 +3,25 @@
 #include "../../../common/include/kernel/syscall-definitions.h"
 
 /**
+ * @brief we are in userspace. now the start routine + arguments gets called and after it's done, pthread_exit is called.
+ * 
+ * @param start_routine the routine that pthread_create should start
+ * @param args the args
+ * @return void* nothing bruh
+ */
+void* wrapper(void* (*start_routine)(void*), void* args)
+{
+  pthread_exit(start_routine(args));
+  return 0;
+}
+/**
  * function stub
  * posix compatible signature - do not change the signature!
  */
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-                   void *(*start_routine)(void *), void *arg)
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
 {
-  return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, 0x0);
+  return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, (size_t)wrapper);
+  // wrapper defined above
 }
 
 /**
