@@ -16,7 +16,8 @@
 // first thread
 UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}// UserThread's members
+  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  "Thread::join_cond"},  myret_lock_{"thread::retvallock"} // UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
@@ -48,7 +49,8 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"}
+  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"},
+   condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"}, myret_lock_{"thread::retvallock"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
@@ -82,7 +84,9 @@ UserThread::~UserThread()
 
   parent_process_->lockThreadMutex();
   parent_process_->removeFromThreadList(this);
+  parent_process_->addToRetvalList(tid_, myret_);
   parent_process_->unLockThreadMutex();
+  join_cond_.signal();
 
   if(isLast())
   {

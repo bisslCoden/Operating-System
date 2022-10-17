@@ -7,6 +7,7 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_MAX_IN_MB 8
+#define SAFE_RETVAL 675467
 
 class UserProcess;
 
@@ -65,6 +66,11 @@ class UserThread : public Thread
      */
     bool setupStack();
 
+    void lockJoin(){condition_mutex_.acquire();}
+    void unlockJoin(){condition_mutex_.release();}
+    void waitJoin(){join_cond_.wait();}
+
+
     void* getUserstackStart() { return (void*)userstack_start_; }
 
     // tells if thread is the last thread of its process
@@ -81,9 +87,18 @@ class UserThread : public Thread
     // setters
     void setLast() { last_ = true; }
 
+    void setRet(void* value){ myret_ = value;}
+
+    void lockRet(){ myret_lock_.acquire();}
+    void unlockRet(){ myret_lock_.release();}
+    
     void sendCancelRequest(){ myflags_.cancelreq = true; }
 
+    //lock before!
     Threadflags* getflags(){return &myflags_;}
+    
+    //lock before!
+    int32 getJoiner(){return join_waiter_;}
   
   private:
     // the process that contains this thread
@@ -93,9 +108,14 @@ class UserThread : public Thread
     size_t userstack_start_ = 0;
     size_t userstack_end_ = 0;
 
+    int32 join_waiter_ = -1;
     Mutex flag_mutex_;
+    Mutex condition_mutex_;
+    Condition join_cond_;
 
     Threadflags myflags_;
+    Mutex myret_lock_;
+    void* myret_ = (void*) SAFE_RETVAL;
 
     
     // only true if removeFromThreadList() detects last thread
