@@ -67,8 +67,10 @@ class UserThread : public Thread
     bool setupStack();
 
     void lockJoin(){condition_mutex_.acquire();}
+    void setJoiner(int32 tid){join_waiter_ = tid;}
     void unlockJoin(){condition_mutex_.release();}
-    void waitJoin(){join_cond_.wait();}
+    void waitJoin(bool reacquire){join_cond_.wait(reacquire);}
+    void signalJoin(){join_cond_.signal();}
 
 
     void* getUserstackStart() { return (void*)userstack_start_; }

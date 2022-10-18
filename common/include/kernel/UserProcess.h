@@ -3,9 +3,10 @@
 #include "Thread.h"
 #include "umap.h"
 #include "UserThread.h"
+#include "Syscall.h"
 
 class UserThread;
-
+class Syscall;
 class UserProcess
 {
   public:

@@ -82,22 +82,13 @@ UserThread::~UserThread()
   switch_to_userspace_ = 0;
   debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
 
-  parent_process_->lockThreadMutex();
-  parent_process_->removeFromThreadList(this);
-  parent_process_->addToRetvalList(tid_, myret_);
-  parent_process_->unLockThreadMutex();
-  debug(X_USERTHREAD, "signaling join now!\n");
-  condition_mutex_.acquire();
-  join_cond_.signal();
-  condition_mutex_.release();
-
-  debug(X_USERTHREAD, "after join now!\n");
+  
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] parent process died.\n", tid_);
+  debug(X_USERTHREAD, "returning from my killing\n");
   switch_to_userspace_ = 1;
 }
 

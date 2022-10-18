@@ -161,7 +161,8 @@ void UserProcess::exit(size_t exit_code)
   threads_lock_.acquire();
   for(auto thread : threads_) // first = tid, second = *Thread
   {
-    if(unlikely(thread.first == currentThread->getTID()))
+    if(unlikely(thread.first == currentThread->getTID()));
+    else
     {
       threads_lock_.release();
       killThread(thread.second);
@@ -169,12 +170,14 @@ void UserProcess::exit(size_t exit_code)
       removeFromThreadList(thread.second);
     }
   }
+  removeFromThreadList((UserThread*) currentThread);
+  threads_lock_.release();
 
+
+  killThread((UserThread*)currentThread);
   
   debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
-  killThread((UserThread*)currentThread);
 
-  threads_lock_.release();
 }
 
 void UserProcess::killThread(UserThread* thread)

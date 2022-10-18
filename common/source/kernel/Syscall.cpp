@@ -111,6 +111,7 @@ void Syscall::exit(size_t exit_code)
 {
   debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %ld\n", currentThread->getTID(), exit_code);
   ((UserThread*)currentThread)->getParentProcess()->exit(exit_code);
+  debug(USERPROCESS, "exit sucessfuly finished!\n");
   // currentThread->kill();
 }
 
@@ -246,16 +247,31 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
 void Syscall::pthread_exit(void* value)
 {
   UserThread* callingthread = (UserThread*)currentThread;
+  debug(X_USERTHREAD, "entering p-exit for thread [%ld]\n", callingthread->getTID());
   size_t my_tid = callingthread->getTID();
   
   callingthread->getParentProcess()->lockThreadMutex();
   
   if (callingthread->getParentProcess()->findInThreadList(my_tid) != 0x00)
   {
-    callingthread->lockRet();
-    callingthread->setRet(value);
-    callingthread->unlockRet();
-    debug(X_USERTHREAD, "[%ld]: Killing myself \n", my_tid);
+    callingthread->lockJoin();
+    if (callingthread->getJoiner() != -1)
+    {
+      UserThread* to_be_signaled;
+      if((to_be_signaled = (UserThread*)callingthread->getParentProcess()->findInThreadList(callingthread->getJoiner()))!= 0x00)
+      {
+        to_be_signaled->lockJoin();
+        to_be_signaled->signalJoin();
+        to_be_signaled->unlockJoin();
+      }
+      else
+      {
+        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process?\n");
+      }
+    }
+    callingthread->unlockJoin();
+    callingthread->getParentProcess()->addToRetvalList(callingthread->getTID(), value);
+    callingthread->getParentProcess()->removeFromThreadList(callingthread);
     callingthread->getParentProcess()->unLockThreadMutex();
     currentThread->kill();
   }
@@ -264,7 +280,9 @@ void Syscall::pthread_exit(void* value)
     debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
     callingthread->getParentProcess()->unLockThreadMutex();
   }
+  debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", callingthread->getTID());
   return;
+
 }
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
@@ -337,38 +355,42 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 
   UserThread* join_victim = (UserThread*) callingthread->getParentProcess()->findInThreadList(thread);
   debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before retvallock\n", callingthread->getTID(), thread);
+
+  join_victim->lockJoin();
   if (!callingthread->getParentProcess()->getRetVal(thread, &retval) && !callingthread->getParentProcess()->findInThreadList(thread))
   {
     debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock AND thread didnt exist\n", callingthread->getTID(), thread);
+    join_victim->unlockJoin();
     callingthread->getParentProcess()->unLockThreadMutex();
     return -1;
   }
-  debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock\n", callingthread->getTID(), thread);
+
   if(!callingthread->getParentProcess()->getRetVal(thread, &retval))
   {
-    join_victim->lockJoin();
     callingthread->lockJoin();
     if (join_victim->getJoiner() != -1 || callingthread->getJoiner() == (int32) thread)
     {
       debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each other with thread [%ld]!\n",
        thread, callingthread->getTID());
-      callingthread->unlockJoin();
       join_victim->unlockJoin();
+      callingthread->unlockJoin();
       callingthread->getParentProcess()->unLockThreadMutex();
       return -1;
     }
-    callingthread->unlockJoin();
+    join_victim->setJoiner((int32) callingthread->getTID());
+    join_victim->unlockJoin();
     callingthread->getParentProcess()->unLockThreadMutex();
+
     debug(X_USERTHREAD, "thread [%ld] now trying to wait\n", callingthread->getTID());
-    join_victim->waitJoin();
+    callingthread->waitJoin(true);
     debug(X_USERTHREAD, "thread [%ld] got OUT of wait\n", callingthread->getTID());
+    
     if (!callingthread->getParentProcess()->getRetVal(thread, &retval))
       debug(X_USERTHREAD, "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
-    join_victim->unlockJoin();
+    callingthread->unlockJoin();
   }
   else
   {
-    join_victim->lockJoin();
     if (join_victim->getJoiner() != -1)
     {
       debug(X_USERTHREAD, "Deadlock in join detected! Thread [%ld] is/was already joined by another thread!\n", thread);
@@ -409,11 +431,26 @@ int32 Syscall::pthread_cancel(size_t thread)
   if ((its_flags->cancelable == PTHREAD_CANCEL_ENABLE) && 
     its_flags->deferred == PTHREAD_CANCEL_ASYNCHRONOUS) //queue cancellation request
   {
-    cancel_victim->lockRet();
-    cancel_victim->setRet(PTHREAD_CANCELED);
-    cancel_victim->unlockRet();
+ 
     debug(X_USERTHREAD, "Thread [%ld] could be cancelled right away and is now killed!\n", cancel_victim->getTID());
-    
+    cancel_victim->lockJoin();
+    if (cancel_victim->getJoiner() != -1)
+    {
+      UserThread* to_be_signaled;
+      if((to_be_signaled = (UserThread*)cancel_victim->getParentProcess()->findInThreadList(cancel_victim->getJoiner()))!= 0x00)
+      {
+        to_be_signaled->lockJoin();
+        to_be_signaled->signalJoin();
+        to_be_signaled->unlockJoin();
+      }
+      else
+      {
+        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process?\n");
+      }
+    }
+    cancel_victim->getParentProcess()->addToRetvalList(cancel_victim->getTID(), PTHREAD_CANCELED);
+    cancel_victim->getParentProcess()->removeFromThreadList(cancel_victim);
+    cancel_victim->unlockJoin();
     cancel_victim->unlockFlagMutex();
     current->getParentProcess()->unLockThreadMutex();
     cancel_victim->kill();
