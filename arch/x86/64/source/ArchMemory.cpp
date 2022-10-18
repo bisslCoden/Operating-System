@@ -332,8 +332,6 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
 
       PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
-      debug(SYSCALL, "pdpt before memcpy      %p\n", (void*) pdpt);
-      debug(SYSCALL, "pdpt_dest before memcpy %p\n", (void*) pdpt_dest);
       memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
       debug(A_MEMORY, "Copying the pdpt!\n");
       debug(SYSCALL, "pdpt      %p\n", (void*) pdpt);
@@ -345,8 +343,6 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
           pdpt_dest[pdpti].pd.page_ppn = PageManager::instance()->allocPPN();
           PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
           PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
-          debug(SYSCALL, "pd before memcpy      %p\n", (void*) pd);
-          debug(SYSCALL, "pd_dest before memcpy %p\n", (void*) pd_dest);
           memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
           debug(A_MEMORY, "Copying the pd!\n");
           debug(SYSCALL, "pd      %p\n", (void*) pd);
@@ -355,12 +351,11 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
           {
             if(pd[pdi].pt.present)
             {
+              pd_dest[pdi].pt.page_ppn = PageManager::instance()->allocPPN();
+
               PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
-              debug(SYSCALL, "pt before memcpy      %p\n", (void*) pt);
-              debug(SYSCALL, "pt_dest before memcpy %p\n", (void*) pt_dest);
               memcpy((void*) pt_dest, (void*) pt, PAGE_SIZE);
-
               debug(A_MEMORY, "Copying the pt!\n");
               debug(SYSCALL, "pt      %p\n", (void*) pt);
               debug(SYSCALL, "pt_dest %p\n\n", (void*) pt_dest);
@@ -371,8 +366,6 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
                   pt_dest[pti].page_ppn = PageManager::instance()->allocPPN();
                   void* page = (void*)getIdentAddressOfPPN(pt[pti].page_ppn);
                   void* page_dest = (void*)getIdentAddressOfPPN(pt_dest[pti].page_ppn);
-                  debug(SYSCALL, "page before memcpy      %p\n", (void*) page);
-                  debug(SYSCALL, "page_dest before memcpy %p\n", (void*) page_dest);
                   memcpy(page_dest, page, PAGE_SIZE);
                   debug(A_MEMORY, "Copying the page!\n");
                   debug(SYSCALL, "page      %p\n", (void*) page);
