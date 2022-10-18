@@ -191,6 +191,7 @@ bool UserProcess::getRetVal(size_t tid, void** value){
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     *value = returnvalues_[tid];
+    returnvalues_.erase(tid);
     returnvalue_lock_.release();
     return true;
   }

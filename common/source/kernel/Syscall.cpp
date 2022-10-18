@@ -353,20 +353,13 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   callingthread->getParentProcess()->lockThreadMutex();
   //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; afeter threadlock\n", callingthread->getTID(), thread);
 
-  UserThread* join_victim = (UserThread*) callingthread->getParentProcess()->findInThreadList(thread);
-  debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before retvallock\n", callingthread->getTID(), thread);
+  
+  debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before join and retval\n", callingthread->getTID(), thread);
 
-  join_victim->lockJoin();
-  if (!callingthread->getParentProcess()->getRetVal(thread, &retval) && !callingthread->getParentProcess()->findInThreadList(thread))
+  if (callingthread->getParentProcess()->findInThreadList(thread))
   {
-    debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock AND thread didnt exist\n", callingthread->getTID(), thread);
-    join_victim->unlockJoin();
-    callingthread->getParentProcess()->unLockThreadMutex();
-    return -1;
-  }
-
-  if(!callingthread->getParentProcess()->getRetVal(thread, &retval))
-  {
+    UserThread* join_victim = (UserThread*) callingthread->getParentProcess()->findInThreadList(thread);
+    join_victim->lockJoin();
     callingthread->lockJoin();
     if (join_victim->getJoiner() != -1 || callingthread->getJoiner() == (int32) thread)
     {
@@ -389,16 +382,15 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
       debug(X_USERTHREAD, "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
     callingthread->unlockJoin();
   }
+  else if (!callingthread->getParentProcess()->getRetVal(thread, &retval))
+  {
+    debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock AND thread didnt exist or was joined alreafy\n", callingthread->getTID(), thread);
+    //join_victim->unlockJoin();
+    callingthread->getParentProcess()->unLockThreadMutex();
+    return -1;
+  }
   else
   {
-    if (join_victim->getJoiner() != -1)
-    {
-      debug(X_USERTHREAD, "Deadlock in join detected! Thread [%ld] is/was already joined by another thread!\n", thread);
-      join_victim->unlockJoin();
-      callingthread->getParentProcess()->unLockThreadMutex();
-      return -1;
-    }
-    join_victim->unlockJoin();
     callingthread->getParentProcess()->unLockThreadMutex();
   }
 

@@ -77,6 +77,7 @@ class UserProcess
 
     void killThread(UserThread* thread);
 
+    //REMOVES the retval from the list so careful
     bool getRetVal(size_t tid, void** value);
 
   private:

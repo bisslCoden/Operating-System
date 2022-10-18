@@ -89,10 +89,6 @@ class UserThread : public Thread
     // setters
     void setLast() { last_ = true; }
 
-    void setRet(void* value){ myret_ = value;}
-
-    void lockRet(){ myret_lock_.acquire();}
-    void unlockRet(){ myret_lock_.release();}
     
     void sendCancelRequest(){ myflags_.cancelreq = true; }
 
@@ -116,9 +112,6 @@ class UserThread : public Thread
     Condition join_cond_;
 
     Threadflags myflags_;
-    Mutex myret_lock_;
-    void* myret_ = (void*) SAFE_RETVAL;
-
     
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 
