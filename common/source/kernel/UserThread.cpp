@@ -14,7 +14,7 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
+UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
   parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"} // UserThread's members
@@ -23,6 +23,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   loader_ = parent_process_->getLoader();
   
   // setup stack, UserRegisters and address space
+  mystack_.page_offset_ = page_offset;
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
                                    getUserstackStart(),
@@ -46,7 +47,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 }
 
 // pthread_create
-UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
+UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
   parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"},
@@ -54,7 +55,7 @@ UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
-
+  mystack_.page_offset_ = page_offset;
   // set up user registers and adressspace
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper, 
@@ -98,7 +99,7 @@ bool UserThread::setupStack()
   bool vpn_mapped = false;
   size_t ppn_for_stack = 0;
   size_t vpn_for_stack = 0;
-  size_t stack_page_offset = getTID() * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 1 MB
+  size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 4 MB
   size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
 
   // calc
@@ -107,7 +108,7 @@ bool UserThread::setupStack()
   vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
 
   // worked? 
-  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx. stack lies at %lx\n", vpn_for_stack, ppn_for_stack, userstack_start_);
+  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
   assert(vpn_for_stack && ppn_for_stack);
   if(!vpn_mapped)
   {
@@ -117,7 +118,7 @@ bool UserThread::setupStack()
   }
 
   // success man
-  userstack_start_ = stack_start_ptr;
+  mystack_.userstack_start_ = stack_start_ptr;
   debug(USERTHREAD, "setupStack() success. returning true\n");
   return true;
 }

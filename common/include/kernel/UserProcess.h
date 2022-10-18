@@ -4,6 +4,8 @@
 #include "umap.h"
 #include "UserThread.h"
 #include "Syscall.h"
+#include "uvector.h"
+
 
 class UserThread;
 class Syscall;
@@ -55,6 +57,8 @@ class UserProcess
      */
     size_t getNrOfThreads();
 
+    size_t getRandomPageOffset();
+
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}
 
@@ -79,10 +83,12 @@ class UserProcess
 
     //REMOVES the retval from the list so careful
     bool getRetVal(size_t tid, void** value);
+    bool checkInList(size_t NR);
 
   private:
     // the process ID
     size_t const pid_;
+
 
     // the process' fd. see "FileDescriptor.h"
     ssize_t const fd_;
@@ -102,11 +108,15 @@ class UserProcess
     // name of the process.
     ustl::string name_;
 
+  
     // a list containing TIDs and their appropriate UserThread*
     ustl::map<size_t, UserThread*> threads_;
     Mutex threads_lock_;
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
+
+      Mutex offsetlist_lock_;
+    ustl::vector<size_t> offsets_;
 
     // map with tid + return value for join
 };

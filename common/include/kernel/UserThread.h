@@ -34,6 +34,13 @@ typedef struct Threadflags
   bool cancelreq = false;
 }Threadflags;
 
+typedef struct StackInfo
+{
+  size_t userstack_start_ = 0;
+  size_t userstack_end_ = 0;
+  size_t page_offset_ = 0;
+} StackInfo;
+
 
 class UserThread : public Thread
 {
@@ -45,9 +52,9 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number);
+    UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
     
-    UserThread(size_t wrapper, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
 
     ~UserThread();
 
@@ -73,7 +80,7 @@ class UserThread : public Thread
     void signalJoin(){join_cond_.signal();}
 
 
-    void* getUserstackStart() { return (void*)userstack_start_; }
+    void* getUserstackStart() { return (void*)mystack_.userstack_start_; }
 
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }
@@ -103,8 +110,7 @@ class UserThread : public Thread
     UserProcess* parent_process_;
 
     // safe stack start + end ppn
-    size_t userstack_start_ = 0;
-    size_t userstack_end_ = 0;
+  
 
     int32 join_waiter_ = -1;
     Mutex flag_mutex_;
@@ -112,6 +118,7 @@ class UserThread : public Thread
     Condition join_cond_;
 
     Threadflags myflags_;
+    StackInfo mystack_;
     
     // only true if removeFromThreadList() detects last thread
     bool last_ = false; 

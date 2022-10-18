@@ -18,7 +18,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     fs_info_(fs_info),
     name_(filename.c_str()),
     threads_lock_("UserProcess::threads_lock_"),
-    returnvalue_lock_("UserProcess::retvallock")
+    returnvalue_lock_("UserProcess::retvallock"),
+    offsetlist_lock_("UserProcess::offsets")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -35,7 +36,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
 
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number);
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 
   /* moved to addToThreadList()
@@ -120,6 +121,36 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
+size_t UserProcess::getRandomPageOffset(){
+  uint32 firstbits;
+  uint32 lastbits;
+  size_t page_offset;
+  size_t rand; 
+  offsetlist_lock_.acquire();
+  do
+  {
+    offsetlist_lock_.release();
+    asm volatile("rdtsc \n\t" : "=d"(firstbits), "=a"(lastbits) :: );
+    rand = (size_t) firstbits << 32 | lastbits;
+    page_offset = rand % MAX_STACKS;
+    offsetlist_lock_.acquire();
+  } while (checkInList(rand));
+  offsetlist_lock_.release();
+  kprintf("read %ld from tsc and MAX STACKS btw is %d!!\n", rand, MAX_STACKS);
+  
+  return page_offset;
+}
+
+bool UserProcess::checkInList(size_t NR)
+{
+  for (auto val : offsets_)
+  {
+    if(val == NR)
+      return true;
+  }
+  return false;
+}
+
 //caution! aquire lock before!!!
 Thread* UserProcess::findInThreadList(size_t tid){
   if(threads_.find(tid) == threads_.end())
@@ -139,7 +170,7 @@ size_t UserProcess::getNrOfThreads()
 size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
 {
   // pthread
-  UserThread* thread = new UserThread(wrapper);
+  UserThread* thread = new UserThread(wrapper, UserProcess::getRandomPageOffset());
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
