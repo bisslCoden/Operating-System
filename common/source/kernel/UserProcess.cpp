@@ -126,18 +126,15 @@ size_t UserProcess::getRandomPageOffset(){
   size_t lastbits;
   size_t page_offset = 0;
   size_t rand; 
-  int i;
   offsetlist_lock_.acquire();
   do
   {
-    i++;
     offsetlist_lock_.release();
     asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
-    debug(USERPROCESS, "got rand value %ld and page offset %ld!\n", rand, page_offset);
     offsetlist_lock_.acquire();
-  } while (i < 10);
+  } while (checkInList(page_offset));
   offsets_.push_back(rand);
   offsetlist_lock_.release();
   debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %d offset is %ld!!\n", rand, MAX_STACKS, page_offset);

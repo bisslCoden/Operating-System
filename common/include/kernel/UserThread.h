@@ -73,6 +73,10 @@ class UserThread : public Thread
      */
     bool setupStack();
 
+    /**
+     * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
+     * 
+     */
     void lockJoin(){condition_mutex_.acquire();}
     void setJoiner(int32 tid){join_waiter_ = tid;}
     void unlockJoin(){condition_mutex_.release();}

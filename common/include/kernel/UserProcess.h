@@ -43,8 +43,24 @@ class UserProcess
      */
     bool removeFromThreadList(UserThread* thread);
 
-    Thread* findInThreadList(size_t tid);
+   /**
+     * @brief finds a thread in the Userprocess' Threadlist and returns 0x00 if
+     * it couldnt be found. Lock before!!!
+     * 
+     * @param tid the userthread id which should be found
+     * 
+     * @return the Thread searched for
+     */
+    UserThread* findInThreadList(size_t tid);
     
+      /**
+     * @brief add a returnvalue for a thread to the lise and acquires the lock!
+     * 
+     * @param tid the userthread id which should be found
+     * @param value the returnvalue to be added
+     * 
+     * @return false if the Thread already has a retval in the list
+     */
     bool addToRetvalList(size_t tid, void* value);
 
     size_t getPID(){ return pid_; }
@@ -57,6 +73,12 @@ class UserProcess
      */
     size_t getNrOfThreads();
 
+   /**
+     * @brief returns a random stack offset generated with rdtsc. This can then be set in the
+     * Userthread() to get a stack. 
+     * 
+     * @return the offset
+     */
     size_t getRandomPageOffset();
 
     void lockThreadMutex(){threads_lock_.acquire();}
@@ -81,7 +103,14 @@ class UserProcess
 
     void killThread(UserThread* thread);
 
-    //REMOVES the retval from the list so careful
+      /**
+     * @brief a retval is REMOVED from the retvallist and given to the joining thread
+     * 
+     * @param tid the userthread id which should be found
+     * @param value place where the returnvalue is saved into
+     * 
+     * @return false if the Thread was not in the list
+     */
     bool getRetVal(size_t tid, void** value);
     bool checkInList(size_t NR);
 
