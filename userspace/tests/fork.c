@@ -8,7 +8,6 @@ int main(int argc, char** argv)
 {
   printf("Call to Fork!\n");
   int pid = fork();
-  printf("pid: %d\n", pid);
   if (!pid)
   {
     printf("[%d] I am the Child!\n", pid);
@@ -21,5 +20,6 @@ int main(int argc, char** argv)
   {
     printf("Error while forking!");
   }
+  printf("Call to Fork finished!\n");
   return 0;
 }

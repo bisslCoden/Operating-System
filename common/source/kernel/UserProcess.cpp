@@ -87,7 +87,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
 
 
-
   //local fd
 
   debug(USERPROCESS, "Creating new Thread for Fork\n");

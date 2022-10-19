@@ -4,5 +4,8 @@
     "cmake.configureSettings": {
         "DDEBUG":"1",
     },
-    "cmake.buildTask": true
+    "cmake.buildTask": true,
+    "files.associations": {
+        "memory": "cpp"
+    }
 }
