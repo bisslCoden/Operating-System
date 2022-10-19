@@ -231,7 +231,7 @@ const ArchMemoryMapping ArchMemory::resolveMapping(uint64 pml4, uint64 vpage)
         {
           m.page = getIdentAddressOfPPN(m.pt[m.pti].page_ppn);
           m.page_ppn = m.pt[m.pti].page_ppn;
-          debug(X_ARCHMEM, "m.page_ppn : %lx\nTotalNumPages : %lx\n", m.page_ppn, PageManager::instance()->getTotalNumPages());
+          //debug(X_ARCHMEM, "m.page_ppn : %lx\nTotalNumPages : %lx\n", m.page_ppn, PageManager::instance()->getTotalNumPages());
           assert(m.page_ppn < PageManager::instance()->getTotalNumPages());
           m.page_size = PAGE_SIZE;
         }
