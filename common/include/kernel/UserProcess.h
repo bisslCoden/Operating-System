@@ -51,7 +51,7 @@ class UserProcess
      * 
      * @return the Thread searched for
      */
-    UserThread* findInThreadList(size_t tid);
+    Thread* findInThreadList(size_t tid);
     
       /**
      * @brief add a returnvalue for a thread to the lise and acquires the lock!

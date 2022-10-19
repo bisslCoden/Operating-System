@@ -6,8 +6,9 @@ pthread_t tid;
 
 int fastroutine()
 {
-    int old;
-   // pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
+//     int old;
+//     printf("old val was %d\n", old);
+//    // pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
     printf("graceful exit!\n");
     pthread_exit((void*)99);
     return 1;

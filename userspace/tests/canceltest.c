@@ -6,7 +6,6 @@ void simple_routine()
   printf("2 - PTHREAD: FUNCTION CALL WORKES\n");
   int bef;
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &bef);
-  int result = -98;
   while(1);
   pthread_exit((void*)9);
 }

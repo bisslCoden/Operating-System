@@ -98,6 +98,16 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
   return return_value;
 }
 
+bool checkAdressValid(void* addr)
+{
+  if ((long long unsigned)addr > USER_BREAK)
+  {
+    kprintf("what are you looking for in the kernel huh? - BAD USER!\n");
+    return false;
+  }
+  return true;
+}
+
 void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 {
   if(buffer && ((size_t)buffer >= USER_BREAK || (size_t)buffer + size > USER_BREAK))
@@ -227,7 +237,8 @@ void Syscall::trace()
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
-
+  if(!checkAdressValid((void*) thread))
+    exit(999);
   // add as much parameter checking as possible and return -1
 
   if(currentThread->getType() != Thread::TYPE::USER_THREAD)
@@ -243,6 +254,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
 
   return 0;
 }
+
 
 void Syscall::pthread_exit(void* value)
 {
@@ -287,6 +299,8 @@ void Syscall::pthread_exit(void* value)
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
 {
+  if(!checkAdressValid((void*) oldstate))
+    exit(999);
   if((state != 1) && (state != 0))
   {
     debug(X_USERTHREAD, "got a wrong arg as cancelstate!\n");
@@ -307,6 +321,8 @@ int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
   return 0;
 };
 int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
+  if(!checkAdressValid((void*) oldtype))
+    exit(999);
    if((type != 1) && (type != 0))
   {
     debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
@@ -343,6 +359,8 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
+  if(!checkAdressValid((void*) value_ptr))
+    exit(999);
   UserThread* callingthread = (UserThread*)currentThread;
   void* retval;
 

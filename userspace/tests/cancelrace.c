@@ -6,7 +6,6 @@ pthread_t tid;
 
 int fastroutine()
 {
-    int old;
    // pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
     printf("graceful exit!\n");
     pthread_exit((void*)99);
