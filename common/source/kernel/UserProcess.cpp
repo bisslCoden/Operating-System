@@ -122,21 +122,25 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
 }
 
 size_t UserProcess::getRandomPageOffset(){
-  uint32 firstbits;
-  uint32 lastbits;
-  size_t page_offset;
+  size_t firstbits;
+  size_t lastbits;
+  size_t page_offset = 0;
   size_t rand; 
+  int i;
   offsetlist_lock_.acquire();
   do
   {
+    i++;
     offsetlist_lock_.release();
-    asm volatile("rdtsc \n\t" : "=d"(firstbits), "=a"(lastbits) :: );
-    rand = (size_t) firstbits << 32 | lastbits;
-    page_offset = rand % MAX_STACKS;
+    asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+    rand =  lastbits | firstbits << 32;
+    page_offset = rand % (MAX_STACKS);
+    debug(USERPROCESS, "got rand value %ld and page offset %ld!\n", rand, page_offset);
     offsetlist_lock_.acquire();
-  } while (checkInList(rand));
+  } while (i < 10);
+  offsets_.push_back(rand);
   offsetlist_lock_.release();
-  kprintf("read %ld from tsc and MAX STACKS btw is %d!!\n", rand, MAX_STACKS);
+  debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %d offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   
   return page_offset;
 }

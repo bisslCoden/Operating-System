@@ -61,8 +61,8 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper, 
                                    getUserstackStart(), getKernelStackStartPointer());
 
-  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n", 
-    getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n", 
+    getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
@@ -72,6 +72,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   // add Thread to process to scheduler
   parent_process_->addToThreadList(this);
+
   Scheduler::instance()->addNewThread((Thread*)this);
 
   debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
@@ -119,6 +120,6 @@ bool UserThread::setupStack()
 
   // success man
   mystack_.userstack_start_ = stack_start_ptr;
-  debug(USERTHREAD, "setupStack() success. returning true\n");
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
   return true;
 }
