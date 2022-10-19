@@ -3,6 +3,11 @@
 #include "types.h"
 #include "offsets.h"
 #include "paging-definitions.h"
+#include "Mutex.h"
+
+//vpn to adress shift by 12 or divide through Page size
+//userbreak ends 0x8000000
+// vadress % Page size : get offset
 
 class ArchMemoryMapping
 {
@@ -116,6 +121,8 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
+  void copyVirtualMem(ArchMemory &destination);
+  Mutex arch_memory_lock_;
 private:
 
 /** 

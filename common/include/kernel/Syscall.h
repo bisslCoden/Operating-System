@@ -6,6 +6,7 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
+
 class Syscall
 {
   public:
@@ -22,9 +23,16 @@ class Syscall
 
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
+  static int fork();
 
-  static uint32 get_thread_count();
+  // pthreads
+  static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
+  static void pthread_exit(void* value);
+  static size_t pthread_join(size_t thread, void** value_ptr);
+  // cancel not 100% working
+  static int32 pthread_cancel(size_t thread);
+  static int32 pthread_setcancelstate(int32 state, int32* oldstate);
+  static int32 pthread_setcanceltype(int32 type, int32* oldtype);
 
-  static size_t fork();
 };
 

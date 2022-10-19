@@ -32,8 +32,7 @@ extern "C" void threadStartHack()
 Thread::Thread(FileSystemInfo *working_dir, ustl::string name, Thread::TYPE type, size_t tid) :
     kernel_registers_(0), user_registers_(0), switch_to_userspace_(type == Thread::USER_THREAD ? 1 : 0), loader_(0),
     next_thread_in_lock_waiters_list_(0), lock_waiting_on_(0), holding_lock_list_(0), state_(Running), 
-    tid_(tid),
-    my_terminal_(0), working_dir_(working_dir), name_(name)
+    tid_(tid), my_terminal_(0), type_(type), working_dir_(working_dir), name_(name)
 {
   debug(THREAD, "Thread ctor, this is %p, stack is %p, fs_info ptr: %p\n", this, kernel_stack_, working_dir_);
   ArchThreads::createKernelRegisters(kernel_registers_, (void*) (type == Thread::USER_THREAD ? 0 : threadStartHack), getKernelStackStartPointer());
@@ -62,13 +61,17 @@ Thread::~Thread()
 // DO NOT use new / delete in this Method, as it is sometimes called from an Interrupt Handler with Interrupts disabled
 void Thread::kill()
 {
-  debug(THREAD, "kill: Called by <%s (%p)>. Preparing Thread <%s (%p)> for destruction\n", currentThread->getName(),
-        currentThread, getName(), this);
+  /* debug(THREAD, "kill called by currentThread->TID: [%ld] lies at: %lx called: <%s>. killing TID: [%ld] at: %lx called: <%s>.\n", 
+                 currentThread->getTID(), (size_t)currentThread, currentThread->getName().c_str(), 
+                 getTID(), (size_t)this, getName().c_str()); */
+
+  debug(THREAD, "kill called by currentThread-> TID: [%ld]. killing TID: [%ld]\n", getTID(), currentThread->getTID());
 
   setState(ToBeDestroyed); // vvv Code below this line may not be executed vvv
 
   if (currentThread == this)
   {
+    debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
     ArchInterrupts::enableInterrupts();
     Scheduler::instance()->yield();
   }

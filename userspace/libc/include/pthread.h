@@ -12,9 +12,25 @@ extern "C" {
 typedef size_t pthread_t;
 typedef unsigned int pthread_attr_t;
 
+enum cancelstate {
+    PTHREAD_CANCEL_ENABLE,
+    PTHREAD_CANCEL_DISABLE
+};
+
+enum canceltype {
+    PTHREAD_CANCEL_DEFERRED, 
+    PTHREAD_CANCEL_ASYNCHRONOUS
+};
+
+//not yet implemented
+
+
 //pthread mutex typedefs
 typedef unsigned int pthread_mutex_t;
 typedef unsigned int pthread_mutexattr_t;
+
+#define PTHREAD_CANCELED ((void *) -1)
+#define PTHREAD_
 
 //pthread spinlock typedefs
 typedef unsigned int pthread_spinlock_t;
@@ -26,6 +42,11 @@ typedef unsigned int pthread_condattr_t;
 extern int pthread_create(pthread_t *thread,
          const pthread_attr_t *attr, void *(*start_routine)(void *),
          void *arg);
+
+
+//setters for cancelflags
+extern int pthread_setcancelstate(int state, int *oldstate);
+extern int pthread_setcanceltype(int type, int *oldtype);
 
 extern void pthread_exit(void *value_ptr);
 
@@ -53,8 +74,6 @@ extern int pthread_cond_signal(pthread_cond_t *cond);
 extern int pthread_cond_broadcast(pthread_cond_t *cond);
 
 extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
-
-extern int get_thread_count(void);
 
 #ifdef __cplusplus
 }

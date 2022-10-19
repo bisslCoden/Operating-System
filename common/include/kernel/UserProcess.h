@@ -17,6 +17,13 @@ class UserProcess
      *
      */
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
+    /**
+     * Constructor
+     * @param parent parent process to fork
+     * @param pid the id of the parent
+     *
+     */
+    UserProcess(UserProcess* parent, size_t pid);
 
      /**
      * CopyConstructor
@@ -28,6 +35,8 @@ class UserProcess
 
 
     ~UserProcess();
+
+
 
     /**
      * @brief safely adds a userthread to threads
@@ -47,16 +56,44 @@ class UserProcess
      */
     bool removeFromThreadList(UserThread* thread);
 
+    Thread* findInThreadList(size_t tid);
+    
+    bool addToRetvalList(size_t tid, void* value);
+
     size_t getPID(){ return pid_; }
     Loader* getLoader() { return loader_; }
-
+    FileSystemInfo* getWorkingDir() { return working_dir_; }
+    ustl::string getName() { return name_; }
     /**
-     * @brief Get the nr of threads in list_of_threads_
-     * IMPORTANT: NOT LOCKED, USE list_of_threads_lock_ AROUND FUNCTION CALL
+     * @brief returns threads_.size() but threadsafe
      * 
      * @return size_t the numer of threads
      */
-    size_t getNrOfThreads() { return threads_.size(); }
+    size_t getNrOfThreads();
+
+    void lockThreadMutex(){threads_lock_.acquire();}
+    void unLockThreadMutex(){threads_lock_.release();}
+
+
+    /**
+     * @brief Create a New Thread object (pthread_create)
+     * 
+     * @param start_routine which thread should execute
+     * @return size_t thread ID
+     */
+    size_t createNewThread(size_t start_routine, size_t args, size_t wrapper);
+
+    /**
+     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * 
+     * @param exit_code 
+     * @return size_t 
+     */
+    void exit(size_t exit_code);
+
+    void killThread(UserThread* thread);
+
+    bool getRetVal(size_t tid, void** value);
 
   private:
     // the process ID
@@ -86,6 +123,8 @@ class UserProcess
     // a list containing TIDs and their appropriate UserThread*
     ustl::map<size_t, UserThread*> threads_;
     Mutex threads_lock_;
+    ustl::map<size_t, void*> returnvalues_;
+    Mutex returnvalue_lock_;
 
     // map with tid + return value for join
 };

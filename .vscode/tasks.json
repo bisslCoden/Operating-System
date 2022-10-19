@@ -1,0 +1,76 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Launch Qemugdb",
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "qemugdb"
+            ],
+            "options": {
+                "cwd": "/tmp/sweb"
+            },
+            "isBackground": true,
+            "dependsOn": ["build dbg sweb"],
+            "dependsOrder": "sequence",
+            "problemMatcher": {
+                "pattern":
+                {
+                    "regexp": ".",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                },
+                "background": {
+                    "beginsPattern": "^Booting",
+                    "endsPattern": "."
+                }
+            }
+        },
+        {
+            "label": "create folder",
+            "type": "shell",
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "/tmp/sweb"
+            ]
+        },
+        {
+            "label": "cmake sweb",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "${workspaceRoot}", // vscode has to be opened in sweb/ folder!
+                "-DDEBUG=1"
+            ],
+            "options": {
+                "cwd": "/tmp/sweb"
+            }
+        },
+        {
+            "label": "make sweb",
+            "type": "shell",
+            "command": "make",
+            "args": ["-j"],
+            "options": {
+                "cwd": "/tmp/sweb"
+            }
+        },
+        {
+            "label": "build dbg sweb",
+            "dependsOn": [
+                "create folder",
+                "cmake sweb",
+                "make sweb"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

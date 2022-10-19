@@ -10,16 +10,20 @@
 #include "PageManager.h"
 #include "ArchThreads.h"
 #include "offsets.h"
+#include "VfsSyscall.h"
 
 
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
     fd_(VfsSyscall::open(filename, O_RDONLY)), 
     fs_info_(fs_info),
+    working_dir_(fs_info),
     name_(filename.c_str()),
-    threads_lock_("UserProcess::threads_lock_")
+    threads_lock_("UserProcess::threads_lock_"),
+    returnvalue_lock_("UserProcess::retvallock")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
+  debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
   if (fd_ >= 0)
@@ -41,15 +45,66 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
   threads_lock_.release();*/
 }
+// User Process Constructor for fork
 
-UserProcess::UserProcess(const UserProcess& parent_process) : 
-  pid_(parent_process.pid_),
-  fd_(parent_process.fd_),
-  fs_info_(parent_process.fs_info_),  
-  name_(parent_process.name_),
-  threads_lock_("UserProcess::threads_lock_")
+UserProcess::UserProcess(UserProcess *parent, size_t pid) :
+  pid_(pid),
+  fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
+  fs_info_(parent->fs_info_),
+  //loader_(new Loader(fd_)),
+  working_dir_(new FileSystemInfo(*parent->fs_info_)),
+  my_terminal_(parent->my_terminal_),
+  name_(parent->name_),
+  threads_lock_("UserProcess::threads_lock_"),
+  returnvalue_lock_("UserProcess::retvallock")
 {
-  debug(DB_FORK, " ENTERING CONSTRUCTOR");
+  debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
+  if(!working_dir_)
+  {
+    debug(USERPROCESS, "Failed to obtain working directory!\n");
+    return;
+  }
+
+  loader_ = new Loader(fd_);
+  if(fd_ < 0)
+  {
+    debug(USERPROCESS, "Failed to create Loader!\n");
+  }
+
+  if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
+  {
+    debug(USERPROCESS, "Failed to create Loader!\n");
+    return;
+  }
+
+  if(!loader_->loadExecutableAndInitProcess())
+  {
+    debug(USERPROCESS, "Failed to init Process\n");
+    return;
+  }
+
+  debug(USERPROCESS, "Start copying virtual memory!\n");
+  ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
+
+
+  //local fd
+
+  debug(USERPROCESS, "Creating new Thread for Fork\n");
+  auto thread = new UserThread(this,(UserThread*) currentThread);
+  if(!thread || thread->getTID()==0)
+  {
+    debug(USERPROCESS, "Failed to create Thread for Fork!\n");
+    delete thread;
+    return;
+  }
+
+  threads_lock_.acquire();
+  threads_.insert({thread->getTID(),thread});
+  threads_lock_.release();
+
+  ProcessRegistry::instance()->processStart();
+  Scheduler::instance()->addNewThread(thread);
+  Scheduler::instance()->printThreadList();
 }
 
 UserProcess::~UserProcess()
@@ -79,7 +134,7 @@ bool UserProcess::addToThreadList(UserThread* thread)
     debug(USERPROCESS, "SHIT: addToThreadList() already has thread with tid [%ld] in list\n", tid);
     threads_lock_.release();
 
-    assert(false); // assert or not? 
+    assert(false); // assert or not? - lets leave them in for now :D 
     return false; 
   }
 
@@ -89,18 +144,32 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+//this function locks internally!
+bool UserProcess::addToRetvalList(size_t tid, void* value){
+  returnvalue_lock_.acquire();
+  if (returnvalues_.find(tid) != returnvalues_.end())
+  {
+    returnvalue_lock_.release();
+    debug(USERPROCESS, "how did that thread [%ld] exit twice??\n", tid);
+    assert(false);
+    return false;
+  }
 
+  returnvalues_.insert(ustl::make_pair(tid, value));
+  debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
+  returnvalue_lock_.release();
+  return true;
+}
+
+//not threadsafe: acquire before
 bool UserProcess::removeFromThreadList(UserThread* thread)
 {
-  threads_lock_.acquire();
-
   // checks if the thread is in list
   size_t tid = thread->getTID();
   if(threads_.find(tid) == threads_.end())
   {
     debug(USERPROCESS, "SHIT: removeFromThreadList() could not find thread with tid [%ld] in list\n", tid);
-    threads_lock_.release();
-    assert(false); // assert or not? 
+    //assert(false); // assert or not?
     return false; 
   }
 
@@ -111,6 +180,82 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   threads_.erase(tid);
   debug(X_USERPROCESS, "removed TID: [%ld] from UserProcess::threads_\n", tid);
 
-  threads_lock_.release();
   return true;
+}
+
+//caution! aquire lock before!!!
+Thread* UserProcess::findInThreadList(size_t tid){
+  if(threads_.find(tid) == threads_.end())
+    return (Thread*) 0x00;
+  return threads_[tid];
+}
+
+
+size_t UserProcess::getNrOfThreads()
+{
+  threads_lock_.acquire();
+  size_t number = threads_.size();
+  threads_lock_.release();
+  return number;
+}
+
+size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
+{
+  // pthread
+  UserThread* thread = new UserThread(wrapper);
+  /*First Argument: RDI
+    Second Argument: RSI
+    Third Argument: RDX
+    Fourth Argument: RCX
+    Fifth Argument: R8
+    Sixth Argument: R9
+  */
+  thread->user_registers_->rdi = start_routine;
+  thread->user_registers_->rsi = args;
+  if(thread)
+    return thread->getTID();
+  
+  return 0;
+}
+
+void UserProcess::exit(size_t exit_code)
+{
+  debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  threads_lock_.acquire();
+  for(auto thread : threads_) // first = tid, second = *Thread
+  {
+    if(unlikely(thread.first == currentThread->getTID()))
+    {
+      threads_lock_.release();
+      killThread(thread.second);
+      threads_lock_.acquire();
+      removeFromThreadList(thread.second);
+    }
+  }
+
+  
+  debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
+  killThread((UserThread*)currentThread);
+
+  threads_lock_.release();
+}
+
+void UserProcess::killThread(UserThread* thread)
+{
+  debug(USERPROCESS, "PID: [%ld] killThread() called for tid [%ld]\n", pid_, thread->getTID());
+  thread->kill();
+}
+
+bool UserProcess::getRetVal(size_t tid, void** value){
+  returnvalue_lock_.acquire();
+  if (returnvalues_.find(tid) != returnvalues_.end())
+  {
+    *value = returnvalues_[tid];
+    returnvalue_lock_.release();
+    return true;
+  }
+  returnvalue_lock_.release();
+  return false;
+  
+
 }

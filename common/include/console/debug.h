@@ -44,6 +44,7 @@ const size_t SCHEDULER          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t SYSCALL            = Ansi_Blue    | OUTPUT_ENABLED;
 const size_t MAIN               = Ansi_Red     | OUTPUT_ENABLED;
 const size_t THREAD             = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t USERTHREAD         = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t USERPROCESS        = Ansi_Cyan    | OUTPUT_ENABLED;
 const size_t PROCESS_REG        = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t BACKTRACE          = Ansi_Cyan    | OUTPUT_ENABLED;
@@ -93,7 +94,6 @@ const size_t X_USERPROCESS      = Ansi_Cyan    | OUTPUT_ENABLED;
 const size_t X_USERTHREAD       = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_PAGEFAULT        = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
-const size_t X_PAGEMANGER       = Ansi_Green   | OUTPUT_ENABLED;
-
-
-const size_t DB_FORK            = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t X_PAGEMANAGER      = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_LOADER           = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_ARCHTHREADS      = Ansi_Yellow  | OUTPUT_ENABLED;

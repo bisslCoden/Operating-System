@@ -37,8 +37,13 @@ class ProcessRegistry : public Thread
     size_t processCount();
 
     /**
+     * Creates the child process and returns the pid
+     */
+    size_t processFork();
+
+    /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
-     * 
+     *
      * @return ProcessRegistry* to access membermethods
      */
     static ProcessRegistry* instance();
@@ -46,16 +51,24 @@ class ProcessRegistry : public Thread
 
     /**
      * creates an unique ID for every process OR thread ID
-     * 
+     *
      * @return size_t the ID
      */
     size_t createID();
   private:
+
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
+
+    //prevous ID creation for fork for fork
+    //size_t process_pids_ = 0;
+    //ustl::map<long int, UserProcess*> processes_running_;
+
+    // Mutexes
+
     // ensures unique IDs for TID AND PID
     size_t next_id_ = 1;
     Mutex next_id_lock_;
