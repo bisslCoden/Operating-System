@@ -42,6 +42,11 @@ class ProcessRegistry : public Thread
     size_t processFork();
 
     /**
+     * Makes a process wait till change of state
+     */
+    size_t waitPid();
+
+    /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
      *
      * @return ProcessRegistry* to access membermethods

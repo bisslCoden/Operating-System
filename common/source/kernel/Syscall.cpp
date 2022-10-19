@@ -76,6 +76,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
     case sc_fork:
       return_value = fork();
       break;
+    case sc_waitpid:
+      return_value = wait_pid();
+      break;
     case sc_trace:
       trace();
       break;
@@ -401,5 +404,11 @@ int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
   return ProcessRegistry::instance()->processFork();
+}
+
+int Syscall::wait_pid()
+{
+  debug(SYSCALL, "Calling Syscall Wait Pid!\n");
+  return ProcessRegistry::instance()->waitPid();
 }
 

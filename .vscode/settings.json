@@ -6,6 +6,7 @@
     },
     "cmake.buildTask": true,
     "files.associations": {
-        "memory": "cpp"
+        "memory": "cpp",
+        "syscall-definitions.h": "c"
     }
 }

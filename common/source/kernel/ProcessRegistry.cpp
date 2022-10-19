@@ -135,6 +135,31 @@ size_t ProcessRegistry::processFork()
   return pid;
 }
 
+size_t ProcessRegistry::waitPid()
+{
+  size_t pid = createID();
+
+  /*debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
+  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "After parent read %p\n", parent);
+  auto process = new UserProcess(parent,pid);
+  debug(PROCESS_REG, "After new UserProcess\n");
+  if (!process || process->getPID()==0)
+  {
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
+    delete process;
+    return -1;
+  }
+
+
+  list_of_processes_lock_.acquire();
+  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_lock_.release();
+
+  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);*/
+  return pid;
+}
+
 
 
 void ProcessRegistry::createProcess(const char* path)
