@@ -6,6 +6,7 @@ pthread_t tids[10];
 
 int counter = 0;
 
+//
 int simple_routine()
 {
   int spinret = 0;
