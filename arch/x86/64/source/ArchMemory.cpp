@@ -314,7 +314,7 @@ PageMapLevel4Entry* ArchMemory::getRootOfKernelPagingStructure()
 
 void ArchMemory::copyVirtualMem(ArchMemory &destination)
 {
-  debug(A_MEMORY, "Entering copyVirtualMem function!\n");
+  debug(A_MEMORY, "Entering copyVirtualMemory function!\n");
   arch_memory_lock_.acquire();
   PageMapLevel4Entry *pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
