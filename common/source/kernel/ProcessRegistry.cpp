@@ -138,9 +138,6 @@ size_t ProcessRegistry::processFork()
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
   size_t pid = createID();
-  // debug(SYSCALL, "arg1 is %d\n", arg1);
-  // debug(SYSCALL, "arg2 is %d\n", (int*) arg2);
-  // debug(SYSCALL, "arg3 is %d\n", arg3);
   if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(SYSCALL, "arg1 smaller -1\n");
@@ -152,10 +149,14 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
   {
     debug(SYSCALL, "arg1 equals 0\n");
-  } 
-  else //   the single child process with this ID.
+  }
+  else if((long int) arg1 > 0) // any specifed process
   {
     debug(SYSCALL, "arg1 greater 0\n");
+  }  
+  else //   something went wrong
+  {
+    debug(SYSCALL, "we have an error somewhere\n");
   } 
   if(arg2 != 0)
   {
