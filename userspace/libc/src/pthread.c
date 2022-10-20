@@ -1,5 +1,6 @@
 #include "pthread.h"
 #include "syscall.h"
+#include "sched.h"
 #include "../../../common/include/kernel/syscall-definitions.h"
 
 /**
@@ -23,6 +24,20 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
   return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, (size_t)wrapper);
   // wrapper defined above
 }
+
+size_t atomic_lock(pthread_spinlock_t *lock){
+  size_t myval = 0;
+  asm("xchg %0, %1\n\t" : "=r" (myval) : "m" (*lock), "0" (myval) : "memory" );
+  return myval;
+};
+
+size_t atomic_unlock(pthread_spinlock_t* lock){
+  size_t myval = 1;
+  asm("xchg %0, %1\n\t" : "=r" (myval) : "m" (*lock), "0" (myval) : "memory" );
+  return myval;
+}
+
+
 
 /**
  * function stub
@@ -165,7 +180,8 @@ int pthread_spin_destroy(pthread_spinlock_t *lock)
  */
 int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
-  return -1;
+   *lock = 1;
+  return 0;
 }
 
 /**
@@ -174,7 +190,12 @@ int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
  */
 int pthread_spin_lock(pthread_spinlock_t *lock)
 {
-  return -1;
+  while (!atomic_lock(lock))
+  {
+    //not suuper safe but okay for now
+    sched_yield();
+  }
+  return 0;
 }
 
 /**
@@ -192,6 +213,8 @@ int pthread_spin_trylock(pthread_spinlock_t *lock)
  */
 int pthread_spin_unlock(pthread_spinlock_t *lock)
 {
-  return -1;
+  if(atomic_unlock(lock) != 0)
+    return -1;
+  return 0;
 }
 

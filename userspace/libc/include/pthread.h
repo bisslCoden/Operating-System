@@ -22,10 +22,10 @@ enum canceltype {
 
 //not yet implemented
 
-
 //pthread mutex typedefs
 typedef unsigned int pthread_mutex_t;
 typedef unsigned int pthread_mutexattr_t;
+
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define PTHREAD_
@@ -47,6 +47,13 @@ extern int pthread_setcancelstate(int state, int *oldstate);
 extern int pthread_setcanceltype(int type, int *oldtype);
 
 extern void pthread_exit(void *value_ptr);
+
+//spinlocks
+extern int pthread_spin_init(pthread_spinlock_t *lock, int pshared);
+extern int pthread_spin_lock(pthread_spinlock_t *lock);
+extern int pthread_spin_unlock(pthread_spinlock_t *lock);
+
+
 
 extern int pthread_cancel(pthread_t thread);
 
