@@ -63,6 +63,10 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
+    if  (present && writing)
+    {
+      currentThread->loader_->arch_memory_.copyOnWrite(address);
+    }
     currentThread->loader_->loadPage(address);
   }
   else

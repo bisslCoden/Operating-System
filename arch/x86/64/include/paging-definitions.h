@@ -26,7 +26,7 @@ typedef struct
   uint64 write_through             :1;
   uint64 cache_disabled            :1;
   uint64 accessed                  :1;
-  uint64 ignored_3                 :1;
+  uint64 cow                       :1;
   uint64 size                      :1; // must be 0
   uint64 ignored_2                 :4;
   uint64 page_ppn                  :28;
@@ -45,7 +45,7 @@ struct PageDirPointerTablePageDirEntry
   uint64 write_through             :1;
   uint64 cache_disabled            :1;
   uint64 accessed                  :1;
-  uint64 ignored_3                 :1;
+  uint64 cow                       :1;
   uint64 size                      :1; // 0 means page directory mapped
   uint64 ignored_2                 :4;
   uint64 page_ppn                  :28;
@@ -67,7 +67,8 @@ struct PageDirPointerTablePageEntry
   uint64 dirty                     :1;
   uint64 size                      :1; // 1 means 1gb page mapped
   uint64 global                    :1;
-  uint64 ignored_2                 :3;
+  uint64 cow                       :1;
+  uint64 ignored_2                 :2;
   uint64 pat                       :1;
   uint64 reserved_2                :17; // must be 0
   uint64 page_ppn                  :10;
@@ -92,7 +93,7 @@ struct PageDirPageTableEntry
   uint64 write_through             :1;
   uint64 cache_disabled            :1;
   uint64 accessed                  :1;
-  uint64 ignored_3                 :1;
+  uint64 cow                       :1;
   uint64 size                      :1; // 0 means page table mapped
   uint64 ignored_2                 :4;
   uint64 page_ppn                  :28;
@@ -114,7 +115,8 @@ struct PageDirPageEntry
   uint64 dirty                     :1;
   uint64 size                      :1;  // 1 means 2mb page mapped
   uint64 global                    :1;
-  uint64 ignored_2                 :3;
+  uint64 cow                       :1;
+  uint64 ignored_2                 :2;
   uint64 pat                       :1;
   uint64 reserved_2                :8; // must be 0
   uint64 page_ppn                  :19;
@@ -142,7 +144,8 @@ typedef struct
   uint64 dirty                     :1;
   uint64 size                      :1;
   uint64 global                    :1;
-  uint64 ignored_2                 :3;
+  uint64 cow                       :1;
+  uint64 ignored_2                 :2;
   uint64 page_ppn                  :28;
   uint64 reserved_1                :12; // must be 0
   uint64 ignored_1                 :11;

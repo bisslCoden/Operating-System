@@ -122,6 +122,7 @@ public:
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
   void copyVirtualMem(ArchMemory &destination);
+  void copyOnWrite(size_t add);
   Mutex arch_memory_lock_;
 private:
 
