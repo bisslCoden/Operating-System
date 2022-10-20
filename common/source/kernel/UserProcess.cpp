@@ -137,7 +137,7 @@ size_t UserProcess::getRandomPageOffset(){
   } while (checkInList(page_offset));
   offsets_.push_back(rand);
   offsetlist_lock_.release();
-  debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   
   return page_offset;
 }
