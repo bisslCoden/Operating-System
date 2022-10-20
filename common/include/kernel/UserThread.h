@@ -7,7 +7,6 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_MAX_IN_MB 8
-#define SAFE_RETVAL 675467
 
 class UserProcess;
 

@@ -6,7 +6,7 @@ int global3 = 8;
 
 int main()
 {
-    int stackvar;
+   // int stackvar;
     printf("global init is at: %p, uninit at %p, globalinit2: %p\n", &global, &global2, &global3);
     for (size_t i = 0; i < 2000; i++)
     {
