@@ -135,28 +135,36 @@ size_t ProcessRegistry::processFork()
   return pid;
 }
 
-size_t ProcessRegistry::waitPid()
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
   size_t pid = createID();
-
-  /*debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
-  auto parent = ((UserThread*)currentThread)->getParentProcess();
-  debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent,pid);
-  debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID()==0)
+  // debug(SYSCALL, "arg1 is %d\n", arg1);
+  // debug(SYSCALL, "arg2 is %d\n", (int*) arg2);
+  // debug(SYSCALL, "arg3 is %d\n", arg3);
+  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
-    delete process;
-    return -1;
+    debug(SYSCALL, "arg1 smaller -1\n");
   }
-
-
-  list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(pid, process));
-  list_of_processes_lock_.release();
-
-  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);*/
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(SYSCALL, "arg1 equals -1\n");
+  } 
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(SYSCALL, "arg1 equals 0\n");
+  } 
+  else //   the single child process with this ID.
+  {
+    debug(SYSCALL, "arg1 greater 0\n");
+  } 
+  if(arg2 != 0)
+  {
+    debug(SYSCALL, "arg2 different 0\n");
+  }
+  if(arg3 > 0) 
+  {
+    debug(SYSCALL, "arg3 bigger 0\n");
+  }
   return pid;
 }
 

@@ -4,6 +4,7 @@
 #include "Mutex.h"
 #include "Thread.h"
 #include "UserProcess.h"
+#include "types.h"
 
 class ProcessRegistry : public Thread
 {
@@ -44,7 +45,7 @@ class ProcessRegistry : public Thread
     /**
      * Makes a process wait till change of state
      */
-    size_t waitPid();
+    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3);
 
     /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
