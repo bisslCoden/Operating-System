@@ -237,8 +237,8 @@ void Syscall::trace()
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
-  if(!checkAdressValid((void*) thread))
-    exit(999);
+  // if(!checkAdressValid((void*) thread))
+  //   exit(999);
   // add as much parameter checking as possible and return -1
 
   if(currentThread->getType() != Thread::TYPE::USER_THREAD)
@@ -299,8 +299,8 @@ void Syscall::pthread_exit(void* value)
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
 {
-  if(!checkAdressValid((void*) oldstate))
-    exit(999);
+  // if(!checkAdressValid((void*) oldstate))
+  //   exit(999);
   if((state != 1) && (state != 0))
   {
     debug(X_USERTHREAD, "got a wrong arg as cancelstate!\n");
@@ -321,8 +321,8 @@ int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
   return 0;
 };
 int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
-  if(!checkAdressValid((void*) oldtype))
-    exit(999);
+  // if(!checkAdressValid((void*) oldtype))
+  //   exit(999);
    if((type != 1) && (type != 0))
   {
     debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
@@ -359,8 +359,8 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
-  if(!checkAdressValid((void*) value_ptr))
-    exit(999);
+  // if(!checkAdressValid((void*) value_ptr))
+  //   exit(999);
   UserThread* callingthread = (UserThread*)currentThread;
   void* retval;
 
