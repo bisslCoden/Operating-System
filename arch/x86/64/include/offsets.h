@@ -21,7 +21,9 @@
  * Use only the lower canonical half for userspace
  */
 #define USER_BREAK 0x0000800000000000ULL
+#define END_OF_STACKS 0x0000650000000000ULL
 
+#define MAX_STACKS (USER_BREAK - END_OF_STACKS) / (PAGE_SIZE * 512ULL * 512ULL * STACK_SIZE_MAX_IN_MB)
 /**
  * End of the non-canonical space, start of kernel space
  */
