@@ -160,6 +160,9 @@ void ProcessRegistry::createProcess(const char* path)
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
   //int number = 10;
+  ustl::map<size_t, UserProcess*> list;
+  list = ProcessRegistry::getProcessList();
+  UserThread* callingthread = (UserThread*)currentThread;
   if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
     debug(DBEK, "arg1 smaller -1\n");
   else if((long int) arg1 == -1) // any child process.
@@ -167,7 +170,19 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
     debug(DBEK, "arg1 equals 0\n");
   else if((long int) arg1 > 0) // any specifed process
-    debug(DBEK, "arg1 greater 0\n");
+  {
+   debug(DBEK, "arg1 greater 0\n");
+   auto search = list.find(arg1);
+   if (search != list.end())
+   {
+    debug(DBEK, "Found\n");
+    debug(DBEK, "Wait Status: %d\n", callingthread->getParentProcess()->getWaitStatus());
+    callingthread->getParentProcess()->setWaitStatus(1);
+    debug(DBEK, "Wait Status: %d\n", callingthread->getParentProcess()->getWaitStatus());
+   }
+   else
+     debug(DBEK, "Not found\n");
+  }
   else //   something went wrong
   {
     debug(DBEK, "we have an error somewhere\n");
@@ -178,8 +193,6 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   if(arg3 > 0) 
     debug(DBEK, "arg3 bigger 0\n");
 
-  ustl::map<size_t, UserProcess*> list;
-  list = ProcessRegistry::getProcessList();
   auto search = list.find(arg1);
   if (search != list.end())
     debug(DBEK, "Found\n");

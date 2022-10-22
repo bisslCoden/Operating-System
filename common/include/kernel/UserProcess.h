@@ -96,6 +96,8 @@ class UserProcess
     bool getRetVal(size_t tid, void** value);
 
     bool getWaitStatus(){ return wait_status_; }
+    
+    void setWaitStatus(bool arg);
 
   private:
     // the process ID

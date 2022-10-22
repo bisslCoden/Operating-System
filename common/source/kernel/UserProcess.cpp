@@ -260,3 +260,8 @@ bool UserProcess::getRetVal(size_t tid, void** value){
   
 
 }
+
+void UserProcess::setWaitStatus(bool arg)
+{ 
+  wait_status_ = arg; 
+}
