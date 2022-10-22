@@ -43,9 +43,10 @@ class ProcessRegistry : public Thread
     size_t processFork();
 
     /**
-     * Makes a process wait till change of state
+     * Makes the process wait
      */
     size_t waitPid(size_t arg1, size_t* arg2, size_t arg3);
+
 
     /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
@@ -61,6 +62,14 @@ class ProcessRegistry : public Thread
      * @return size_t the ID
      */
     size_t createID();
+    
+    /**
+     * gives the list of processes back
+     *
+     * @ustl::map<size_t, UserProcess*> List with processes
+     */
+    ustl::map<size_t, UserProcess*> getProcessList();
+
   private:
 
     char const **progs_;
