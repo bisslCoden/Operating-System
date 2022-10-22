@@ -171,27 +171,31 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     debug(DBEK, "arg1 equals 0\n");
   else if((long int) arg1 > 0) // any specifed process
   {
-   debug(DBEK, "arg1 greater 0\n");
+   debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
    auto search = list.find(arg1);
    if (search != list.end())
    {
     debug(DBEK, "Found\n");
-    debug(DBEK, "Wait Status: %d\n", callingthread->getParentProcess()->getWaitStatus());
+    debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     callingthread->getParentProcess()->setWaitStatus(1);
-    debug(DBEK, "Wait Status: %d\n", callingthread->getParentProcess()->getWaitStatus());
+    debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
+    //callingthread->getParentProcess()->unLockThreadMutex();
+    while (callingthread->getParentProcess()->getWaitStatus())
+      Scheduler::instance()->yield();
+   // callingthread->getParentProcess()->lockThreadMutex();
    }
    else
-     debug(DBEK, "Not found\n");
+     debug(DBEK, "Not found, process %ld\n", arg1);
   }
   else //   something went wrong
   {
-    debug(DBEK, "we have an error somewhere\n");
+    debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
     return -1;
   } 
   if(arg2 != 0)
-    debug(DBEK, "arg2 different 0\n");
+    debug(DBEK, "arg2 different 0, process %ld\n", arg1);
   if(arg3 > 0) 
-    debug(DBEK, "arg3 bigger 0\n");
+    debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
 
   auto search = list.find(arg1);
   if (search != list.end())
