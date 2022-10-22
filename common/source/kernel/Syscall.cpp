@@ -406,9 +406,56 @@ int Syscall::fork()
   return ProcessRegistry::instance()->processFork();
 }
 
-int Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
-  debug(SYSCALL, "Calling Syscall Wait Pid!\n");
+  debug(SYSCALL, "Calling Syscall waitpid!\n");
   return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3);
 }
+
+/*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  int number = 10;
+  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(DBEK, "arg1 smaller -1\n");
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(DBEK, "arg1 equals -1\n");
+  } 
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(DBEK, "arg1 equals 0\n");
+  }
+  else if((long int) arg1 > 0) // any specifed process
+  {
+    debug(DBEK, "arg1 greater 0\n");
+  }  
+  else //   something went wrong
+  {
+    debug(DBEK, "we have an error somewhere\n");
+  } 
+  if(arg2 != 0)
+  {
+    debug(DBEK, "arg2 different 0\n");
+  }
+  if(arg3 > 0) 
+  {
+    debug(DBEK, "arg3 bigger 0\n");
+  }
+  ustl::map<size_t, UserProcess*> list;
+  list = ProcessRegistry::getProcessList();
+  auto search = list.find(arg1);
+  if (search != list.end())
+  {
+    debug(DBEK, "Found\n");
+  }
+  else
+  {
+    debug(DBEK, "Not found\n");
+  }
+  //debug(DBEK, "%ld\n\n\n\n\n", search->first);
+  return number;
+}*/
+
 
