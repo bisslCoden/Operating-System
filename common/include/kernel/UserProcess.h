@@ -95,6 +95,8 @@ class UserProcess
 
     bool getRetVal(size_t tid, void** value);
 
+    bool getWaitStatus(){ return wait_status_; }
+
   private:
     // the process ID
     size_t const pid_;
@@ -125,6 +127,9 @@ class UserProcess
     Mutex threads_lock_;
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
+
+    // for wait_pid
+    bool wait_status_;
 
     // map with tid + return value for join
 };
