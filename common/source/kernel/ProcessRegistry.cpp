@@ -135,40 +135,10 @@ size_t ProcessRegistry::processFork()
   return pid;
 }
 
-size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
+ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
 {
-  size_t pid = createID();
-  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
-  {
-    debug(SYSCALL, "arg1 smaller -1\n");
-  }
-  else if((long int) arg1 == -1) // any child process.
-  {
-    debug(SYSCALL, "arg1 equals -1\n");
-  } 
-  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
-  {
-    debug(SYSCALL, "arg1 equals 0\n");
-  }
-  else if((long int) arg1 > 0) // any specifed process
-  {
-    debug(SYSCALL, "arg1 greater 0\n");
-  }  
-  else //   something went wrong
-  {
-    debug(SYSCALL, "we have an error somewhere\n");
-  } 
-  if(arg2 != 0)
-  {
-    debug(SYSCALL, "arg2 different 0\n");
-  }
-  if(arg3 > 0) 
-  {
-    debug(SYSCALL, "arg3 bigger 0\n");
-  }
-  return pid;
+  return list_of_processes_;
 }
-
 
 
 void ProcessRegistry::createProcess(const char* path)
@@ -185,5 +155,42 @@ void ProcessRegistry::createProcess(const char* path)
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
   list_of_processes_lock_.release();
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
+}
+
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  //int number = 10;
+  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+    debug(DBEK, "arg1 smaller -1\n");
+  else if((long int) arg1 == -1) // any child process.
+    debug(DBEK, "arg1 equals -1\n");
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+    debug(DBEK, "arg1 equals 0\n");
+  else if((long int) arg1 > 0) // any specifed process
+    debug(DBEK, "arg1 greater 0\n");
+  else //   something went wrong
+  {
+    debug(DBEK, "we have an error somewhere\n");
+    return -1;
+  } 
+  if(arg2 != 0)
+    debug(DBEK, "arg2 different 0\n");
+  if(arg3 > 0) 
+    debug(DBEK, "arg3 bigger 0\n");
+
+  ustl::map<size_t, UserProcess*> list;
+  list = ProcessRegistry::getProcessList();
+  auto search = list.find(arg1);
+  if (search != list.end())
+    debug(DBEK, "Found\n");
+  else
+    debug(DBEK, "Not found\n");
+
+  // for printing the elements of the map
+  /*ustl::map<size_t, UserProcess*>::iterator i;
+  for (i = list.begin(); i != list.end(); ++i) 
+    debug(DBEK, "element %ld\n", i->first);*/ 
+
+  return 0;
 }
 
