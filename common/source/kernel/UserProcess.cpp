@@ -56,7 +56,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   my_terminal_(parent->my_terminal_),
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
-  returnvalue_lock_("UserProcess::retvallock")
+  returnvalue_lock_("UserProcess::retvallock"),
+  wait_status_(false)
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
   if(!working_dir_)
