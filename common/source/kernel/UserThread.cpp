@@ -43,7 +43,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
 }
-//test
+
 bool UserThread::setupStack()
 {
   debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
