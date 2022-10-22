@@ -16,7 +16,7 @@ enum cancelstate {
 };
 
 enum canceltype {
-    PTHREAD_CANCEL_DEFERRED, 
+    PTHREAD_CANCEL_DEFERRED,
     PTHREAD_CANCEL_ASYNCHRONOUS
 };
 
@@ -55,6 +55,8 @@ class UserThread : public Thread
     
     UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
 
+    UserThread(UserProcess* child, UserThread* parent_thread);
+
     ~UserThread();
 
     /**
@@ -66,7 +68,7 @@ class UserThread : public Thread
 
     /**
      * @brief sets up rsp, allocates ppn, finds vpn,
-     * 
+     *
      * @return true stack set successfully
      * @return false stack not setup.
      */

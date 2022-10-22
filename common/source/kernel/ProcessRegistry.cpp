@@ -5,6 +5,8 @@
 #include "kprintf.h"
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
+#include "ArchThreads.h"
+
 
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
@@ -98,6 +100,43 @@ size_t ProcessRegistry::processCount()
   return progs_running_;
 }
 
+size_t ProcessRegistry::createID()
+{
+  /*next_id_lock_.acquire();
+  size_t tmp = next_id_++;
+  next_id_lock_.release();
+  return tmp; */
+  ArchThreads::atomic_add(next_id_,1);
+  return next_id_;
+}
+
+size_t ProcessRegistry::processFork()
+{
+  size_t pid = createID();
+
+  debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
+  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "After parent read %p\n", parent);
+  auto process = new UserProcess(parent,pid);
+  debug(PROCESS_REG, "After new UserProcess\n");
+  if (!process || process->getPID()==0)
+  {
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
+    delete process;
+    return -1;
+  }
+
+
+  list_of_processes_lock_.acquire();
+  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_lock_.release();
+
+  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
+  return pid;
+}
+
+
+
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "create process %s\n", path);
@@ -114,10 +153,3 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-size_t ProcessRegistry::createID()
-{
-  next_id_lock_.acquire();
-  size_t tmp = next_id_++;
-  next_id_lock_.release();
-  return tmp; 
-}

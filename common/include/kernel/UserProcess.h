@@ -20,6 +20,13 @@ class UserProcess
      *
      */
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
+    /**
+     * Constructor
+     * @param parent parent process to fork
+     * @param pid the id of the parent
+     *
+     */
+    UserProcess(UserProcess* parent, size_t pid);
 
     ~UserProcess();
 
@@ -65,7 +72,8 @@ class UserProcess
 
     size_t getPID(){ return pid_; }
     Loader* getLoader() { return loader_; }
-    
+    FileSystemInfo* getWorkingDir() { return working_dir_; }
+    ustl::string getName() { return name_; }
     /**
      * @brief returns threads_.size() but threadsafe
      * 

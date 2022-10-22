@@ -80,6 +80,9 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
     case sc_outline:
       outline(arg1, arg2);
       break;
+    case sc_fork:
+      return_value = fork();
+      break;
     case sc_trace:
       trace();
       break;
@@ -437,8 +440,8 @@ int32 Syscall::pthread_cancel(size_t thread)
   debug(X_USERTHREAD, "Thread [%ld] is tryin' to cancel [%ld]!\n",current->getTID(), cancel_victim->getTID());
   cancel_victim->lockFlagMutex();
   Threadflags* its_flags = cancel_victim->getflags();
-  
-  if ((its_flags->cancelable == PTHREAD_CANCEL_ENABLE) && 
+
+  if ((its_flags->cancelable == PTHREAD_CANCEL_ENABLE) &&
     its_flags->deferred == PTHREAD_CANCEL_ASYNCHRONOUS) //queue cancellation request
   {
  
@@ -474,5 +477,12 @@ int32 Syscall::pthread_cancel(size_t thread)
   current->getParentProcess()->unLockThreadMutex();
   cancel_victim->sendCancelRequest();
   return 0;
+
+}
+
+int Syscall::fork()
+{
+  debug(SYSCALL, "Calling Syscall Fork!\n");
+  return ProcessRegistry::instance()->processFork();
 }
 

@@ -30,7 +30,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
 
-  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n", 
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
   debug(X_USERTHREAD, "TID [%ld]: Stack, Registers and AddressSpace set.\n", getTID());
 
@@ -46,6 +46,36 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   switch_to_userspace_ = 1;
 }
 
+bool UserThread::setupStack()
+{
+  debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
+  bool vpn_mapped = false;
+  size_t ppn_for_stack = 0;
+  size_t vpn_for_stack = 0;
+  size_t stack_page_offset = getTID() * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 1 MB
+  size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
+
+  // calc
+  vpn_for_stack = stack_start_ptr / PAGE_SIZE;
+  ppn_for_stack = PageManager::instance()->allocPPN();
+  vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
+
+  // worked?
+  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx. stack lies at %lx\n", vpn_for_stack, ppn_for_stack, userstack_start_);
+  assert(vpn_for_stack && ppn_for_stack);
+  if(!vpn_mapped)
+  {
+    debug(USERTHREAD, "setupStack() RIP. returning false\n");
+    PageManager::instance()->freePPN(ppn_for_stack);
+    return false;
+  }
+
+  // success man
+  userstack_start_ = stack_start_ptr;
+  debug(USERTHREAD, "setupStack() success. returning true\n");
+  return true;
+}
+
 // pthread_create
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
@@ -58,12 +88,18 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   mystack_.page_offset_ = page_offset;
   // set up user registers and adressspace
   setupStack();
-  ArchThreads::createUserRegisters(user_registers_, (void*)wrapper, 
+  ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    getUserstackStart(), getKernelStackStartPointer());
 
+<<<<<<< HEAD
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n", 
     getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+=======
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
+    getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
+  ArchThreads::setAddressSpace((Thread*)this, loader_->arch_memory_);
+>>>>>>> origin/master
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
   // set terminal
@@ -77,6 +113,29 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
+}
+
+// Constructor of UserThread for fork
+UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
+  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
+  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}
+{
+  loader_ = child->getLoader();
+
+  ArchThreads::createUserRegisters(user_registers_,
+                                   (void*) parent_thread->user_registers_->rip,
+                                   getUserstackStart(),
+                                   getKernelStackStartPointer());
+
+  memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
+  user_registers_->rax = 0;
+  user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
+
+  ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
+
+  switch_to_userspace_ = 1;
+  debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor for fork finished\n", getTID());
+  ArchThreads::printThreadRegisters(this);
 }
 
 UserThread::~UserThread()
@@ -94,6 +153,7 @@ UserThread::~UserThread()
   switch_to_userspace_ = 1;
 }
 
+<<<<<<< HEAD
 bool UserThread::setupStack()
 {
   debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
@@ -123,3 +183,5 @@ bool UserThread::setupStack()
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
   return true;
 }
+=======
+>>>>>>> origin/master
