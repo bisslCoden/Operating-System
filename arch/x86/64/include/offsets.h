@@ -19,7 +19,7 @@
 
 /**
  * Use only the lower canonical half for userspace
- */
+ *///
 #define USER_BREAK 0x0000800000000000ULL
 #define END_OF_STACKS 0x0000650000000000ULL
 
