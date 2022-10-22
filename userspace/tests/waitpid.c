@@ -9,8 +9,11 @@
 int main(int argc, char** argv)
 {
   printf("Call to wait_pid!\n");
-  int p_id = waitpid((pid_t) 15,(int*) 1222,22222);
-  printf("pid = %d\n", p_id);
+  int p_id = waitpid((pid_t) 2,(int*) 1222,22222);
+  if(p_id != 0){
+    printf("some error happend");
+    return -1;
+  }
   printf("Call to wait_pid finished!\n");
   return 0;
 }
