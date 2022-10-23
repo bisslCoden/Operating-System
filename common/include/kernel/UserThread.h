@@ -20,10 +20,6 @@ enum canceltype {
     PTHREAD_CANCEL_ASYNCHRONOUS
 };
 
-
-
-
-
 typedef struct Threadflags
 {
   int cancelable = PTHREAD_CANCEL_ENABLE;
@@ -32,8 +28,6 @@ typedef struct Threadflags
   int joinable = true;
   bool cancelreq = false;
 }Threadflags;
-
-//>>>>>>>>> Temporary merge branch 2
 
 class UserThread : public Thread
 {

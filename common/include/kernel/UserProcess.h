@@ -27,8 +27,6 @@ class UserProcess
 
     ~UserProcess();
 
-
-
     /**
      * @brief safely adds a userthread to threads
      * 
@@ -39,7 +37,7 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
-     * @brief safely removes userthread from threads_
+     * @brief UNSAFELY removes userthread from threads_ 
      * 
      * @param thread the userthread
      * @return true if found in list
@@ -47,24 +45,31 @@ class UserProcess
      */
     bool removeFromThreadList(UserThread* thread);
 
+    /**
+     * @brief UNSAFELY searches TID in threads_
+     * 
+     * @param tid the tid
+     * @return Thread* pointer to the thread (0 if not found)
+     */
     Thread* findInThreadList(size_t tid);
     
+    /**
+     * @brief safely adds a thread's return value to returnvalues_
+     * maps the value to its TID
+     * 
+     * @param tid the tid
+     * @param value pointer to the value
+     * @return true if success
+     * @return false if already in list (assert)
+     */
     bool addToRetvalList(size_t tid, void* value);
 
-    size_t getPID(){ return pid_; }
-    Loader* getLoader() { return loader_; }
-    FileSystemInfo* getWorkingDir() { return working_dir_; }
-    ustl::string getName() { return name_; }
     /**
      * @brief returns threads_.size() but threadsafe
      * 
      * @return size_t the numer of threads
      */
     size_t getNrOfThreads();
-
-    void lockThreadMutex(){threads_lock_.acquire();}
-    void unLockThreadMutex(){threads_lock_.release();}
-
 
     /**
      * @brief Create a New Thread object (pthread_create)
@@ -82,8 +87,21 @@ class UserProcess
      */
     void exit(size_t exit_code);
 
+    /**
+     * @brief calls thread->kill() which sets state to toBeDestroyed
+     * 
+     * @param thread pointer to the thread
+     */
     void killThread(UserThread* thread);
 
+    void lockThreadMutex(){threads_lock_.acquire();}
+    void unLockThreadMutex(){threads_lock_.release();}
+
+    // getters
+    size_t getPID(){ return pid_; }
+    Loader* getLoader() { return loader_; }
+    FileSystemInfo* getWorkingDir() { return working_dir_; }
+    ustl::string getName() { return name_; }
     bool getRetVal(size_t tid, void** value);
 
   private:
@@ -108,12 +126,12 @@ class UserProcess
     // name of the process.
     ustl::string name_;
 
-    // a list containing TIDs and their appropriate UserThread*
+    // a list mapping TIDs and their appropriate UserThread*
     ustl::map<size_t, UserThread*> threads_;
     Mutex threads_lock_;
+
+    // a list mapping a return value to a TID
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
-
-    // map with tid + return value for join
 };
 

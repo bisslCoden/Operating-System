@@ -12,7 +12,7 @@
 #include "offsets.h"
 #include "VfsSyscall.h"
 
-
+// standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
     fd_(VfsSyscall::open(filename, O_RDONLY)), 
@@ -32,21 +32,15 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   if (!loader_ || !loader_->loadExecutableAndInitProcess())
   {
     debug(USERPROCESS, "Error: loading %s failed!\n", name_.c_str());
-    // kill(); // not needed anymore, no thread created yet
     return;
   }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
 
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number);
   assert(first_thread && "UserThread constructor failed");
-
-  /* moved to addToThreadList()
-  threads_lock_.acquire();
-  threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
-  threads_lock_.release();*/
 }
 
-// User Process Constructor for fork
+// fork
 UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   pid_(pid),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
@@ -98,10 +92,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-  threads_lock_.acquire();
-  threads_.insert({thread->getTID(),thread});
-  threads_lock_.release();
-
+  addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
   Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
@@ -144,9 +135,11 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+
 //this function locks internally!
 bool UserProcess::addToRetvalList(size_t tid, void* value){
   returnvalue_lock_.acquire();
+
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     returnvalue_lock_.release();
@@ -157,6 +150,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
 
   returnvalues_.insert(ustl::make_pair(tid, value));
   debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
+  
   returnvalue_lock_.release();
   return true;
 }
@@ -184,7 +178,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
 }
 
 //caution! aquire lock before!!!
-Thread* UserProcess::findInThreadList(size_t tid){
+Thread* UserProcess::findInThreadList(size_t tid)
+{
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
