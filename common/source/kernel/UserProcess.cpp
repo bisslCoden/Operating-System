@@ -84,8 +84,9 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   }
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
+  threads_lock_.acquire();
   ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
-
+  threads_lock_.release();
 
   //local fd
 
