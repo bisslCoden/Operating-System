@@ -1,28 +1,37 @@
 #include "pthread.h"
 #include <stdio.h>
+#include "assert.h"
+#include "sched.h"
 
 pthread_spinlock_t spinny;
 pthread_t tids[10]; 
 
 int counter = 0;
+int never_false = 1;
+
 
 //
 int simple_routine()
 {
   int spinret = 0;
   printf("hi i ll try to get the spin!\n");
-     spinret = pthread_spin_lock(&spinny);
-     printf("spinret LOCK returned me %d!\n", spinret);
-for (size_t i = 0; i < 40000000; i++)
-{
-    int res = (i + i+1) % 365;
-    if((counter + res) < 200000000)
-        counter += res;
-}
-     spinret = pthread_spin_unlock(&spinny);
-     printf("spinret UNLOCK returned me %d!\n", spinret);
+  spinret = pthread_spin_lock(&spinny);
+  assert(never_false == 1 && "never false aint 1? whaat?\n");
+  printf("spinret LOCK returned me %d!\n", spinret);
+  never_false = 0;
+  sched_yield();
+  never_false = 1;
+ 
+  // for (size_t i = 0; i < 4000000; i++)
+  // {
+  //   int res = (i + i+1) % 365;
+  //   if((counter + res) < 20000000)
+  //       counter += res;
+  // }
+  spinret = pthread_spin_unlock(&spinny);
+  printf("spinret UNLOCK returned me %d!\n", spinret);
 
-  printf("unlocked it!\n");
+//  printf("unlocked it!\n");
   return 0;
 }
 
@@ -30,7 +39,7 @@ int main()
 {
   int ret;
   int rets;
-  pthread_spin_init(&spinny, 0);
+  //pthread_spin_init(&spinny, 0);
   printf("Hello!\n");
   for (size_t i = 0; i < 10; i++)
   {

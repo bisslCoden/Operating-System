@@ -4,6 +4,7 @@
 #include "Mutex.h"
 #include "Condition.h"
 #include "UserProcess.h"
+#include "uatomic.h"
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_MAX_IN_MB 8
@@ -31,6 +32,9 @@ typedef struct Threadflags
   //TODO joinable
   int joinable = true;
   bool cancelreq = false;
+  ustl::atomic_flag kcancelreq;
+  ustl::atomic_flag knotcancelable;
+  ustl::atomic_flag kasynchronous;
 }Threadflags;
 
 typedef struct StackInfo
@@ -95,14 +99,14 @@ class UserThread : public Thread
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
 
-    void setCancelState(int state){ myflags_.cancelable = state; return;}
-    void setCancelType(int type) { myflags_.deferred = type; return; }
+    void setCancelState(int state);
+    void setCancelType(int type);
+    void sendCancelRequest();
 
     // setters
     void setLast() { last_ = true; }
 
     
-    void sendCancelRequest(){ myflags_.cancelreq = true; }
 
     //lock before!
     Threadflags* getflags(){return &myflags_;}

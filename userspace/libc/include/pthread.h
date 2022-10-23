@@ -31,7 +31,6 @@ typedef unsigned int pthread_mutexattr_t;
 #define PTHREAD_
 
 //pthread spinlock typedefs
-typedef unsigned int pthread_spinlock_t;
 
 //pthread cond typedefs
 typedef unsigned int pthread_cond_t;
@@ -40,6 +39,13 @@ typedef unsigned int pthread_condattr_t;
 extern int pthread_create(pthread_t *thread,
          const pthread_attr_t *attr, void *(*start_routine)(void *),
          void *arg);
+         
+typedef struct spinlock{
+    size_t mylock_;
+    size_t initialized_;
+    int pshared_;
+}pthread_spinlock_t;
+
 
 
 //setters for cancelflags

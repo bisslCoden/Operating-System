@@ -118,6 +118,29 @@ UserThread::~UserThread()
   switch_to_userspace_ = 1;
 }
 
+
+void UserThread::setCancelState(int state){ 
+  myflags_.cancelable = state;
+  if(state == PTHREAD_CANCEL_DISABLE)
+    myflags_.knotcancelable.test_and_set();
+  else
+    myflags_.knotcancelable.clear();
+  return;
+}
+void UserThread::setCancelType(int type) { 
+  myflags_.deferred = type; 
+  if (type == PTHREAD_CANCEL_ASYNCHRONOUS)
+    myflags_.kasynchronous.test_and_set();
+  else
+    myflags_.kasynchronous.clear();
+  return; 
+}
+void UserThread::sendCancelRequest(){ 
+  myflags_.cancelreq = true;
+  myflags_.kcancelreq.test_and_set();
+  return; 
+  }
+
 bool UserThread::setupStack()
 {
   debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());

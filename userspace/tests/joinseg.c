@@ -14,6 +14,7 @@ int fastroutine()
 }
 
 int stupidroutine(){
+    int* very_cool_pointer = (int*) 0x0c;
     int retval;
     int ret;
     for (size_t i = 0; i < 12; i++)
@@ -21,6 +22,7 @@ int stupidroutine(){
         ret = pthread_join(tids[i], (void**)&retval);
         printf("ret stupid: %d for joining %ld\n", ret, tids[i]);
     }
+    *very_cool_pointer = -1;
     return 1;
 }
 

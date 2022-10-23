@@ -258,22 +258,20 @@ void UserProcess::exit(size_t exit_code)
   threads_lock_.acquire();
   for(auto thread : threads_) // first = tid, second = *Thread
   {
-    if(unlikely(thread.first == currentThread->getTID()));
+    if(thread.first == currentThread->getTID());
     else
     {
-      threads_lock_.release();
-      killThread(thread.second);
-      threads_lock_.acquire();
-      removeFromThreadList(thread.second);
+      thread.second->lockFlagMutex();
+      debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
+      thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
+      thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
+      thread.second->sendCancelRequest();
+      thread.second->unlockFlagMutex();
     }
   }
-  removeFromThreadList((UserThread*) currentThread);
   threads_lock_.release();
-
-
-  killThread((UserThread*)currentThread);
-  
-  debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
+  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
+  Syscall::pthread_exit((void*) exit_code);
 
 }
 
