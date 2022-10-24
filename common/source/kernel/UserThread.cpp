@@ -118,26 +118,6 @@ UserThread::~UserThread()
   switch_to_userspace_ = 1;
 }
 
-<<<<<<< HEAD
-// ----------------------------------------------------------------------------------------------------------------------------
-
-bool UserThread::setupStack()
-{
-  debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
-  bool vpn_mapped = false;
-  size_t ppn_for_stack = 0;
-  size_t vpn_for_stack = 0;
-  size_t stack_page_offset = getTID() * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 1 MB
-  size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
-
-  // calc
-  vpn_for_stack = stack_start_ptr / PAGE_SIZE;
-  ppn_for_stack = PageManager::instance()->allocPPN();
-  vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
-
-  // worked?
-  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx. stack lies at %lx\n", vpn_for_stack, ppn_for_stack, userstack_start_);
-=======
 
 void UserThread::setCancelState(int state){ 
   myflags_.cancelable = state;
@@ -179,29 +159,17 @@ bool UserThread::setupStack()
 
   // worked? 
   //debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
->>>>>>> origin/master
   assert(vpn_for_stack && ppn_for_stack);
   if(!vpn_mapped)
   {
     debug(USERTHREAD, "setupStack() RIP. returning false\n");
-<<<<<<< HEAD
-=======
     assert(false);
->>>>>>> origin/master
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
 
   // success man
-<<<<<<< HEAD
-  userstack_start_ = stack_start_ptr;
-  userstack_end_ = stack_start_ptr + PAGE_SIZE - sizeof(size_t); // last address of first page
-  debug(USERTHREAD, "setupStack() success. returning true\n");
-  return true;
-}
-=======
   mystack_.userstack_start_ = stack_start_ptr;
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
   return true;
 }
->>>>>>> origin/master
