@@ -87,6 +87,7 @@ class UserThread : public Thread
     void unlockJoin(){condition_mutex_.release();}
     void waitJoin(bool reacquire){join_cond_.wait(reacquire);}
     void signalJoin(){join_cond_.signal();}
+    bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
 
 
     void* getUserstackStart() { return (void*)mystack_.userstack_start_; }

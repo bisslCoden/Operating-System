@@ -200,7 +200,7 @@ size_t UserProcess::getRandomPageOffset(){
     page_offset = rand % (MAX_STACKS);
     offsetlist_lock_.acquire();
   } while (checkInList(page_offset));
-  offsets_.push_back(rand);
+  offsets_.push_back(page_offset);
   offsetlist_lock_.release();
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   
@@ -255,13 +255,19 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
 void UserProcess::exit(size_t exit_code)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
-  threads_lock_.acquire();
+  if (!threads_lock_.isHeldBy(currentThread))
+    threads_lock_.acquire();
+  
   for(auto thread : threads_) // first = tid, second = *Thread
   {
     if(thread.first == currentThread->getTID());
     else
     {
-      thread.second->lockFlagMutex();
+      if (!thread.second->checkFlagLock(currentThread))
+      {
+        thread.second->lockFlagMutex();
+      }
+      
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
       thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);

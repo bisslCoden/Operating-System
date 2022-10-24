@@ -39,7 +39,7 @@ int main()
 {
   int ret;
   int rets;
-  //pthread_spin_init(&spinny, 0);
+  pthread_spin_init(&spinny, 0);
   printf("Hello!\n");
   for (size_t i = 0; i < 10; i++)
   {

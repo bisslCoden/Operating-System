@@ -106,7 +106,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
+  //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
 
   
   if(isLast())
@@ -114,7 +114,7 @@ UserThread::~UserThread()
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
-  debug(X_USERTHREAD, "returning from my killing\n");
+  //debug(X_USERTHREAD, "returning from my killing\n");
   switch_to_userspace_ = 1;
 }
 
@@ -143,9 +143,10 @@ void UserThread::sendCancelRequest(){
 
 bool UserThread::setupStack()
 {
-  debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
+  //debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
   bool vpn_mapped = false;
   size_t ppn_for_stack = 0;
+  debug(X_THREADSTACK, "TID[%ld] my offset IIIIS: %ld\n", tid_, mystack_.page_offset_);
   size_t vpn_for_stack = 0;
   size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 4 MB
   size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
@@ -153,14 +154,16 @@ bool UserThread::setupStack()
   // calc
   vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
   ppn_for_stack = PageManager::instance()->allocPPN();
+  debug(X_USERTHREAD, "got my first physical page with number %ld\n", ppn_for_stack);
   vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
 
   // worked? 
-  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
+  //debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
   assert(vpn_for_stack && ppn_for_stack);
   if(!vpn_mapped)
   {
     debug(USERTHREAD, "setupStack() RIP. returning false\n");
+    assert(false);
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }

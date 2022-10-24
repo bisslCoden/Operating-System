@@ -18,8 +18,8 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
 
   if ((syscall_number != sc_sched_yield) && (syscall_number != sc_outline)) // no debug print because these might occur very often
   {
-    debug(SYSCALL, "Syscall %zd called with arguments %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx)\n",
-          syscall_number, arg1, arg1, arg2, arg2, arg3, arg3, arg4, arg4, arg5, arg5);
+    debug(SYSCALL, "Syscall %zd called with arguments %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) by thread [%ld]\n",
+          syscall_number, arg1, arg1, arg2, arg2, arg3, arg3, arg4, arg4, arg5, arg5, currentThread->getTID());
   }
   //UserProcess::getRandomPageOffset();
   //call exit with phthread cancelled if the thread can be cancelled
@@ -313,6 +313,7 @@ int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
   //debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", callingthread->getTID(), state);
   callingthread->unlockFlagMutex();
 
+
   // if(state == PTHREAD_CANCEL_ENABLE && callingthread->getflags()->cancelreq)
   // {
   //   callingthread->unlockFlagMutex();
@@ -374,7 +375,7 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   
   debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before join and retval\n", callingthread->getTID(), thread);
 
-  if (callingthread->getParentProcess()->findInThreadList(thread))
+  if (callingthread->getParentProcess()->findInThreadList(thread) != 0x00)
   {
     UserThread* join_victim = (UserThread*) callingthread->getParentProcess()->findInThreadList(thread);
     join_victim->lockJoin();
@@ -423,15 +424,20 @@ int32 Syscall::pthread_cancel(size_t thread)
   UserThread* current = callingThread;
   current->getParentProcess()->lockThreadMutex();
   UserThread* cancel_victim;
-  if(! (cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread)))
+  debug(X_USERTHREAD, "[%ld]: I will search for %ld\n", current->getTID(), thread);
+ 
+  if((cancel_victim = (UserThread*) current->getParentProcess()->findInThreadList(thread)) == 0x00)
   {
-    debug(X_USERTHREAD, "Thread [%ld] is tryin' to cancel [%ld] BUT THAT ONE IS DEAD ALREADY!\n",current->getTID(), cancel_victim->getTID());
+    debug(X_USERTHREAD, "Thread [%ld] is tryin' to cancel [%ld] BUT THAT ONE IS DEAD ALREADY!\n",current->getTID(), thread);
     current->getParentProcess()->unLockThreadMutex();
     return -1;
   }
   debug(X_USERTHREAD, "Thread [%ld] is tryin' to cancel [%ld]!\n",current->getTID(), cancel_victim->getTID());
   cancel_victim->lockFlagMutex();
-  
+  cancel_victim->sendCancelRequest();
+  cancel_victim->unlockFlagMutex();
+  current->getParentProcess()->unLockThreadMutex();
+  return 0;
   //Threadflags* its_flags = cancel_victim->getflags();
 
 
@@ -468,10 +474,7 @@ int32 Syscall::pthread_cancel(size_t thread)
     debug(X_USERTHREAD, "Thread [%ld]: could not kill bc its flags were state: %d type: %d!\n", current->getTID(), cancel_victim->getflags()->cancelable,
     cancel_victim->getflags()->deferred);
 */
-  cancel_victim->sendCancelRequest();
-  cancel_victim->unlockFlagMutex();
-  current->getParentProcess()->unLockThreadMutex();
-  return 0;
+
 
 }
 

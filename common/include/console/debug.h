@@ -97,3 +97,4 @@ const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t X_PAGEMANAGER      = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_LOADER           = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_ARCHTHREADS      = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t X_THREADSTACK      = Ansi_Red     | OUTPUT_ENABLED;
