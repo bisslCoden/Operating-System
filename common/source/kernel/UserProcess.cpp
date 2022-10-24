@@ -65,10 +65,11 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-  loader_ = new Loader(fd_);
-  if(fd_ < 0)
+
+  if(fd_ >= 0)
   {
-    debug(USERPROCESS, "Failed to create Loader!\n");
+    loader_ = new Loader(fd_);
+    //debug(USERPROCESS, "Failed to create Loader!\n");
   }
 
   if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
