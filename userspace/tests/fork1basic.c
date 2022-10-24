@@ -18,8 +18,8 @@ int main(int argc, char** argv)
     assert (pid != 0);  // hello
   }else
   {
-    printf("Error while forking!");
+    printf("Error while forking!\n");
   }
-  printf("Call to Fork finished!\n");
+  printf("Test finished!\n");
   return 0;
 }
