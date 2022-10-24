@@ -152,7 +152,7 @@ class UserProcess
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
-      Mutex offsetlist_lock_;
+    Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
 
     // map with tid + return value for join

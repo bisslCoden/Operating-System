@@ -89,6 +89,8 @@ class UserThread : public Thread
     void signalJoin(){join_cond_.signal();}
     bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
 
+    size_t getPageOffset(){return mystack_.page_offset_;}
+
 
     void* getUserstackStart() { return (void*)mystack_.userstack_start_; }
 
