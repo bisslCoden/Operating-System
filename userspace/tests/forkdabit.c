@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define FORKS 7
+// 7 forks is max
+#define FORKS 9
 
 int main(int argc, char** argv)
 {
@@ -13,7 +14,7 @@ int main(int argc, char** argv)
 
   for(int i = 0; i < 10000; i++)
   {
-    if((i % 1000) == 0)
-      printf("counted to 1000, pid: %ld\n", pid);
+    if((i % 5000) == 0)
+      printf("counted half way. pid: %ld\n", pid);
   }
 }

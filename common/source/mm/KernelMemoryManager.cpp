@@ -437,6 +437,13 @@ bool KernelMemoryManager::mergeWithFollowingFreeSegment(MallocSegment *this_one)
 pointer KernelMemoryManager::ksbrk(ssize_t size)
 {
   assert(base_break_ <= (size_t)kernel_break_ + size && "kernel heap break value corrupted");
+  if(!((reserved_max_ == 0 || ((kernel_break_ - base_break_) + size) <= reserved_max_)))
+  {
+    debug(X_KMM, "triggered if clause\n");
+    lock_.release();
+    Syscall::exit(12345678);
+    return NULL;
+  }
   assert((reserved_max_ == 0 || ((kernel_break_ - base_break_) + size) <= reserved_max_) && "maximum kernel heap size reached");
   assert(DYNAMIC_KMM && "ksbrk should only be called if DYNAMIC_KMM is 1 - not in baseline SWEB");
   if(size != 0)
