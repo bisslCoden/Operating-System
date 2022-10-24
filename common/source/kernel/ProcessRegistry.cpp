@@ -175,8 +175,18 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     callingthread->getParentProcess()->setWaitStatus(1);
     debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     //callingthread->getParentProcess()->unLockThreadMutex();
-    while (callingthread->getParentProcess()->getWaitStatus())
+    /*while (callingthread->getParentProcess()->getWaitStatus())
+    {
       Scheduler::instance()->yield();
+      if(callingthread->){
+        callingthread->getParentProcess()->setWaitStatus(0);
+      }
+
+    }*/
+    for(int i = 0; i < 10; i++){
+      Scheduler::instance()->yield();
+      //debug(DBEK, "waiting %ld\n", arg1);
+    }
    // callingthread->getParentProcess()->lockThreadMutex();
    }
    else
