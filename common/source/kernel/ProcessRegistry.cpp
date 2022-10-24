@@ -183,10 +183,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
       }
 
     }*/
-    for(int i = 0; i < 10; i++){
+    //for(int i = 0; i < 10; i++){
       Scheduler::instance()->yield();
       //debug(DBEK, "waiting %ld\n", arg1);
-    }
+    //}
    // callingthread->getParentProcess()->lockThreadMutex();
    }
    else
