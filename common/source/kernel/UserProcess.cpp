@@ -62,7 +62,9 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-  loader_ = new Loader(fd_);
+  if (fd_ >= 0)
+    loader_ = new Loader(fd_); 
+    
   if(fd_ < 0)
   {
     debug(USERPROCESS, "Failed to create Loader!\n");
