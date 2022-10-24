@@ -41,7 +41,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   assert(first_thread && "UserThread constructor failed");
 }
 
-// fork
+// User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   pid_(pid),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
@@ -51,9 +51,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   my_terminal_(parent->my_terminal_),
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
-  returnvalue_lock_("UserProcess::retvallock"), 
+  returnvalue_lock_("UserProcess::retvallock"),
   offsetlist_lock_("UserProcess::offsets")
-
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
   if(!working_dir_)
