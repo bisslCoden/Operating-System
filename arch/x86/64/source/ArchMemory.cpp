@@ -144,8 +144,11 @@ ArchMemory::~ArchMemory()
               {
                 if (pt[pti].present)
                 {
-                  pt[pti].present = 0;
-                  PageManager::instance()->freePPN(pt[pti].page_ppn);
+                  if  (!pt[pti].cow)
+                  {
+                    pt[pti].present = 0;
+                    PageManager::instance()->freePPN(pt[pti].page_ppn);
+                  }
                 }
               }
               pd[pdi].pt.present = 0;
@@ -317,52 +320,46 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
   debug(A_MEMORY, "Entering copyVirtualMem function!\n");
   arch_memory_lock_.acquire();
   PageMapLevel4Entry *pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
-  /*PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
-  debug(SYSCALL, "pml4 before memcpy      %p\n", (void*) pml4);
-  debug(SYSCALL, "pml4_dest before memcpy %p\n", (void*) pml4_dest);
+  PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
+  /*debug(SYSCALL, "pml4 before memcpy      %p\n", (void*) pml4);
+  debug(SYSCALL, "pml4_dest before memcpy %p\n", (void*) pml4_dest);*/
   memcpy((void*) pml4_dest, (void*) pml4, PAGE_SIZE);
-  debug(A_MEMORY, "Copying the pml4!\n");
+  /*debug(A_MEMORY, "Copying the pml4!\n");
   debug(SYSCALL, "pml4      %p\n", (void*) pml4);
   debug(SYSCALL, "pml4_dest %p\n\n", (void*) pml4_dest);*/
   for(size_t pml4i = 0; pml4i < (PAGE_MAP_LEVEL_4_ENTRIES/2); pml4i++)
   {
     if(pml4[pml4i].present)
     {
-      /*pml4_dest[pml4i].page_ppn = PageManager::instance()->allocPPN();
+      pml4_dest[pml4i].page_ppn = PageManager::instance()->allocPPN();
       PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
       memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
-      debug(A_MEMORY, "Copying the pdpt!\n");
+      /*debug(A_MEMORY, "Copying the pdpt!\n");
       debug(SYSCALL, "pdpt      %p\n", (void*) pdpt);
       debug(SYSCALL, "pdpt_dest %p\n\n", (void*) pdpt_dest);*/
-      pml4[pml4i].cow = 1;
-      PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
       for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
       {
         if(pdpt[pdpti].pd.present)
         {
-          /*pdpt_dest[pdpti].pd.page_ppn = PageManager::instance()->allocPPN();
+          pdpt_dest[pdpti].pd.page_ppn = PageManager::instance()->allocPPN();
           PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
           PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
           memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
-          debug(A_MEMORY, "Copying the pd!\n");
+          /*debug(A_MEMORY, "Copying the pd!\n");
           debug(SYSCALL, "pd      %p\n", (void*) pd);
           debug(SYSCALL, "pd_dest %p\n\n", (void*) pd_dest);*/
-          pdpt[pdpti].pd.cow = 1;
-          PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
           for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
           {
             if(pd[pdi].pt.present)
             {
-              /*pd_dest[pdi].pt.page_ppn = PageManager::instance()->allocPPN();
+              pd_dest[pdi].pt.page_ppn = PageManager::instance()->allocPPN();
               PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
               memcpy((void*) pt_dest, (void*) pt, PAGE_SIZE);
-              debug(A_MEMORY, "Copying the pt!\n");
+              /*debug(A_MEMORY, "Copying the pt!\n");
               debug(SYSCALL, "pt      %p\n", (void*) pt);
               debug(SYSCALL, "pt_dest %p\n\n", (void*) pt_dest);*/
-              pd[pdi].pt.cow = 1;
-              PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               for (size_t pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
               {
                 if(pt[pti].present)
@@ -388,86 +385,26 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
   arch_memory_lock_.release();
 }
 
-void ArchMemory::copyOnWrite(size_t add)
+void ArchMemory::copyOnWrite(size_t address)
 {
   debug(A_MEMORY,"Entering copy on write function");
-
-  size_t used_page = 0;
-  size_t page_arr[4];
-  size_t virtual_page = add/PAGE_SIZE;
-
-  for (int i = used_page; i < 4; ++i)
-  {
-    page_arr[i]= PageManager::instance()->allocPPN();
-  }
   arch_memory_lock_.acquire();
+  size_t virtual_page = address/PAGE_SIZE;
 
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
-  if (!m.page_ppn || !m.pt[m.pti].cow)
+  size_t used_page = m.pt[m.pti].page_ppn;
+
+  // this is the only case cow needs to be cow 1 and writable 0
+  if  (m.pt[m.pti].cow && !m.pt[m.pti].writeable)
   {
-    arch_memory_lock_.release();
-    for (int i = 0; i < 4; ++i)
-    {
-      PageManager::instance()->freePPN(page_arr[i]);
-    }
-    return;
+    m.pt[m.pti].page_ppn = PageManager::instance()->allocPPN();
+    void* page_curr = (void*)getIdentAddressOfPPN(used_page);
+    void* page_dest = (void*)getIdentAddressOfPPN(m.pt[m.pti].page_ppn);
+    memcpy(page_dest, page_curr, PAGE_SIZE);
+    m.pt[m.pti].cow = 0;
+    m.pt[m.pti].writeable = 1;
   }
-  size_t page_ppn_n = page_arr[used_page++];
-  void* page = (void*)getIdentAddressOfPPN(m.page_ppn);
-  void* page_dest = (void*)getIdentAddressOfPPN(page_ppn_n);
-  memcpy(page_dest, page, PAGE_SIZE);
-
-  if (m.pd[m.pdi].pt.cow)
-  {
-    size_t pt_ppn_n = page_arr[used_page++];
-    PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(m.pt_ppn);
-    PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pt_ppn_n);
-    memcpy((void*)pt_dest, (void*)pt, PAGE_SIZE);
-
-    m.pt = (PageTableEntry*) getIdentAddressOfPPN(pt_ppn_n);
-    if  (m.pdpt[m.pdpti].pd.cow)
-    {
-      size_t pd_ppn_n = page_arr[used_page++];
-      PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(m.pd_ppn);
-      PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pd_ppn_n);
-      memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
-
-      m.pd = (PageDirEntry*) getIdentAddressOfPPN(pd_ppn_n);
-      if  (m.pml4[m.pml4i].cow)
-      {
-        size_t pdpt_ppn_n= page_arr[used_page++];
-        PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(m.pdpt_ppn);
-        PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pdpt_ppn_n);
-        memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
-
-        m.pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pdpt_ppn_n);
-
-        m.pml4[m.pml4i].present = 0;
-        m.pml4[m.pml4i].page_ppn = pdpt_ppn_n;
-        m.pml4[m.pml4i].present = 1;
-        m.pml4[m.pml4i].cow = 0;
-      }
-      m.pdpt[m.pdpti].pd.present = 0;
-      m.pdpt[m.pdpti].pd.page_ppn = pd_ppn_n;
-      m.pdpt[m.pdpti].pd.present = 1;
-      m.pdpt[m.pdpti].pd.cow = 0;
-    }
-    m.pd[m.pdi].pt.present = 0;
-    m.pd[m.pdi].pt.page_ppn = pt_ppn_n;
-    m.pd[m.pdi].pt.present = 1;
-    m.pd[m.pdi].pt.cow = 0;
-  }
-  m.pt[m.pti].present = 0;
-  m.pt[m.pti].page_ppn = page_ppn_n;
-  m.pt[m.pti].present = 1;
-  m.pt[m.pti].writeable = 1;
-  m.pt[m.pti].cow = 0;
 
   arch_memory_lock_.release();
-  for (int i = used_page; i < 4; ++i)
-  {
-    PageManager::instance()->freePPN(page_arr[i]);
-  }
-
 }

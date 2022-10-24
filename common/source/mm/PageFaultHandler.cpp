@@ -65,9 +65,13 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   {
     if  (present && writing)
     {
+      debug(PAGEFAULT, "Copy on Write will execute now\n");
       currentThread->loader_->arch_memory_.copyOnWrite(address);
     }
-    currentThread->loader_->loadPage(address);
+    else
+    {
+      currentThread->loader_->loadPage(address);
+    }
   }
   else
   {
