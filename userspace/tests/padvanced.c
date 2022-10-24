@@ -1,4 +1,4 @@
-#include <pthread.h>
+#include "pthread.h"
 #include <stdio.h>
 
 void simple_routine()

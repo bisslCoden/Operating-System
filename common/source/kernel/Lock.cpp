@@ -102,8 +102,8 @@ void Lock::checkForDeadLock()
     return;
   if(held_by_ == currentThread)
   {
-    debug(LOCK, "Deadlock: Lock: %s (%p), held already by currentThread: %s (%p).\n",
-          name_, this, currentThread->getName(), currentThread);
+    debug(LOCK, "Deadlock: Lock: %s (%p), held already by currentThread [%ld]: %s (%p).\n",
+          name_, this, currentThread->getTID(),currentThread->getName(), currentThread);
     printStatus();
     assert(false);
   }
