@@ -15,7 +15,6 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    next_id_lock_("ProcessRegistry::next_pid_lock_"),
     list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
@@ -102,10 +101,6 @@ size_t ProcessRegistry::processCount()
 
 size_t ProcessRegistry::createID()
 {
-  /*next_id_lock_.acquire();
-  size_t tmp = next_id_++;
-  next_id_lock_.release();
-  return tmp; */
   ArchThreads::atomic_add(next_id_,1);
   return next_id_;
 }
@@ -116,22 +111,22 @@ size_t ProcessRegistry::processFork()
 
   debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
   auto parent = ((UserThread*)currentThread)->getParentProcess();
-  debug(PROCESS_REG, "After parent read %p\n", parent);
+  //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent,pid);
+
   debug(PROCESS_REG, "After new UserProcess\n");
   if (!process || process->getPID()==0)
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
     delete process;
     return -1;
   }
 
-
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(pid, process));
   list_of_processes_lock_.release();
-
   debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
+  
   return pid;
 }
 

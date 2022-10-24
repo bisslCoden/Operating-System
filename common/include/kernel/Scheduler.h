@@ -4,6 +4,8 @@
 #include <ulist.h>
 #include "IdleThread.h"
 #include "CleanupThread.h"
+#include "UserThread.h"
+#include "Syscall.h"
 
 class Thread;
 class Mutex;

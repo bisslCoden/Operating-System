@@ -71,6 +71,34 @@ uint32 Scheduler::schedule()
     ret = 0;
   }
 
+  if (currentThread->switch_to_userspace_)
+  {
+     UserThread* current = (UserThread*) currentThread;
+
+    //do atomic checks
+    if (!current->getflags()->knotcancelable.test_and_set())
+    {
+      if (current->getflags()->kasynchronous.test_and_set())
+      {
+        if (current->getflags()->kcancelreq.test_and_set())
+        {
+          currentThreadRegisters = currentThread->kernel_registers_;
+          ret = 0;
+          currentThreadRegisters->rdi = (uint64_t) PTHREAD_CANCELED;
+          ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
+          currentThread->switch_to_userspace_ = 0;
+        }
+        else
+          current->getflags()->kcancelreq.clear();
+      }
+      else
+        current->getflags()->kasynchronous.clear();
+    }
+    else 
+      current->getflags()->knotcancelable.clear();
+  }
+  
+
   return ret;
 }
 

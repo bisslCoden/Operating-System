@@ -3,9 +3,12 @@
 #include "Thread.h"
 #include "umap.h"
 #include "UserThread.h"
+#include "Syscall.h"
+#include "uvector.h"
+
 
 class UserThread;
-
+class Syscall;
 class UserProcess
 {
   public:
@@ -36,8 +39,6 @@ class UserProcess
 
     ~UserProcess();
 
-
-
     /**
      * @brief safely adds a userthread to threads
      * 
@@ -48,7 +49,7 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
-     * @brief safely removes userthread from threads_
+     * @brief UNSAFELY removes userthread from threads_ 
      * 
      * @param thread the userthread
      * @return true if found in list
@@ -56,14 +57,25 @@ class UserProcess
      */
     bool removeFromThreadList(UserThread* thread);
 
+    /**
+     * @brief UNSAFELY searches TID in threads_
+     * 
+     * @param tid the tid
+     * @return Thread* pointer to the thread (0 if not found)
+     */
     Thread* findInThreadList(size_t tid);
     
+    /**
+     * @brief safely adds a thread's return value to returnvalues_
+     * maps the value to its TID
+     * 
+     * @param tid the tid
+     * @param value pointer to the value
+     * @return true if success
+     * @return false if already in list (assert)
+     */
     bool addToRetvalList(size_t tid, void* value);
 
-    size_t getPID(){ return pid_; }
-    Loader* getLoader() { return loader_; }
-    FileSystemInfo* getWorkingDir() { return working_dir_; }
-    ustl::string getName() { return name_; }
     /**
      * @brief returns threads_.size() but threadsafe
      * 
@@ -71,9 +83,13 @@ class UserProcess
      */
     size_t getNrOfThreads();
 
-    void lockThreadMutex(){threads_lock_.acquire();}
-    void unLockThreadMutex(){threads_lock_.release();}
-
+   /**
+     * @brief returns a random stack offset generated with rdtsc. This can then be set in the
+     * Userthread() to get a stack. 
+     * 
+     * @return the offset
+     */
+    size_t getRandomPageOffset();
 
     /**
      * @brief Create a New Thread object (pthread_create)
@@ -91,9 +107,31 @@ class UserProcess
      */
     void exit(size_t exit_code);
 
+    /**
+     * @brief calls thread->kill() which sets state to toBeDestroyed
+     * 
+     * @param thread pointer to the thread
+     */
     void killThread(UserThread* thread);
 
+    void lockThreadMutex(){threads_lock_.acquire();}
+    void unLockThreadMutex(){threads_lock_.release();}
+
+    // getters
+    size_t getPID(){ return pid_; }
+    Loader* getLoader() { return loader_; }
+    FileSystemInfo* getWorkingDir() { return working_dir_; }
+    ustl::string getName() { return name_; }
+      /**
+     * @brief a retval is REMOVED from the retvallist and given to the joining thread
+     * 
+     * @param tid the userthread id which should be found
+     * @param value place where the returnvalue is saved into
+     * 
+     * @return false if the Thread was not in the list
+     */
     bool getRetVal(size_t tid, void** value);
+    bool checkInList(size_t NR);
 
     bool getWaitStatus(){ return wait_status_; }
     
@@ -124,14 +162,19 @@ class UserProcess
     // name of the process.
     ustl::string name_;
 
-    // a list containing TIDs and their appropriate UserThread*
+    // a list mapping TIDs and their appropriate UserThread*
     ustl::map<size_t, UserThread*> threads_;
     Mutex threads_lock_;
+
+    // a list mapping a return value to a TID
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
     // for wait_pid
     bool wait_status_;
+
+    Mutex offsetlist_lock_;
+    ustl::vector<size_t> offsets_;
 
     // map with tid + return value for join
 };
