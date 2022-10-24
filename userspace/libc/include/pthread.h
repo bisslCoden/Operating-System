@@ -6,6 +6,7 @@
 extern "C" {
 #endif
 
+#define PAGE_SIZE 4096
 //pthread typedefs
 typedef size_t pthread_t;
 typedef unsigned int pthread_attr_t;
@@ -23,7 +24,6 @@ enum canceltype {
 //not yet implemented
 
 //pthread mutex typedefs
-typedef unsigned int pthread_mutex_t;
 typedef unsigned int pthread_mutexattr_t;
 
 
@@ -45,6 +45,15 @@ typedef struct spinlock{
     size_t initialized_;
     int pshared_;
 }pthread_spinlock_t;
+
+
+typedef struct UserMutex{
+    size_t initialized_;
+    pthread_spinlock_t sleeperslist_lock_;
+    size_t* firstsleeper_;
+    pthread_mutexattr_t my_attr_;
+    size_t lock;
+}pthread_mutex_t;
 
 
 

@@ -89,8 +89,8 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
-                                   getUserstackStart(),
-                                   getKernelStackStartPointer());
+                                   parent_thread->getUserstackStart(),
+                                   parent_thread->getKernelStackStartPointer());
 
   memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
   user_registers_->rax = 0;
@@ -168,8 +168,10 @@ bool UserThread::setupStack()
     return false;
   }
 
-  // success man
-  mystack_.userstack_start_ = stack_start_ptr;
+  // now we are gonna LIE to the user HAHAHAHAHAHAHAHAA
+  mystack_.userstack_start_ = stack_start_ptr - sizeof(ustl::atomic_flag);
+  ustl::atomic_flag* sleepy = (ustl::atomic_flag*) stack_start_ptr;
+  sleepy->clear();
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
   return true;
 }

@@ -2,6 +2,8 @@
 #include "syscall.h"
 #include "sched.h"
 #include "../../../common/include/kernel/syscall-definitions.h"
+#include "../../../common/include/ustl/uatomic.h"
+
 
 /**
  * @brief we are in userspace. now the start routine + arguments gets called and after it's done, pthread_exit is called.
@@ -45,7 +47,31 @@ size_t atomic_unlock(size_t* lock){
  */
 int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 {
+  pthread_spin_init(&mutex->sleeperslist_lock_, 0);
+  mutex->lock_ = 1;
+  mutex->my_attr_ = *attr;
+  mutex->firstsleeper_ = NULL;
+  mutex->initialized_ = 1;
   return -1;
+}
+
+size_t findStackStackStart(size_t inputadress){
+  size_t outputadress = inputadress >> 12;
+  outputadress = outputadress << 12;
+  outputadress += PAGE_SIZE;
+  return outputadress;
+}
+
+//lock beforeee
+int addToWaitersList(pthread_mutex_t* mutex, size_t* localvar)
+{
+  size_t* iter = mutex->firstsleeper_;
+  while (*iter != NULL)
+  {
+    iter = *iter;
+  }
+  *iter = localvar;
+  return 0;
 }
 
 int pthread_setcancelstate(int state, int *oldstate){
@@ -108,7 +134,21 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex)
  */
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-  return -1;
+  if(mutex->initialized_ != 1)
+    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+
+  if(!atomic_lock(&mutex->lock_))
+  {
+    pthread_spin_lock(mutex->sleeperslist_lock_);
+    size_t next = NULL;
+    addToWaitersList(mutex, &next);
+    ustl::atomic_flag;
+
+    pthread_spin_unlock(mutex->sleeperslist_lock_);
+
+  }
+  else
+    return 0;
 }
 
 /**
