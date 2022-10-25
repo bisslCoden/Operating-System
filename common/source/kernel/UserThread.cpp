@@ -21,7 +21,10 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
-  
+  Userthread = true;
+  //  size_t sleepflag = 1;
+  // size_t res = __atomic_exchange_n(&sleepflag, 0, ustl::memory_order_seq_cst);
+  // debug(X_THREADSTACK, "jst checking exchange: sleep = %ld and check = %ld\n", sleepflag, res);
   // setup stack, UserRegisters and address space
   mystack_.page_offset_ = page_offset;
   setupStack();
@@ -56,6 +59,9 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
   mystack_.page_offset_ = page_offset;
+
+  Userthread = true;
+
   // set up user registers and adressspace
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
@@ -96,11 +102,13 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
+  Userthread = true;
+
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
   switch_to_userspace_ = 1;
   debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor for fork finished\n", getTID());
-  ArchThreads::printThreadRegisters(this);
+  //ArchThreads::printThreadRegisters(this);
 }
 
 UserThread::~UserThread()
@@ -167,11 +175,15 @@ bool UserThread::setupStack()
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
-
   // now we are gonna LIE to the user HAHAHAHAHAHAHAHAA
-  mystack_.userstack_start_ = stack_start_ptr - sizeof(ustl::atomic_flag);
-  ustl::atomic_flag* sleepy = (ustl::atomic_flag*) stack_start_ptr;
-  sleepy->clear();
+  mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
+  if(currentThread->getType() != KERNEL_THREAD)
+  {
+    *((size_t*)stack_start_ptr) = (size_t) 0;
+    debug(X_THREADSTACK, "in my actual beginning i have %ld", *((size_t*)stack_start_ptr));
+  }  
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
+  debug(USERTHREAD, "[%ld]: my ACTUAL stack starts at: %lx\n",tid_, (size_t*) stack_start_ptr);
+
   return true;
 }

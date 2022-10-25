@@ -56,6 +56,8 @@ class Thread
 
     void* getKernelStackStartPointer();
 
+    bool isUserThread(){return Userthread;}
+
     bool isStackCanaryOK();
 
     const char* getName();
@@ -143,6 +145,7 @@ class Thread
     FileSystemInfo* working_dir_;
 
     ustl::string name_;
+    bool Userthread = false;
 
 };
 

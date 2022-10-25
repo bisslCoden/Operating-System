@@ -2,7 +2,7 @@
 #include "syscall.h"
 #include "sched.h"
 #include "../../../common/include/kernel/syscall-definitions.h"
-#include "../../../common/include/ustl/uatomic.h"
+#include "assert.h"
 
 
 /**
@@ -50,7 +50,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
   pthread_spin_init(&mutex->sleeperslist_lock_, 0);
   mutex->lock_ = 1;
   mutex->my_attr_ = *attr;
-  mutex->firstsleeper_ = NULL;
+  mutex->firstsleeper_ = 0;
   mutex->initialized_ = 1;
   return -1;
 }
@@ -63,14 +63,14 @@ size_t findStackStackStart(size_t inputadress){
 }
 
 //lock beforeee
-int addToWaitersList(pthread_mutex_t* mutex, size_t* localvar)
+int addToWaitersList(pthread_mutex_t* mutex, size_t* localvaradress)
 {
   size_t* iter = mutex->firstsleeper_;
-  while (*iter != NULL)
+  while (*iter != 0)
   {
-    iter = *iter;
+    iter = (size_t*)*iter;
   }
-  *iter = localvar;
+  *iter = (size_t)localvaradress;
   return 0;
 }
 
@@ -139,13 +139,22 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
 
   if(!atomic_lock(&mutex->lock_))
   {
-    pthread_spin_lock(mutex->sleeperslist_lock_);
-    size_t next = NULL;
+    pthread_spin_lock(&mutex->sleeperslist_lock_);
+    size_t next = 0;
     addToWaitersList(mutex, &next);
-    ustl::atomic_flag;
+    size_t setsleep = findStackStackStart((size_t) &next);
+    //this is here to set me sleeping
+    
+    assert(atomic_unlock((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
+    pthread_spin_unlock(&mutex->sleeperslist_lock_);
+    sched_yield();
 
-    pthread_spin_unlock(mutex->sleeperslist_lock_);
-
+    pthread_spin_lock(&mutex->sleeperslist_lock_);
+    assert(atomic_lock(&mutex->lock_) == 1 && "huh? got woken up but still cant get a lock!\n");
+    mutex->firstsleeper_ = (size_t*) next;
+    pthread_spin_unlock(&mutex->sleeperslist_lock_);
+    
+    return 0;
   }
   else
     return 0;
@@ -157,7 +166,18 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
  */
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-  return -1;
+  if(mutex->initialized_ != 1)
+    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+  pthread_spin_lock(&mutex->sleeperslist_lock_);
+  if(mutex->firstsleeper_ != 0){
+    size_t setwake = findStackStackStart((size_t) *mutex->firstsleeper_);
+    //this is here to set me sleeping
+    
+    assert(atomic_lock((size_t*) setwake) == 1 && "tried to wake but was alreay woke?\n");
+  }
+  assert(atomic_unlock(&mutex->lock_) == 0 && "whaat? lock was free when unlocking\n");
+  pthread_spin_unlock(&mutex->sleeperslist_lock_);
+  return 0;
 }
 
 /**

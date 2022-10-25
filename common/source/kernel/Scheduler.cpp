@@ -34,6 +34,12 @@ Scheduler::Scheduler()
   addNewThread(&idle_thread_);
 }
 
+size_t* getToFlag(Thread* it)
+{
+  UserThread* user = (UserThread*) it;
+  return (size_t*) ((size_t)user->getUserstackStart() + sizeof(size_t));
+}
+
 uint32 Scheduler::schedule()
 {
   assert(!ArchInterrupts::testIFSet() && "Tried to schedule with Interrupts enabled");
@@ -46,6 +52,18 @@ uint32 Scheduler::schedule()
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
+    if ((*it)->Userthread && (*it)->getState() == Sleeping)
+    {
+      size_t* adressflag = getToFlag((*it));
+      debug(X_THREADSTACK, "now trying to deref flag for thread [%ld]\n", (*it)->getTID());
+      size_t sleepy = __atomic_exchange_n(adressflag, 1, ustl::memory_order_seq_cst);
+      debug(X_THREADSTACK, "got %ld for sleepy for thread [%ld]\n", sleepy, (*it)->getTID());
+      if (sleepy == 0)
+      {
+        wake((*it));
+      }
+    }
+    
     if((*it)->schedulable())
     {
       currentThread = *it;
@@ -71,7 +89,7 @@ uint32 Scheduler::schedule()
     ret = 0;
   }
 
-  if (currentThread->switch_to_userspace_)
+  if (currentThread->Userthread)
   {
      UserThread* current = (UserThread*) currentThread;
 
@@ -97,6 +115,31 @@ uint32 Scheduler::schedule()
     else 
       current->getflags()->knotcancelable.clear();
   }
+
+  if (currentThread->Userthread)
+  {
+    currentThread->switch_to_userspace_ = 0;
+    debug(X_THREADSTACK, "checking sleepflag for [%ld]\n", currentThread->getTID());
+    size_t* test = (size_t*)((UserThread*) currentThread)->getUserstackStart();
+    test -= sizeof(size_t);
+    *test = 0;
+    debug(X_THREADSTACK, "DAS HAT FUNKTIONIERT ARSCHLOCH\n");
+    debug(X_THREADSTACK, "NOW also geting PF at %p????: %ld\n",test, *test);
+    size_t* sleepflag = getToFlag(currentThread);
+    debug(X_THREADSTACK, "checking sleepflag for [%ld]: %ld\n", currentThread->getTID(), *sleepflag);
+    size_t sleeping = __atomic_exchange_n(sleepflag, 0, ustl::memory_order_seq_cst);
+
+    if (sleeping == 1)
+    {
+      debug(X_THREADSTACK, "found out that [%ld] wants to sleep\n", currentThread->getTID());
+      currentThreadRegisters = currentThread->kernel_registers_;
+      ret = 0;
+      currentThread->switch_to_userspace_ = 0;
+      sleep();
+    }
+    currentThread->switch_to_userspace_ = 1;
+  }
+  
   
 
   return ret;
@@ -117,6 +160,15 @@ void Scheduler::addNewThread(Thread *thread)
 
 void Scheduler::sleep()
 {
+  debug(X_THREADSTACK, "sleep called!\n");
+  if (currentThread->Userthread)
+  {
+    debug(X_THREADSTACK, "by a userthread!\n");
+    size_t* sleepflag = getToFlag(currentThread);
+    __atomic_exchange_n(sleepflag, 1, ustl::memory_order_seq_cst);
+    debug(SCHEDULER, "now setting current [%ld] to sleep\n", currentThread->getTID());
+  }
+  
   currentThread->setState(Sleeping);
   assert(block_scheduling_ == 0);
   yield();
@@ -124,9 +176,18 @@ void Scheduler::sleep()
 
 void Scheduler::wake(Thread* thread_to_wake)
 {
+
   // wait until the thread is sleeping
   while(thread_to_wake->getState() != Sleeping)
     yield();
+  
+  if (thread_to_wake->Userthread)
+  {
+    size_t* sleepflag = getToFlag(thread_to_wake);
+    debug(SCHEDULER, "now waking up current [%ld]\n", currentThread->getTID());
+    __atomic_exchange_n(sleepflag, 0, ustl::memory_order_seq_cst);
+  }
+
   thread_to_wake->setState(Running);
 }
 
