@@ -107,15 +107,13 @@ size_t ProcessRegistry::createID()
 
 size_t ProcessRegistry::processFork()
 {
-  size_t pid = createID();
-
-  debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
+  debug(PROCESS_REG, "ProcessRegistry::processFork() called starting process creation\n");
   auto parent = ((UserThread*)currentThread)->getParentProcess();
   //debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent,pid);
+  auto process = new UserProcess(parent);
 
   debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID()==0)
+  if (!process || process->getPID() == 0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
     delete process;
@@ -123,24 +121,30 @@ size_t ProcessRegistry::processFork()
   }
 
   list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
   list_of_processes_lock_.release();
-  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
   
-  return pid;
+  debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
+  return process->getPID();
 }
-
-
 
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "create process %s\n", path);
-  FileSystemInfo test = *working_dir_;
-  debug(PROCESS_REG, "was able to deref that\n");
-  UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
-  assert(process && "Process creation failed miserably o_O");
+  FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
+  if(!fs_info)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
+    return;
+  }
+  UserProcess* process = new UserProcess(path, fs_info);
+  if(!process || process->getPID() == 0)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
+    return;
+  }
 
-  debug(PROCESS_REG, "created process successfully!\n");
+  debug(X_PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));

@@ -14,13 +14,13 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
+UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  process_(process_), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"} // UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
-  loader_ = parent_process_->getLoader();
+  loader_ = process_->getLoader();
   
   // setup stack, UserRegisters and address space
   mystack_.page_offset_ = page_offset;
@@ -39,7 +39,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
     setTerminal(main_console->getTerminal(terminal_number));
 
   // add Thread to process to scheduler
-  parent_process_->addToThreadList(this);
+  process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
   debug(X_USERTHREAD, "TID [%ld]: UserThread() for first thread finished\n", getTID());
@@ -50,11 +50,11 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"},
+  process_(((UserThread*)currentThread)->process_), flag_mutex_{"thread::flag_mutex_"},
    condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
-  loader_ = parent_process_->getLoader();
+  loader_ = process_->getLoader();
   mystack_.page_offset_ = page_offset;
   // set up user registers and adressspace
   setupStack();
@@ -71,7 +71,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
     setTerminal(main_console->getTerminal(terminal_number));
 
   // add Thread to process to scheduler
-  parent_process_->addToThreadList(this);
+  process_->addToThreadList(this);
 
   Scheduler::instance()->addNewThread((Thread*)this);
 
@@ -80,23 +80,26 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 }
 
 // fork
-UserThread::UserThread(UserProcess *parent_process, UserThread* parent_thread) :
-  Thread(parent_process->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(parent_process),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+UserThread::UserThread(UserProcess *child_process, UserThread* parent_thread) :
+  Thread(child_process->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
+  process_(child_process),
+  flag_mutex_{"thread::flag_mutex_"}, 
+  condition_mutex_{"Thread::cond_mutex_"},
+  join_cond_{&condition_mutex_, 
   "Thread::join_cond"}
 {
-  loader_ = parent_process_->getLoader();
+  loader_ = child_process->getLoader();
 
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
-                                   getUserstackStart(),
-                                   getKernelStackStartPointer());
+                                   parent_thread->getUserstackStart(),
+                                   parent_thread->getKernelStackStartPointer());
 
   memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  ArchThreads::setAddressSpace(this, parent_process_->getLoader()->arch_memory_);
+  ArchThreads::setAddressSpace(this, process_->getLoader()->arch_memory_);
 
   switch_to_userspace_ = 1;
   debug(X_USERTHREAD, "TID [%ld]: UserThread() for fork finished\n", getTID());
@@ -111,8 +114,8 @@ UserThread::~UserThread()
   
   if(isLast())
   {
-    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
-    delete parent_process_;
+    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), process_->getPID());
+    delete process_;
   }
   //debug(X_USERTHREAD, "returning from my killing\n");
   switch_to_userspace_ = 1;
@@ -154,7 +157,7 @@ bool UserThread::setupStack()
   // calc
   vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
   ppn_for_stack = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "got my first physical page with number %ld\n", ppn_for_stack);
+  debug(X_USERTHREAD, "got my first physical page with number %lx\n", ppn_for_stack);
   vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
 
   // worked? 

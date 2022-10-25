@@ -21,7 +21,7 @@ ArchMemory::ArchMemory() :
   PageMapLevel4Entry* new_pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   memcpy((void*) new_pml4, (void*) kernel_page_map_level_4, PAGE_SIZE);
   memset(new_pml4, 0, PAGE_SIZE / 2); // should be zero, this is just for safety
-  debug(X_ARCHMEM, "PPN %lx | pml4 lies at %p\n", page_map_level_4_, new_pml4);
+  debug(X_ARCHMEM, "pml4 lies at %p on ppn %ld\n", new_pml4, page_map_level_4_);
 }
 
 template<typename T>

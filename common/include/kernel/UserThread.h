@@ -51,7 +51,7 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
     
     UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
 
@@ -91,7 +91,7 @@ class UserThread : public Thread
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }
     // return process of thread
-    UserProcess* getParentProcess() { return parent_process_; }
+    UserProcess* getParentProcess() { return process_; }
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
@@ -104,7 +104,6 @@ class UserThread : public Thread
     void setLast() { last_ = true; }
 
     
-
     //lock before!
     Threadflags* getflags(){return &myflags_;}
     
@@ -113,7 +112,7 @@ class UserThread : public Thread
   
   private:
     // the process that contains this thread
-    UserProcess* parent_process_;
+    UserProcess* process_;
 
     // safe stack start + end ppn
   

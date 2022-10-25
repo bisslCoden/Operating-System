@@ -42,8 +42,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
 }
 
 // fork
-UserProcess::UserProcess(UserProcess *parent, size_t pid) :
-  pid_(pid),
+UserProcess::UserProcess(UserProcess *parent) :
+  pid_(ProcessRegistry::instance()->createID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
   fs_info_(parent->fs_info_),
   //loader_(new Loader(fd_)),
@@ -55,7 +55,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   offsetlist_lock_("UserProcess::offsets")
 
 {
-  debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
+  debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
   {
     debug(USERPROCESS, "Failed to obtain working directory!\n");
@@ -90,7 +90,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   //local fd
 
   debug(USERPROCESS, "Creating new Thread for Fork\n");
-  auto thread = new UserThread(this,(UserThread*) currentThread);
+  auto thread = new UserThread(this, (UserThread*) currentThread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
@@ -183,7 +183,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
-size_t UserProcess::getRandomPageOffset(){
+size_t UserProcess::getRandomPageOffset()
+{
   size_t firstbits;
   size_t lastbits;
   size_t page_offset = 0;
@@ -214,14 +215,12 @@ bool UserProcess::checkInList(size_t NR)
   return false;
 }
 
-//caution! aquire lock before!!!
 Thread* UserProcess::findInThreadList(size_t tid)
 {
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
 }
-
 
 size_t UserProcess::getNrOfThreads()
 {

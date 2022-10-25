@@ -22,11 +22,10 @@ class UserProcess
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
     /**
      * Constructor
-     * @param parent parent process to fork
-     * @param pid the id of the parent
+     * @param parent parent process that shall be forked
      *
      */
-    UserProcess(UserProcess* parent, size_t pid);
+    UserProcess(UserProcess* parent);
 
     ~UserProcess();
 
@@ -49,7 +48,7 @@ class UserProcess
     bool removeFromThreadList(UserThread* thread);
 
     /**
-     * @brief UNSAFELY searches TID in threads_
+     * @brief UNSAFELY searches TID in threads_ LOCK BEFORE AND RELEASE AFTER CALL
      * 
      * @param tid the tid
      * @return Thread* pointer to the thread (0 if not found)
