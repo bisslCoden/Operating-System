@@ -42,7 +42,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   parent_process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: UserThread() for first thread finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 
@@ -75,17 +75,17 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: UserThread() for pthread_create finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 
 // fork
-UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
-  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
-  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+UserThread::UserThread(UserProcess *parent_process, UserThread* parent_thread) :
+  Thread(parent_process->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
+  parent_process_(parent_process),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"}
 {
-  loader_ = child->getLoader();
+  loader_ = parent_process_->getLoader();
 
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
@@ -96,10 +96,10 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
+  ArchThreads::setAddressSpace(this, parent_process_->getLoader()->arch_memory_);
 
   switch_to_userspace_ = 1;
-  debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor for fork finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: UserThread() for fork finished\n", getTID());
   ArchThreads::printThreadRegisters(this);
 }
 

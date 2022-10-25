@@ -276,7 +276,6 @@ void UserProcess::exit(size_t exit_code)
   threads_lock_.release();
   debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
   Syscall::pthread_exit((void*) exit_code);
-
 }
 
 void UserProcess::killThread(UserThread* thread)
@@ -285,7 +284,8 @@ void UserProcess::killThread(UserThread* thread)
   thread->kill();
 }
 
-bool UserProcess::getRetVal(size_t tid, void** value){
+bool UserProcess::getRetVal(size_t tid, void** value)
+{
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -296,6 +296,4 @@ bool UserProcess::getRetVal(size_t tid, void** value){
   }
   returnvalue_lock_.release();
   return false;
-  
-
 }
