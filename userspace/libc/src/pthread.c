@@ -184,13 +184,13 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
  */
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-  size_t adress = 0x685c00000000 - 8;
+  //size_t adress = 0x685c00000000 - 8;
   if(mutex->initialized_ != 1)
     __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   if(mutex->firstsleeper_ != 0){
     
-    size_t setwake = findStackStackStart((size_t) *mutex->firstsleeper_);
+    size_t setwake = findStackStackStart((size_t) mutex->firstsleeper_);
     assert(atomic_exchange_0((size_t*) setwake) == 1 && "tried to wake but was alreay woke?\n");
     mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;
   }
