@@ -81,7 +81,7 @@ after:
       return_value = fork();
       break;
     case sc_waitpid:
-      return_value = wait_pid(arg1, (size_t*) arg2, arg3);
+      return_value = wait_pid((size_t) arg1, (size_t*) arg2, arg3);
       break;
     case sc_trace:
       trace();

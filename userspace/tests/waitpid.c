@@ -10,17 +10,20 @@ int main(int argc, char** argv)
 {
   printf("Call to wait_pid!\n");
   int pid = fork();
-  pid = fork();
-  if(pid != 0)
+  for(int i = 0; i < 10; i++)
   {
-    int p_id = waitpid((pid_t) pid,(int*) 1222,22222);
-    if(p_id < 0)
+    int pid_c = fork();
+    if(pid_c == 0)
     {
-      printf("some error happend\n");
-      return -1;
-    }
-    else
-      printf("Waited for child with pid: %d\n", p_id);
+      int p_id = waitpid(3, 0, 0);
+      if(p_id < 0)
+      {
+        printf("some error happend\n");
+        return -1;
+      }
+      else
+        printf("Waited for child with pid: %d\n", p_id);
+    }     
   }
   printf("Finished the task, my pid: %d\n", pid);
   return 0;

@@ -154,6 +154,7 @@ void ProcessRegistry::createProcess(const char* path)
 
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
+  list_of_processes_lock_.acquire();
   int return_pid = 0;
   ustl::map<size_t, UserProcess*> list;
   list = ProcessRegistry::getProcessList();
@@ -164,9 +165,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
    auto search = list.find(arg1);
    if (search != list.end())
    {
-    debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
+    //debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     callingthread->getParentProcess()->setWaitStatus(1);
-    debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
+    //debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     size_t process_state = search->second->getProcessState();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
@@ -182,6 +183,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
    else
    {
      debug(DBEK, "Not found, process %ld\n", arg1);
+     list_of_processes_lock_.release();
      return -1;
    }
   }
@@ -200,6 +202,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   else //   something went wrong
   {
     debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
+    list_of_processes_lock_.release();
     return -1;
   } 
   if(arg2 != 0)
@@ -208,10 +211,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
 
   // for printing the elements of the map
-  ustl::map<size_t, UserProcess*>::iterator i;
-  for (i = list.begin(); i != list.end(); ++i) 
-    debug(DBEK, "element %ld\n", i->first);
-
+  //ustl::map<size_t, UserProcess*>::iterator i;
+  //for (i = list.begin(); i != list.end(); ++i) 
+   // debug(DBEK, "element %ld\n", i->first);
+  list_of_processes_lock_.release();
   return return_pid;
 }
 
