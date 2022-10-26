@@ -6,6 +6,14 @@
 #include "Syscall.h"
 #include "uvector.h"
 
+enum ProcessState
+{
+UNINTERRUPTABLE_SLEEP,
+RUNNING_AND_RUNNABLE,
+INTERRRUPTABLE_SLEEP,
+STOPPED
+};
+
 
 class UserThread;
 class Syscall;

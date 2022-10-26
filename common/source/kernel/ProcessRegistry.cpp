@@ -170,23 +170,34 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     size_t threadcount = search->second->getNrOfThreads();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
-      debug(DBEK, "Parent: %d, Child %d\n\n\n\n\n", callingthread->getParentProcess()->getPID(), arg1);
+      //debug(DBEK, "Parent: %d, Child %d\n\n\n\n\n", callingthread->getParentProcess()->getPID(), arg1);
       Scheduler::instance()->yield();
-      if(search->second->getNrOfThreads() != threadcount){
+      if(threadcount != search->second->getNrOfThreads())
+      {
+        debug(DBEK, "didnt found\n\n\n\n\n\n\n\n");
         callingthread->getParentProcess()->setWaitStatus(0);
       }
     }
     return_pid = search->second->getPID();
    }
    else
+   {
      debug(DBEK, "Not found, process %ld\n", arg1);
+     return -1;
+   }
   }
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
     debug(DBEK, "arg1 smaller -1\n");
+  }
   else if((long int) arg1 == -1) // any child process.
+  {
     debug(DBEK, "arg1 equals -1\n");
+  }
   else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
     debug(DBEK, "arg1 equals 0\n");
+  }
   else //   something went wrong
   {
     debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
