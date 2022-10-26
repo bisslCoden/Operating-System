@@ -16,7 +16,7 @@ int never_false = 1;
 int simple_routine()
 {
   int mutret = 0;
-  printf("hi i ll try to get the spin!\n");
+  printf("hi i ll try to get the mutex!\n");
   mutret = pthread_mutex_lock(&mutex);
   printf("lock returned %d.\n", mutret);
   assert(never_false == 1 && "never false aint 1? whaat?\n");

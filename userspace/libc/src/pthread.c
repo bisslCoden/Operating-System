@@ -59,7 +59,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 size_t findStackStackStart(size_t inputadress){
   size_t outputadress = inputadress >> 12;
   outputadress = outputadress << 12;
-  outputadress += PAGE_SIZE;
+  outputadress += PAGE_SIZE - sizeof(size_t);
   return outputadress;
 }
 
@@ -75,6 +75,7 @@ void addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
   size_t* iter = mutex->firstsleeper_;
   while (*iter != 0)
   {
+    printf("iter = %p and points to %p\n", iter, (size_t*) *iter);
     iter = (size_t*) *iter;
   }
   *iter = (size_t) localvaradress;
@@ -135,6 +136,11 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex)
   return -1;
 }
 
+//userstack:
+//0x672bfffffff0
+//flagadress:
+//0x672c00000000
+
 /**
  * function stub
  * posix compatible signature - do not change the signature!
@@ -148,10 +154,11 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
   {
     pthread_spin_lock(&mutex->sleeperslist_lock_);
     size_t* next = 0;
+    printf("after didnt get lock;\n");
     addToWaitersList(mutex, &next);
     size_t setsleep = findStackStackStart((size_t) &next);
     //this is here to set me sleeping
-    printf("added myself to sleep list, setting sleep at %p and there is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
+    //printf("added myself to sleep list, setting sleep at %p and there is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
     assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
     printf("added myself to sleep list, setting sleep at %p and there now is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
     pthread_spin_unlock(&mutex->sleeperslist_lock_);

@@ -205,8 +205,9 @@ bool UserThread::setupStack()
 
 
   mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
-  mystack_.UserMutex = ((size_t*) ArchMemory::getIdentAddressOfPPN(ppn_for_stack)) + PAGE_SIZE;
-
+  size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn_for_stack);
+  location += PAGE_SIZE - sizeof(size_t);
+  mystack_.UserMutex = (size_t*) location;
   *mystack_.UserMutex = 0;
 
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx and flag is at %lx"
