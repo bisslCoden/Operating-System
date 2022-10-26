@@ -154,7 +154,7 @@ void ProcessRegistry::createProcess(const char* path)
 
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
-  list_of_processes_lock_.acquire();
+  //list_of_processes_lock_.acquire();
   int return_pid = 0;
   ustl::map<size_t, UserProcess*> list;
   list = ProcessRegistry::getProcessList();
@@ -178,12 +178,13 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
         callingthread->getParentProcess()->setWaitStatus(0);
       }
     }
+    debug(DBEK, "PID of the return %ld\n", search->second->getPID());
     return_pid = search->second->getPID();
    }
    else
    {
      debug(DBEK, "Not found, process %ld\n", arg1);
-     list_of_processes_lock_.release();
+     //list_of_processes_lock_.release();
      return -1;
    }
   }
@@ -202,7 +203,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   else //   something went wrong
   {
     debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
-    list_of_processes_lock_.release();
+    //list_of_processes_lock_.release();
     return -1;
   } 
   if(arg2 != 0)
@@ -214,7 +215,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   //ustl::map<size_t, UserProcess*>::iterator i;
   //for (i = list.begin(); i != list.end(); ++i) 
    // debug(DBEK, "element %ld\n", i->first);
-  list_of_processes_lock_.release();
+  //list_of_processes_lock_.release();
   return return_pid;
 }
 
