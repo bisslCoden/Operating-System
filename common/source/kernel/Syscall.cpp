@@ -83,6 +83,9 @@ after:
     case sc_waitpid:
       return_value = wait_pid((size_t) arg1, (size_t*) arg2, arg3);
       break;
+    case sc_getpid:
+      return_value = get_pid();
+      break;
     case sc_trace:
       trace();
       break;
@@ -491,6 +494,13 @@ size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
   debug(SYSCALL, "Calling Syscall waitpid!\n");
   return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3);
+}
+
+int Syscall::get_pid()
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  debug(SYSCALL, "Calling Syscall getpid!\n");
+  return callingthread->getParentProcess()->getPID();
 }
 
 /*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)

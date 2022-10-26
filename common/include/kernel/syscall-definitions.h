@@ -18,6 +18,7 @@
 #define sc_trace 252
 
 #define sc_waitpid 263
+#define sc_getpid 264
 
 #define sc_pthread_create 400
 #define sc_pthread_cancel 401
