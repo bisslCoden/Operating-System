@@ -42,6 +42,7 @@ typedef struct StackInfo
   size_t userstack_start_ = 0;
   size_t userstack_end_ = 0;
   size_t page_offset_ = 0;
+  size_t* UserMutex;
 } StackInfo;
 
 
@@ -98,6 +99,9 @@ class UserThread : public Thread
     bool isLast() { return last_; }
     // return process of thread
     UserProcess* getParentProcess() { return parent_process_; }
+
+    bool schedulable() override;
+
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}

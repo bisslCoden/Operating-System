@@ -49,6 +49,33 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   switch_to_userspace_ = 1;
 }
 
+bool UserThread::schedulable(){
+  
+  if (getState() == Running)
+  {
+    // size_t addr = (size_t) mystack_.userstack_start_ + sizeof(size_t);
+    // addr = *(size_t*)addr;
+    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, 0, ustl::memory_order_seq_cst);
+    debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
+    if (sleepy == 0)
+    {
+      return true;
+    }
+    else if(sleepy == 1)
+    {
+      //get the right flag back
+      __atomic_exchange_n(mystack_.UserMutex, 1, ustl::memory_order_seq_cst);
+      return false;
+    }
+    else
+    {
+      assert(false && "Sleep flag was neither 1 nor 0?\n");
+    }
+  }
+  return false;
+}
+
+
 // pthread_create
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
@@ -175,15 +202,16 @@ bool UserThread::setupStack()
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
-  // now we are gonna LIE to the user HAHAHAHAHAHAHAHAA
+
+
   mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
-  if(currentThread->getType() != KERNEL_THREAD)
-  {
-    *((size_t*)stack_start_ptr) = (size_t) 0;
-    debug(X_THREADSTACK, "in my actual beginning i have %ld", *((size_t*)stack_start_ptr));
-  }  
-  debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
-  debug(USERTHREAD, "[%ld]: my ACTUAL stack starts at: %lx\n",tid_, (size_t*) stack_start_ptr);
+  mystack_.UserMutex = ((size_t*) ArchMemory::getIdentAddressOfPPN(ppn_for_stack)) + PAGE_SIZE;
+
+  *mystack_.UserMutex = 0;
+
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx and flag is at %lx"
+  "in kernel mapping %p\n",tid_, mystack_.userstack_start_, stack_start_ptr, mystack_.UserMutex);
+
 
   return true;
 }

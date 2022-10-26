@@ -6,6 +6,7 @@
 #include "CleanupThread.h"
 #include "UserThread.h"
 #include "Syscall.h"
+#include "ArchMemory.h"
 
 class Thread;
 class Mutex;
