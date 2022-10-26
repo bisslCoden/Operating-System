@@ -36,6 +36,7 @@ Scheduler::Scheduler()
 
 size_t* getToFlag(Thread* it)
 {
+  debug(X_THREADSTACK, "getting to flag from %ld\n", it->getTID());
   UserThread* user = (UserThread*) it;
   return (size_t*) ((size_t)user->getUserstackStart() + sizeof(size_t));
 }
@@ -48,12 +49,12 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
     if ((*it)->Userthread && (*it)->getState() == Sleeping)
     {
+      currentThread = *it;
       size_t* adressflag = getToFlag((*it));
       debug(X_THREADSTACK, "now trying to deref flag for thread [%ld]\n", (*it)->getTID());
       size_t sleepy = __atomic_exchange_n(adressflag, 1, ustl::memory_order_seq_cst);
@@ -116,7 +117,7 @@ uint32 Scheduler::schedule()
       current->getflags()->knotcancelable.clear();
   }
 
-  if (currentThread->Userthread)
+  /*if (currentThread->Userthread)
   {
     currentThread->switch_to_userspace_ = 0;
     debug(X_THREADSTACK, "checking sleepflag for [%ld]\n", currentThread->getTID());
@@ -139,7 +140,7 @@ uint32 Scheduler::schedule()
     }
     currentThread->switch_to_userspace_ = 1;
   }
-  
+  */
   
 
   return ret;
@@ -165,6 +166,7 @@ void Scheduler::sleep()
   {
     debug(X_THREADSTACK, "by a userthread!\n");
     size_t* sleepflag = getToFlag(currentThread);
+    debug(X_THREADSTACK, "flag was %ld settingnow to 1\n", *sleepflag);
     __atomic_exchange_n(sleepflag, 1, ustl::memory_order_seq_cst);
     debug(SCHEDULER, "now setting current [%ld] to sleep\n", currentThread->getTID());
   }
