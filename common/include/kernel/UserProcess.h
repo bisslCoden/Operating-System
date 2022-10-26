@@ -145,6 +145,12 @@ class UserProcess
     
     void setWaitStatus(bool arg);
 
+    void setProcessState(ProcessState state);
+
+  ProcessState getProcessState() const;
+  //set these to protected to children can access aswell
+  volatile ProcessState state_;
+
   private:
     // the process ID
     size_t const pid_;
@@ -180,6 +186,7 @@ class UserProcess
 
     // for wait_pid
     bool wait_status_;
+
 
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;

@@ -167,14 +167,13 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     callingthread->getParentProcess()->setWaitStatus(1);
     debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
-    size_t threadcount = search->second->getNrOfThreads();
+    size_t process_state = search->second->getProcessState();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
       //debug(DBEK, "Parent: %d, Child %d\n\n\n\n\n", callingthread->getParentProcess()->getPID(), arg1);
       Scheduler::instance()->yield();
-      if(threadcount != search->second->getNrOfThreads())
+      if(process_state != search->second->getProcessState())
       {
-        debug(DBEK, "didnt found\n\n\n\n\n\n\n\n");
         callingthread->getParentProcess()->setWaitStatus(0);
       }
     }
