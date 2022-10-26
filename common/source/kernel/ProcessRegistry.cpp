@@ -155,7 +155,7 @@ void ProcessRegistry::createProcess(const char* path)
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
   //list_of_processes_lock_.acquire();
-  int return_pid = 0;
+  int return_pid = -6;
   ustl::map<size_t, UserProcess*> list;
   list = ProcessRegistry::getProcessList();
   UserThread* callingthread = (UserThread*)currentThread;
@@ -169,6 +169,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     callingthread->getParentProcess()->setWaitStatus(1);
     //debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     size_t process_state = search->second->getProcessState();
+    debug(DBEK, "arg1: %ld, parent %ld, second: %ld \n", arg1, callingthread->getParentProcess()->getPID(),  search->second->getPID());
+    return_pid = search->second->getPID();
+    debug(DBEK, "PID of the return1: %ld\n", return_pid);
     while (callingthread->getParentProcess()->getWaitStatus())
     {
       //debug(DBEK, "Parent: %d, Child %d\n\n\n\n\n", callingthread->getParentProcess()->getPID(), arg1);
@@ -178,8 +181,6 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
         callingthread->getParentProcess()->setWaitStatus(0);
       }
     }
-    debug(DBEK, "PID of the return %ld\n", search->second->getPID());
-    return_pid = search->second->getPID();
    }
    else
    {
@@ -187,6 +188,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
      //list_of_processes_lock_.release();
      return -1;
    }
+   debug(DBEK, "PID of the return2: %ld\n", search->second->getPID());
   }
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {

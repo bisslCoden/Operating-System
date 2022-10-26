@@ -10,8 +10,10 @@ int main(int argc, char** argv)
 {
   printf("Call to wait_pid!\n");
   int pid = fork();
+  printf("pid : %d, and mine process id: %d\n", pid, getpid());
   if(pid != 0)
   {
+    printf("pid before waitpid: %d\n", pid);
     int p_id = waitpid(pid, 0, 0);
     if(p_id < 0)
     {
