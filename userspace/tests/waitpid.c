@@ -10,6 +10,8 @@ int main(int argc, char** argv)
 {
   printf("Call to wait_pid!\n");
   int pid = fork();
+  pid = fork();
+  pid = fork();
   printf("pid : %d, and mine process id: %d\n", pid, getpid());
   if(pid != 0)
   {
@@ -18,7 +20,7 @@ int main(int argc, char** argv)
     if(p_id < 0)
     {
       printf("some error happend\n");
-     return -1;
+      return -1;
     }
     else
      printf("Waited for child with pid: %d\n", p_id);    

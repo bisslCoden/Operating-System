@@ -165,22 +165,22 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
    auto search = list.find(arg1);
    if (search != list.end())
    {
-    //debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     callingthread->getParentProcess()->setWaitStatus(1);
-    //debug(DBEK, "Wait Status: %d, process %ld\n", callingthread->getParentProcess()->getWaitStatus(), arg1);
     size_t process_state = search->second->getProcessState();
-    debug(DBEK, "arg1: %ld, parent %ld, second: %ld \n", arg1, callingthread->getParentProcess()->getPID(),  search->second->getPID());
+    //debug(DBEK, "arg1: %ld, parent %ld, second: %ld \n", arg1, callingthread->getParentProcess()->getPID(),  search->second->getPID());
     return_pid = search->second->getPID();
-    debug(DBEK, "PID of the return1: %ld\n", return_pid);
+    //debug(DBEK, "PID of the return1: %ld\n", return_pid);
+    //list_of_processes_lock_.acquire();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
-      //debug(DBEK, "Parent: %d, Child %d\n\n\n\n\n", callingthread->getParentProcess()->getPID(), arg1);
-      Scheduler::instance()->yield();
+      debug(DBEK, "In while loop: %ld\n", callingthread->getParentProcess()->getPID());
       if(process_state != search->second->getProcessState())
       {
         callingthread->getParentProcess()->setWaitStatus(0);
       }
+      Scheduler::instance()->yield();
     }
+    //list_of_processes_lock_.release();
    }
    else
    {
