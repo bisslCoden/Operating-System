@@ -22,7 +22,7 @@ void simple_routine()
     printf("[1 child: cancel async] ");
   pthread_exit((void*)9);
 }
-
+//hui
 void simple_routine2()
 {
   int old;
