@@ -16,8 +16,10 @@
 // first thread
 UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  process_(process_), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
-  "Thread::join_cond"} // UserThread's members
+  process_(process_), 
+  flag_mutex_{"thread::flag_mutex_"}, 
+  condition_mutex_{"Thread::cond_mutex_"},
+  join_cond_{ &condition_mutex_, "Thread::join_cond" } // UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
@@ -25,14 +27,13 @@ UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl:
   // setup stack, UserRegisters and address space
   mystack_.page_offset_ = page_offset;
   setupStack();
-  ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
+  ArchThreads::createUserRegisters(user_registers_, 
+                                   loader_->getEntryFunction(),
                                    getUserstackStart(),
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
-  debug(X_USERTHREAD, "TID [%ld]: Stack, Registers and AddressSpace set.\n", getTID());
 
   // set terminal
   if (main_console->getTerminal(terminal_number))
@@ -177,16 +178,19 @@ bool UserThread::setupStack()
   return true;
 }
 
-int UserThread::exec(char* const argv[])
+int UserThread::exec(char* const argv[], size_t argc)
 {
   // arg convention checking was laready done in Syscall::execv()
 
+  /*
   // create page for args
   size_t ppn = PageManager::instance()->allocPPN();
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
   assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
   size_t argv_addr = ArchMemory::getIdentAddressOfPPN(ppn);
   debug(USERTHREAD, "exec() ppn = %lx, vpn = %lx, argv_addr = %lx\n", ppn, vpn, argv_addr);
+
+  size_t start = vpn * PAGE_SIZE;
   
   // fill page with args
   size_t argc = 0;
@@ -211,6 +215,35 @@ int UserThread::exec(char* const argv[])
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = argc; 
   user_registers_->rsi = argv_addr * PAGE_SIZE;
+  debug(X_USERTHREAD, "bevore return from exec()\n");
+  return 123;
+  */
+
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
+  size_t ppn = PageManager::instance()->allocPPN();
+  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
+  size_t ident = ArchMemory::getIdentAddressOfPPN(ppn);
+  debug(USERTHREAD, "exec(): vpn = %lx, ppn = %lx, ident = %lx\n", vpn, ppn, ident);
+
+  size_t end_of_page = vpn * PAGE_SIZE;
+  size_t start_argv_addr = end_of_page + sizeof(size_t) * argc;
+  size_t start_argv_ident = ident + sizeof(size_t) * argc;
+  debug(USERTHREAD, "exec(): end_of_page = %lx, start_argv_addr = %lx, start_argv_ident = %lx\n", 
+        end_of_page, start_argv_addr, start_argv_ident);
+  for(size_t i = 0; argv[i]; i++)
+  {
+    debug(X_USERTHREAD, "start of for loop: ident = %lx, start_argv_addr = %lx, start_argv_ident = %lx\n", ident, start_argv_addr, start_argv_ident);
+    *((size_t*)ident) = start_argv_addr;
+    ident += sizeof(size_t);
+    debug(X_USERTHREAD, "ident increased to %lx\n", ident);
+    memcpy((void*)start_argv_ident, (void*)argv[i], strlen(argv[i]));
+    debug(X_USERTHREAD, "memcpy(start_argv_ident = %lx, argv[%ld] = %s, strlen() = %ld)\n", start_argv_ident, i, argv[i], strlen(argv[i]));
+    start_argv_addr += sizeof(char)*strlen(argv[i]) + 1;
+    start_argv_ident += sizeof(char)*strlen(argv[i]) + 1;
+    debug(X_USERTHREAD, "end of for loop: start_argv_addr = %lx, start_argv_ident = %lx\n", start_argv_addr, start_argv_ident);
+    debug(X_USERTHREAD, "---\n");
+  }
+  
   debug(X_USERTHREAD, "bevore return from exec()\n");
   return 0;
 }

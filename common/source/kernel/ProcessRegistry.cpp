@@ -152,12 +152,12 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+int ProcessRegistry::execvProcess(const char* path, char *const argv[], size_t argc)
 {
   debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx\n", path, (size_t)argv);
   UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
-  debug(PROCESS_REG, "execv for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
-  int ret = currentProcess->execv(path, argv);
+  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  int ret = currentProcess->execv(path, argv, argc);
 
   // vvvvvvv sshiat vvvvvvv 
   debug(PROCESS_REG, "ERROR: RETURNED FROM EXECV??? wtf?!?\n");

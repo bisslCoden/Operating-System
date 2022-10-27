@@ -48,7 +48,8 @@ class ProcessRegistry : public Thread
      */
     static ProcessRegistry* instance();
     void createProcess(const char* path);
-    int execvProcess(const char* path, char *const argv[]);
+
+    int execvProcess(const char* path, char *const argv[], size_t argc);
 
 
     /**

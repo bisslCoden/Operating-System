@@ -6,6 +6,7 @@
 #include "Syscall.h"
 #include "uvector.h"
 
+#define NO_EXEC_CALL 123454321
 
 class UserThread;
 class Syscall;
@@ -43,8 +44,18 @@ class UserProcess
      * 
      * @param path the path to the binary
      * @param argv the arguments 
+     * @param argc the argument count
      */
-    int execv(const char* path, char *const argv[]);
+    int execv(const char* path, char *const argv[], size_t argc);
+
+    /**
+     * @brief does the Loader setup + fd check
+     * 
+     * @param fd the fd that's used in the Loader constructor
+     * @return true if success,
+     * @return false if rip
+     */
+    bool setupLoader(ssize_t fd);
 
     /**
      * @brief UNSAFELY removes userthread from threads_ 
@@ -98,12 +109,13 @@ class UserProcess
     size_t createNewThread(size_t start_routine, size_t args, size_t wrapper);
 
     /**
-     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * @brief exits the whole userprogram if kill_last is true. 
+     * otherwise only destroys all except currentThread
      * 
-     * @param exit_code 
-     * @return size_t 
+     * @param exit_code the exit code
+     * @param kill_last bool that says whether currentThread should be killed.
      */
-    void exit(size_t exit_code);
+    void exit(size_t exit_code, bool kill_currentThread = true);
 
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}

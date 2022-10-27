@@ -503,8 +503,9 @@ int Syscall::execv(const char * path, char *const argv[])
   if(!strcmp(path, argv[0]))
     argv_ok[0] = true;
   // 1 : last element must be NULL
-  for(int i = 1; !argv_ok[1] ; i++)
-    if(argv[i] == NULL)
+  size_t argc = 1;
+  for(; !argv_ok[1] ; argc++)
+    if(argv[argc] == NULL)
       argv_ok[1] = true;
   if(!argv_ok[0] || !argv_ok[1])
   {
@@ -512,6 +513,6 @@ int Syscall::execv(const char * path, char *const argv[])
     return -1;
   }
 
-  debug(X_EXECV, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
-  return ProcessRegistry::instance()->execvProcess(path, argv);
+  debug(X_EXECV, "Syscall::execv(path = %s, argv = %lx, argc = %ld)\n", path, (size_t)argv, argc);
+  return ProcessRegistry::instance()->execvProcess(path, argv, argc);
 }

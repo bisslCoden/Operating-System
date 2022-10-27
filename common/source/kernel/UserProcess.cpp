@@ -27,14 +27,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
-  if (fd_ >= 0)
-    loader_ = new Loader(fd_);
-
-  if (!loader_ || !loader_->loadExecutableAndInitProcess())
-  {
-    debug(USERPROCESS, "Error: loading %s failed!\n", name_.c_str());
+  if(!setupLoader(fd_))
     return;
-  }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
 
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
@@ -53,7 +47,6 @@ UserProcess::UserProcess(UserProcess *parent) :
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock"), 
   offsetlist_lock_("UserProcess::offsets")
-
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
@@ -62,25 +55,9 @@ UserProcess::UserProcess(UserProcess *parent) :
     return;
   }
 
-  if (fd_ >= 0)
-    loader_ = new Loader(fd_); 
-    
-  if(fd_ < 0)
-  {
-    debug(USERPROCESS, "Failed to create Loader!\n");
-  }
-
-  if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
-  {
-    debug(USERPROCESS, "Failed to create Loader!\n");
+  if (!setupLoader(fd_))
     return;
-  }
-
-  if(!loader_->loadExecutableAndInitProcess())
-  {
-    debug(USERPROCESS, "Failed to init Process\n");
-    return;
-  }
+  debug(USERPROCESS, "UserProcess fork constructor sucessfully setupLoader()\n");
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
   threads_lock_.acquire();
@@ -249,7 +226,7 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
   return 0;
 }
 
-void UserProcess::exit(size_t exit_code)
+void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
   if (!threads_lock_.isHeldBy(currentThread))
@@ -274,7 +251,8 @@ void UserProcess::exit(size_t exit_code)
   }
   threads_lock_.release();
   debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
-  Syscall::pthread_exit((void*) exit_code);
+  if(kill_currentThread)
+    Syscall::pthread_exit((void*) exit_code);
 }
 
 bool UserProcess::getRetVal(size_t tid, void** value)
@@ -292,42 +270,43 @@ bool UserProcess::getRetVal(size_t tid, void** value)
 }
 
 // TODO: kill all old threads 
-int UserProcess::execv(const char* path, char *const argv[])
+int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
-  int exec_ret = 0;
-  ssize_t prev_fd = fd_;
-  Loader* prev_loader = loader_;
-
+  debug(USERPROCESS, "execv() called\n");
   // fd
-  fd_ = VfsSyscall::open(path, O_RDONLY);
-  if(fd_ < 0)
+  ssize_t old_fd = fd_;
+  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+  if(!setupLoader(new_fd))
   {
-    debug(USERPROCESS, "ERROR: execv(path = %s) fd_ = %ld\n", path, fd_);
-    goto closefd;
+    debug(USERPROCESS, " execv() ERREOR with fd or Loader\n");
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
   }
-  // loader 
-  loader_ = new Loader(fd_);
-  if(!loader_ || !loader_->loadExecutableAndInitProcess())
-  {
-    debug(USERPROCESS, "ERROR: execv() loader_ failed.\n");
-    goto deleteloader;
-  }
+  VfsSyscall::close(old_fd);
+  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+
+  // TODO: kill old threads
+  exit(13579, false);
 
   // exec (should not return)
   debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutable...().\n", path, (size_t)argv);
-  exec_ret = ((UserThread*)currentThread)->exec(argv);
+  ((UserThread*)currentThread)->exec(argv, argc);
   
   // rip
-  debug(USERPROCESS, "ERROR: returned value [%d] from currentThread->exec(argv)???\n", exec_ret); 
+  return 0;
+}
 
-deleteloader: 
-  delete loader_;
-  loader_ = prev_loader;
+bool UserProcess::setupLoader(ssize_t fd)
+{
+  if(fd < 0)
+    return false;
 
-closefd:
-  if(exec_ret != 0)
-    VfsSyscall::close(fd_);
+  fd_ = fd;
+  Loader* new_loader = new Loader(fd_);
+  if(!new_loader || !new_loader->loadExecutableAndInitProcess())
+    return false;
 
-  fd_ = prev_fd;
-  return -1;
+  loader_ = new_loader;
+  return true;
 }
