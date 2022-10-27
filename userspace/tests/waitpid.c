@@ -8,13 +8,10 @@
 
 int main(int argc, char** argv)
 {
-  for(int i = 0; i < 10; i++)
+  for(int i = 0; i < 3; i++)
   {
     printf("Call to wait_pid!\n");
     int pid = fork();
-    pid = fork();
-    pid = fork();
-    pid = fork();
     pid = fork();
     printf("pid : %d, and mine process id: %d\n", pid, getpid());
     if(pid != 0)

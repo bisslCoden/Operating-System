@@ -8,6 +8,7 @@
 
 enum ProcessState
 {
+ZERO, //to check if the process exist or not with getProcessState()
 UNINTERRUPTABLE_SLEEP,
 RUNNING_AND_RUNNABLE,
 INTERRRUPTABLE_SLEEP,
