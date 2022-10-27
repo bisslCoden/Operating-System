@@ -91,7 +91,7 @@ const size_t M_ZONE             = Ansi_Yellow;
 // add your debug message-categories here. pls also use a X_ as prefix as it indicates to X-treme debugging
 const size_t X_PROCESS_REG      = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t X_USERPROCESS      = Ansi_Cyan    | OUTPUT_ENABLED;
-const size_t X_USERTHREAD       = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_USERTHREAD       = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t X_PAGEFAULT        = Ansi_Green   | OUTPUT_ENABLED;
 const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t X_PAGEMANAGER      = Ansi_Green   | OUTPUT_ENABLED;

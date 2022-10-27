@@ -69,7 +69,7 @@ class UserProcess
      * 
      * @param tid the tid
      * @param value pointer to the value
-     * @return true if success
+     * @return true if success, 
      * @return false if already in list (assert)
      */
     bool addToRetvalList(size_t tid, void* value);

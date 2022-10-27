@@ -179,34 +179,38 @@ bool UserThread::setupStack()
 
 int UserThread::exec(char* const argv[])
 {
-  // arg checking convention was laready done in Syscall::execv()
+  // arg convention checking was laready done in Syscall::execv()
 
   // create page for args
   size_t ppn = PageManager::instance()->allocPPN();
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
   assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
   size_t argv_addr = ArchMemory::getIdentAddressOfPPN(ppn);
-  debug(USERTHREAD, "exec() ppn = %ld, vpn = %ld, argv_addr = %ld\n", ppn, vpn, argv_addr);
+  debug(USERTHREAD, "exec() ppn = %lx, vpn = %lx, argv_addr = %lx\n", ppn, vpn, argv_addr);
   
-  size_t offset = 0;
-  size_t current_arg_len = 0;
+  // fill page with args
   size_t argc = 0;
-  for(int i = 0; !argv[i]; i++)
+  size_t offset = 0;
+  for(int i = 0; argv[i]; i++)
   {
-    offset += current_arg_len;
-    current_arg_len = strlen(argv[i] + 1);
-    debug(USERTHREAD, "exec(): argv[%d] = %s | current_arg_len =\n", i, argv[i]);
-    size_t destination = argv_addr + offset;
-    memcpy((void*)destination, (void*)argv[i], current_arg_len);
-    argc++;
-  }
-  debug(USERTHREAD, "exec() offset = %ld, ");
+    size_t arg_size = strlen(argv[i]);
+    debug(X_USERTHREAD, "exec(): argv[%d] = %s | arg_size = %ld\n", i, argv[i], arg_size);
 
+    size_t destination = argv_addr + offset;
+    memcpy((void*)destination, (void*)argv[i], arg_size);
+    debug(X_USERTHREAD, "memcpy(dest = %lx, src = %lx, arg_size = %ld\n", destination, (size_t)argv[i], arg_size);
+    offset += arg_size;
+    argc++;
+    debug(X_USERTHREAD, "offset: %ld\n", offset);
+  }
+  debug(X_USERTHREAD, "exec() argc = %ld, offset = %ld\n", argc, offset);
+
+  // last values
+  loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = argc; 
   user_registers_->rsi = argv_addr * PAGE_SIZE;
-
-  loader_ = process_->getLoader();
+  debug(X_USERTHREAD, "bevore return from exec()\n");
   return 0;
 }
