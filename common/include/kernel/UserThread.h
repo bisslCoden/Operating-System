@@ -91,7 +91,7 @@ class UserThread : public Thread
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }
     // return process of thread
-    UserProcess* getParentProcess() { return process_; }
+    UserProcess* getProcess() { return process_; }
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
@@ -109,6 +109,9 @@ class UserThread : public Thread
     
     //lock before!
     int32 getJoiner(){return join_waiter_;}
+
+    // execv
+    int exec(char* const argv[]);
   
   private:
     // the process that contains this thread

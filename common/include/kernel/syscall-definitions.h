@@ -5,7 +5,6 @@
 #define fd_stderr 2
 
 #define sc_exit 1
-#define sc_fork 222
 #define sc_read 3
 #define sc_write 4
 #define sc_open 5
@@ -24,3 +23,5 @@
 #define sc_pthread_setcancelstate 404
 #define sc_pthread_setcanceltype 405
 
+#define sc_fork 501
+#define sc_execv 502

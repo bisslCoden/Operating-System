@@ -107,8 +107,8 @@ size_t ProcessRegistry::createID()
 
 size_t ProcessRegistry::processFork()
 {
-  debug(PROCESS_REG, "ProcessRegistry::processFork() called starting process creation\n");
-  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "processFork() called starting process creation\n");
+  auto parent = ((UserThread*)currentThread)->getProcess();
   //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent);
 
@@ -130,7 +130,7 @@ size_t ProcessRegistry::processFork()
 
 void ProcessRegistry::createProcess(const char* path)
 {
-  debug(PROCESS_REG, "create process %s\n", path);
+  debug(PROCESS_REG, "createProcess(path = %s)\n", path);
   FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
   if(!fs_info)
   {
@@ -152,3 +152,15 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
+int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+{
+  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx\n", path, (size_t)argv);
+  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(PROCESS_REG, "execv for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  int ret = currentProcess->execv(path, argv);
+
+  // vvvvvvv sshiat vvvvvvv 
+  debug(PROCESS_REG, "ERROR: RETURNED FROM EXECV??? wtf?!?\n");
+  //assert(false);
+  return ret;
+}

@@ -48,6 +48,8 @@ class ProcessRegistry : public Thread
      */
     static ProcessRegistry* instance();
     void createProcess(const char* path);
+    int execvProcess(const char* path, char *const argv[]);
+
 
     /**
      * creates an unique ID for every process OR thread ID

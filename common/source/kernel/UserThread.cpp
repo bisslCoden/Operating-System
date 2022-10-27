@@ -176,3 +176,37 @@ bool UserThread::setupStack()
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
   return true;
 }
+
+int UserThread::exec(char* const argv[])
+{
+  // arg checking convention was laready done in Syscall::execv()
+
+  // create page for args
+  size_t ppn = PageManager::instance()->allocPPN();
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
+  assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
+  size_t argv_addr = ArchMemory::getIdentAddressOfPPN(ppn);
+  debug(USERTHREAD, "exec() ppn = %ld, vpn = %ld, argv_addr = %ld\n", ppn, vpn, argv_addr);
+  
+  size_t offset = 0;
+  size_t current_arg_len = 0;
+  size_t argc = 0;
+  for(int i = 0; !argv[i]; i++)
+  {
+    offset += current_arg_len;
+    current_arg_len = strlen(argv[i] + 1);
+    debug(USERTHREAD, "exec(): argv[%d] = %s | current_arg_len =\n", i, argv[i]);
+    size_t destination = argv_addr + offset;
+    memcpy((void*)destination, (void*)argv[i], current_arg_len);
+    argc++;
+  }
+  debug(USERTHREAD, "exec() offset = %ld, ");
+
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  user_registers_->rip = (size_t)loader_->getEntryFunction();
+  user_registers_->rdi = argc; 
+  user_registers_->rsi = argv_addr * PAGE_SIZE;
+
+  loader_ = process_->getLoader();
+  return 0;
+}

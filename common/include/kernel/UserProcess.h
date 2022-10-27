@@ -39,6 +39,14 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
+     * @brief creates a thread that starts the binary of the program
+     * 
+     * @param path the path to the binary
+     * @param argv the arguments 
+     */
+    int execv(const char* path, char *const argv[]);
+
+    /**
      * @brief UNSAFELY removes userthread from threads_ 
      * 
      * @param thread the userthread
@@ -97,13 +105,6 @@ class UserProcess
      */
     void exit(size_t exit_code);
 
-    /**
-     * @brief calls thread->kill() which sets state to toBeDestroyed
-     * 
-     * @param thread pointer to the thread
-     */
-    void killThread(UserThread* thread);
-
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}
 
@@ -129,7 +130,7 @@ class UserProcess
 
 
     // the process' fd. see "FileDescriptor.h"
-    ssize_t const fd_;
+    ssize_t fd_;
 
     // information about the program. path...
     FileSystemInfo* const fs_info_;

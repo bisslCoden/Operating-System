@@ -277,12 +277,6 @@ void UserProcess::exit(size_t exit_code)
   Syscall::pthread_exit((void*) exit_code);
 }
 
-void UserProcess::killThread(UserThread* thread)
-{
-  debug(USERPROCESS, "PID: [%ld] killThread() called for tid [%ld]\n", pid_, thread->getTID());
-  thread->kill();
-}
-
 bool UserProcess::getRetVal(size_t tid, void** value)
 {
   returnvalue_lock_.acquire();
@@ -295,4 +289,45 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   }
   returnvalue_lock_.release();
   return false;
+}
+
+// TODO: kill all old threads 
+int UserProcess::execv(const char* path, char *const argv[])
+{
+  int exec_ret = 0;
+  ssize_t prev_fd = fd_;
+  Loader* prev_loader = loader_;
+
+  // fd
+  fd_ = VfsSyscall::open(path, O_RDONLY);
+  if(fd_ < 0)
+  {
+    debug(USERPROCESS, "ERROR: execv(path = %s) fd_ = %ld\n", path, fd_);
+    goto closefd;
+  }
+  // loader 
+  loader_ = new Loader(fd_);
+  if(!loader_ || !loader_->loadExecutableAndInitProcess())
+  {
+    debug(USERPROCESS, "ERROR: execv() loader_ failed.\n");
+    goto deleteloader;
+  }
+
+  // exec (should not return)
+  debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutable...().\n", path, (size_t)argv);
+  exec_ret = ((UserThread*)currentThread)->exec(argv);
+  
+  // rip
+  debug(USERPROCESS, "ERROR: returned value [%d] from currentThread->exec(argv)???\n", exec_ret); 
+
+deleteloader: 
+  delete loader_;
+  loader_ = prev_loader;
+
+closefd:
+  if(exec_ret != 0)
+    VfsSyscall::close(fd_);
+
+  fd_ = prev_fd;
+  return -1;
 }

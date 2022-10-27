@@ -4,7 +4,7 @@
 #define SIMPLE1 1
 #define SIMPLE2 1
 #define SIMPLE3 1
-#define FORKS 1
+#define FORKS 123
 
 void simple_routine()
 {
