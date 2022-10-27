@@ -1,4 +1,11 @@
 {
     "cmake.buildDirectory": "/tmp/sweb",
-    "C_Cpp.default.configurationProvider": " compileCommands"
+    "debug.onTaskErrors": "debugAnyway",
+    "cmake.configureSettings": {
+        "DDEBUG":"1",
+    },
+    "cmake.buildTask": true,
+    "files.associations": {
+        "memory": "cpp"
+    }
 }
