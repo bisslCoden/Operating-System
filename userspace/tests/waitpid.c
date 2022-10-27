@@ -8,25 +8,28 @@
 
 int main(int argc, char** argv)
 {
-  printf("Call to wait_pid!\n");
-  int pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  pid = fork();
-  printf("pid : %d, and mine process id: %d\n", pid, getpid());
-  if(pid != 0)
+  for(int i = 0; i < 10; i++)
   {
-    printf("pid before waitpid: %d\n", pid);
-    int p_id = waitpid(pid, 0, 0);
-    if(p_id < 0 || pid < 0)
+    printf("Call to wait_pid!\n");
+    int pid = fork();
+    pid = fork();
+    pid = fork();
+    pid = fork();
+    pid = fork();
+    printf("pid : %d, and mine process id: %d\n", pid, getpid());
+    if(pid != 0)
     {
-      printf("some error happend\n");
-      return -1;
+      printf("pid before waitpid: %d\n", pid);
+      int p_id = waitpid(pid, 0, 0);
+      if(p_id < 0 || pid < 0)
+      {
+        printf("some error happend\n");
+        return -1;
+      }
+      else
+       printf("Waited for child with pid: %d\n", p_id);    
     }
-    else
-     printf("Waited for child with pid: %d\n", p_id);    
+    printf("Finished the task, my pid: %d\n", getpid());
   }
-  printf("Finished the task, my pid: %d\n", getpid());
   return 0;
 }
