@@ -155,7 +155,7 @@ void ProcessRegistry::createProcess(const char* path)
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
 {
   //list_of_processes_lock_.acquire();
-  int return_pid = -6;
+  int return_pid = 0;
   ustl::map<size_t, UserProcess*> list;
   list = ProcessRegistry::getProcessList();
   UserThread* callingthread = (UserThread*)currentThread;
@@ -163,6 +163,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   {
    debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
    auto search = list.find(arg1);
+   auto search_parent = list.find(callingthread->getParentProcess()->getPID());
    if (search != list.end())
    {
     callingthread->getParentProcess()->setWaitStatus(1);
@@ -171,16 +172,24 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     return_pid = search->second->getPID();
     //debug(DBEK, "PID of the return1: %ld\n", return_pid);
     //list_of_processes_lock_.acquire();
+    bool process_alive = 1;
+    bool parent_alive = 1;
     while (callingthread->getParentProcess()->getWaitStatus())
     {
-      debug(DBEK, "In while loop: %ld\n", callingthread->getParentProcess()->getPID());
+      search = list.find(arg1);
+      search_parent = list.find(callingthread->getParentProcess()->getPID());
+      if(search == list.end() || search_parent == list.end())
+        return -1;
+      debug(DBEK, "In while loop, pid: %ld\n getState: %d\n actual state: %ld\n wait_status: %d\n process alive: %d\n, parent alive: %d\n", callingthread->getParentProcess()->getPID(), 
+      search->second->getProcessState(), process_state, callingthread->getParentProcess()->getWaitStatus(), process_alive, parent_alive);
+      Scheduler::instance()->yield();
       if(process_state != search->second->getProcessState())
       {
+        list_of_processes_lock_.acquire();
         callingthread->getParentProcess()->setWaitStatus(0);
+        list_of_processes_lock_.release();
       }
-      Scheduler::instance()->yield();
     }
-    //list_of_processes_lock_.release();
    }
    else
    {
@@ -207,7 +216,8 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
     //list_of_processes_lock_.release();
     return -1;
-  } 
+  }
+  //  list_of_processes_lock_.release();
   if(arg2 != 0)
     debug(DBEK, "arg2 different 0, process %ld\n", arg1);
   if(arg3 > 0) 
