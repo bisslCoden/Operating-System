@@ -157,10 +157,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   //list_of_processes_lock_.acquire();
   int return_pid = -6;
   ustl::map<size_t, UserProcess*> list;
-  list = ProcessRegistry::getProcessList();
-  UserThread* callingthread = (UserThread*)currentThread;
   if((long int) arg1 > 0) // any specifed process
   {
+    list = ProcessRegistry::getProcessList();
+    UserThread* callingthread = (UserThread*)currentThread;
    debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
    auto search = list.find(arg1);
    if (search != list.end())
@@ -173,6 +173,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     //list_of_processes_lock_.acquire();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
+      search = list.find(arg1);
+      if (search == list.end())
+      {
+        debug(DBEK, "In if inwhile loop: %ld\n", callingthread->getParentProcess()->getPID());
+        return -1;
+      }
       debug(DBEK, "In while loop: %ld\n", callingthread->getParentProcess()->getPID());
       if(process_state != search->second->getProcessState())
       {

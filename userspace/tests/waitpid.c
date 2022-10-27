@@ -19,7 +19,7 @@ int main(int argc, char** argv)
   {
     printf("pid before waitpid: %d\n", pid);
     int p_id = waitpid(pid, 0, 0);
-    if(p_id < 0)
+    if(p_id < 0 || pid < 0)
     {
       printf("some error happend\n");
       return -1;
