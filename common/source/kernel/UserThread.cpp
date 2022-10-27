@@ -53,7 +53,7 @@ bool UserThread::schedulable(){
   
   if (getState() == Running)
   {
-
+    //testsystem
     //checks if exit is called
     if (!getflags()->knotcancelable.test_and_set())
       {
