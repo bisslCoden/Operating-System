@@ -173,12 +173,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     //list_of_processes_lock_.acquire();
     while (callingthread->getParentProcess()->getWaitStatus())
     {
-      search = list.find(arg1);
-      if (search == list.end())
-      {
-        debug(DBEK, "In if inwhile loop: %ld\n", callingthread->getParentProcess()->getPID());
-        return -1;
-      }
+      //search = list.find(arg1);
+      //if (search == list.end())
+      //{
+       // debug(DBEK, "In if inwhile loop: %ld\n", callingthread->getParentProcess()->getPID());
+        //return -1;
+      //}
       debug(DBEK, "In while loop: %ld\n", callingthread->getParentProcess()->getPID());
       if(process_state != search->second->getProcessState())
       {
