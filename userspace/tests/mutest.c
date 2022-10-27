@@ -3,7 +3,7 @@
 #include "assert.h"
 #include "sched.h"
 
-#define NUM_THREADS 3
+#define NUM_THREADS 100
 
 pthread_mutex_t mutex;
 pthread_t tids[NUM_THREADS]; 

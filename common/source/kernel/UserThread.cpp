@@ -53,8 +53,26 @@ bool UserThread::schedulable(){
   
   if (getState() == Running)
   {
-    // size_t addr = (size_t) mystack_.userstack_start_ + sizeof(size_t);
-    // addr = *(size_t*)addr;
+
+    //checks if exit is called
+    if (!getflags()->knotcancelable.test_and_set())
+      {
+        if (getflags()->kasynchronous.test_and_set())
+        {
+          if (getflags()->kcancelreq.test_and_set())
+          {
+            return true;
+          }
+          else
+            getflags()->kcancelreq.clear();
+        }
+        else
+          getflags()->kasynchronous.clear();
+      }
+      else 
+        getflags()->knotcancelable.clear();
+    
+    
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, 0, ustl::memory_order_seq_cst);
     debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
     if (sleepy == 0)

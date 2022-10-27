@@ -75,7 +75,7 @@ void addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
   size_t* iter = mutex->firstsleeper_;
   while (*iter != 0)
   {
-    printf("iter = %p and points to %p\n", iter, (size_t*) *iter);
+    //printf("iter = %p and points to %p\n", iter, (size_t*) *iter);
     iter = (size_t*) *iter;
   }
   *iter = (size_t) localvaradress;
@@ -150,30 +150,30 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
   if(mutex->initialized_ != 1)
     __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
 
-  if(!atomic_exchange_0(&mutex->lock_))
+  pthread_spin_lock(&mutex->sleeperslist_lock_);
+  if(mutex->firstsleeper_ == 0)
   {
-    pthread_spin_lock(&mutex->sleeperslist_lock_);
-    size_t* next = 0;
-    printf("after didnt get lock;\n");
-    addToWaitersList(mutex, &next);
-    size_t setsleep = findStackStackStart((size_t) &next);
-    //this is here to set me sleeping
-    //printf("added myself to sleep list, setting sleep at %p and there is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
-    assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
-    printf("added myself to sleep list, setting sleep at %p and there now is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
-    pthread_spin_unlock(&mutex->sleeperslist_lock_);
-    sched_yield();
+    if (atomic_exchange_0(&mutex->lock_))
+    {
+      pthread_spin_unlock(&mutex->sleeperslist_lock_);
+      return 0;
+    }
+  }  //didnt get the lock now i ll sleep
+  
+  size_t* next = 0;
+  addToWaitersList(mutex, &next);
+  size_t setsleep = findStackStackStart((size_t) &next);
+  assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
+  //printf("added myself to sleep list, setting sleep at %p and there now is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
+  pthread_spin_unlock(&mutex->sleeperslist_lock_);
+  sched_yield();
 
-    pthread_spin_lock(&mutex->sleeperslist_lock_);
-    printf("flag is now agein free? %ld\n", mutex->lock_);
-    assert(atomic_exchange_0(&mutex->lock_) == 1 && "huh? got woken up but still cant get a lock!\n");
-    mutex->firstsleeper_ = (size_t*) next;
-    pthread_spin_unlock(&mutex->sleeperslist_lock_);
-    
-    return 0;
-  }
-  else
-    return 0;
+  pthread_spin_lock(&mutex->sleeperslist_lock_);
+  //printf("flag is now agein free? %ld\n", mutex->lock_);
+  assert(atomic_exchange_0(&mutex->lock_) == 1 && "huh? got woken up but still cant get a lock!\n");
+  mutex->firstsleeper_ = next;
+  pthread_spin_unlock(&mutex->sleeperslist_lock_);
+  return 0;
 }
 
 //0x685bfffffff0
@@ -187,15 +187,16 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
   //size_t adress = 0x685c00000000 - 8;
   if(mutex->initialized_ != 1)
     __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   if(mutex->firstsleeper_ != 0){
-    
+  
     size_t setwake = findStackStackStart((size_t) mutex->firstsleeper_);
     assert(atomic_exchange_0((size_t*) setwake) == 1 && "tried to wake but was alreay woke?\n");
-    mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;
+    // mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;
   }
   assert(atomic_exchange_1(&mutex->lock_) == 0 && "whaat? lock was free when unlocking\n");
-  printf("flag is low agein unlocked: %ld\n", mutex->lock_);
+  //printf("flag is now again unlocked: %ld\n", mutex->lock_);
   pthread_spin_unlock(&mutex->sleeperslist_lock_);
   return 0;
 }
