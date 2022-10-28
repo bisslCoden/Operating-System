@@ -9,7 +9,6 @@ extern "C" {
 #define PAGE_SIZE 4096
 //pthread typedefs
 typedef size_t pthread_t;
-typedef unsigned int pthread_attr_t;
 
 enum cancelstate {
     PTHREAD_CANCEL_ENABLE,
@@ -19,6 +18,11 @@ enum cancelstate {
 enum canceltype {
     PTHREAD_CANCEL_DEFERRED, 
     PTHREAD_CANCEL_ASYNCHRONOUS
+};
+
+enum joinbale {
+    PTHREAD_CREATE_JOINABLE, 
+    PTHREAD_CREATE_DETACHED
 };
 
 //not yet implemented
@@ -36,15 +40,21 @@ typedef unsigned int pthread_mutexattr_t;
 typedef unsigned int pthread_cond_t;
 typedef unsigned int pthread_condattr_t;
 
-extern int pthread_create(pthread_t *thread,
-         const pthread_attr_t *attr, void *(*start_routine)(void *),
-         void *arg);
-         
 typedef struct spinlock{
     size_t mylock_;
     size_t initialized_;
     int pshared_;
 }pthread_spinlock_t;
+
+typedef struct threadattribute
+{
+    int initialized_;
+    int detach_state_;
+    size_t guard_size_; 
+    size_t* stackaddress_;
+    size_t  stacksize_;
+} pthread_attr_t;
+
 
 
 typedef struct UserMutex{
@@ -56,6 +66,10 @@ typedef struct UserMutex{
 }pthread_mutex_t;
 
 
+extern int pthread_create(pthread_t *thread,
+         const pthread_attr_t *attr, void *(*start_routine)(void *),
+         void *arg);
+         
 
 //setters for cancelflags
 extern int pthread_setcancelstate(int state, int *oldstate);
@@ -84,6 +98,12 @@ extern int pthread_mutex_destroy(pthread_mutex_t *mutex);
 extern int pthread_mutex_lock(pthread_mutex_t *mutex);
 
 extern int pthread_mutex_unlock(pthread_mutex_t *mutex);
+
+extern int pthread_attr_init(pthread_attr_t *attr);
+
+extern int pthread_attr_destroy(pthread_attr_t *attr);
+
+
 
 extern int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr);
 

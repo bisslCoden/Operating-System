@@ -23,4 +23,5 @@
 #define sc_pthread_join 403
 #define sc_pthread_setcancelstate 404
 #define sc_pthread_setcanceltype 405
+#define sc_pthread_attr_init 406
 

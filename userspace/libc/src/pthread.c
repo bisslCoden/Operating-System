@@ -41,6 +41,28 @@ size_t atomic_exchange_1(size_t* lock){
 }
 
 
+int pthread_attr_init(pthread_attr_t *attr){
+  if (attr->initialized_ == 1)
+    return -1;
+  
+  attr->detach_state_ = PTHREAD_CREATE_JOINABLE;
+  attr->guard_size_ = PAGE_SIZE;
+  __syscall(sc_pthread_attr_init, (size_t)&attr->stackaddress_, (size_t)&attr->stacksize_, 0x0, 0x0, 0x0);
+  return 0;
+}
+int pthread_attr_destroy(pthread_attr_t *attr){
+  if (attr->initialized_ != 1)
+  {
+    return -1;
+  }
+  attr->initialized_ = 0;
+  return 0;
+  
+};
+
+
+
+
 
 /**
  * function stub

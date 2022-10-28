@@ -33,6 +33,7 @@ class Syscall
   static int32 pthread_cancel(size_t thread);
   static int32 pthread_setcancelstate(int32 state, int32* oldstate);
   static int32 pthread_setcanceltype(int32 type, int32* oldtype);
+  static int32 pthread_attr_init(size_t** stackaddr, size_t* stacksize);
 
 };
 

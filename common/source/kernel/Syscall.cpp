@@ -93,6 +93,9 @@ after:
     case sc_pthread_setcanceltype:
       return_value = pthread_setcanceltype((int) arg1, (int*) arg2);
       break;
+    case sc_pthread_attr_init:
+      return_value = pthread_attr_init((size_t**) arg1, (size_t*) arg2);
+      break;;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
@@ -475,9 +478,15 @@ int32 Syscall::pthread_cancel(size_t thread)
     debug(X_USERTHREAD, "Thread [%ld]: could not kill bc its flags were state: %d type: %d!\n", current->getTID(), cancel_victim->getflags()->cancelable,
     cancel_victim->getflags()->deferred);
 */
-
-
 }
+
+int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
+{
+  *stackaddr = (size_t*)callingThread->getUserstackStart();
+  *stacksize = STACK_SIZE_MAX_IN_MB * PAGE_SIZE * 512ULL * 512;
+  return 0;
+}
+
 
 int Syscall::fork()
 {
