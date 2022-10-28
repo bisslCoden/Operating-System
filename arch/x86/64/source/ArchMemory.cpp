@@ -71,7 +71,7 @@ bool ArchMemory::insert(pointer map_ptr, uint64 index, uint64 ppn, uint64 bzero,
 {
   assert(map_ptr & ~0xFFFFF00000000000ULL);
   T* map = (T*) map_ptr;
-  debug(A_MEMORY, "%s: page %p index %zx ppn %zx user_access %zx size %zx\n", __PRETTY_FUNCTION__, map, index, ppn,
+  debug(X_A_MEMORY, "%s: page %p index %zx ppn %zx user_access %zx size %zx\n", __PRETTY_FUNCTION__, map, index, ppn,
         user_access, size);
   if (bzero)
   {

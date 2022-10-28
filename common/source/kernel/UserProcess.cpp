@@ -274,7 +274,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
-  Loader* old_loader = loader_;
+  //Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
   if(!setupLoader(new_fd))
   {
@@ -290,10 +290,10 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 
   // exec 
   debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutable...().\n", path, (size_t)argv);
-  ((UserThread*)currentThread)->exec(argv, argc);
+  ((UserThread*)currentThread)->execv(argv, argc);
   
   VfsSyscall::close(old_fd); 
-  delete old_loader; 
+  // delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
   return 0;
 }
 

@@ -111,7 +111,7 @@ class UserThread : public Thread
     int32 getJoiner(){return join_waiter_;}
 
     // execv
-    int exec(char* const argv[], size_t argc);
+    int execv(char* const argv[], size_t argc);
   
   private:
     // the process that contains this thread
