@@ -6,7 +6,7 @@ char const *user_progs[] = {
                             "/usr/shell.sweb",
                             // "/usr/pcreate.sweb",
                             // "/usr/threadattack.sweb",
-                            "/usr/execprinter.sweb",
+                            //"/usr/execprinter.sweb",
                             0
                            };
 

@@ -6,7 +6,7 @@
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
-
+#include "offsets.h"
 
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
@@ -152,9 +152,35 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-int ProcessRegistry::execvProcess(const char* path, char *const argv[], size_t argc)
+int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 {
-  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx\n", path, (size_t)argv);
+  // checking parameter ptr + calling convention 
+  bool pathptr_ok = (size_t)path < USER_BREAK;
+  bool argvptr_ok = (size_t)argv < USER_BREAK;
+  if(!pathptr_ok || !argvptr_ok)
+  {
+    debug(SYSCALL, "ERROR: invalid parameters for execv()\n");
+    return -1;
+  }
+  // check for calling convention of args: {path, args[], NULL}: 
+  // 0 : first element must be path
+  // 1 : last element must be NULL
+  bool argv_ok[] = {false, false};
+  // 0 : first element must be path
+  if(!strcmp(path, argv[0]))
+    argv_ok[0] = true;
+  size_t argc = 1;
+  for(; !argv_ok[1]; argc++)
+    if(argv[argc] == NULL)
+      argv_ok[1] = true;
+  if(!argv_ok[0] || !argv_ok[1])
+  {
+    debug(SYSCALL, "EROOR: execv() calling convention for args mistreated!\n");
+    return -1;
+  }
+
+  // UserProcess::execv()
+  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
   UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   int ret = currentProcess->execv(path, argv, argc);

@@ -51,7 +51,7 @@ class UserProcess
     /**
      * @brief does the Loader setup + fd check
      * 
-     * @param fd the fd that's used in the Loader constructor
+     * @param fd the fd that's used in the Loader constructor (use local variable, not member fd_)
      * @return true if success,
      * @return false if rip
      */

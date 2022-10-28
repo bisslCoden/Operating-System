@@ -489,30 +489,6 @@ int Syscall::fork()
 
 int Syscall::execv(const char * path, char *const argv[])
 {
-  bool path_ok = (size_t)path < USER_BREAK;
-  bool argvptr_ok = (size_t)argv < USER_BREAK;
-  if(!path_ok || !argvptr_ok)
-  {
-    debug(SYSCALL, "ERROR: invalid parameters for execv()\n");
-    return -1;
-  }
-
-  // check for calling convention of args: {path, args[], NULL} 
-  bool argv_ok[] = {false, false};
-  // 0 : first element must be path
-  if(!strcmp(path, argv[0]))
-    argv_ok[0] = true;
-  // 1 : last element must be NULL
-  size_t argc = 1;
-  for(; !argv_ok[1] ; argc++)
-    if(argv[argc] == NULL)
-      argv_ok[1] = true;
-  if(!argv_ok[0] || !argv_ok[1])
-  {
-    debug(SYSCALL, "EROOR: execv() calling convention for args mistreated!\n");
-    return -1;
-  }
-
-  debug(X_EXECV, "Syscall::execv(path = %s, argv = %lx, argc = %ld)\n", path, (size_t)argv, argc);
-  return ProcessRegistry::instance()->execvProcess(path, argv, argc);
+  debug(SYSCALL, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
+  return ProcessRegistry::instance()->execvProcess(path, argv);
 }

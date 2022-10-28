@@ -269,31 +269,31 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   return false;
 }
 
-// TODO: kill all old threads 
+// TODO: kill all old threads - tried.
 int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
-  debug(USERPROCESS, "execv() called\n");
-  // fd
+  debug(USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
+  Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
   if(!setupLoader(new_fd))
   {
-    debug(USERPROCESS, " execv() ERREOR with fd or Loader\n");
+    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
     fd_ = old_fd;
     VfsSyscall::close(new_fd);
     return -1;
   }
-  VfsSyscall::close(old_fd);
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
 
-  // TODO: kill old threads
+  // UserProcess::exit() all old threads except currentThread
   exit(13579, false);
 
-  // exec (should not return)
+  // exec 
   debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutable...().\n", path, (size_t)argv);
   ((UserThread*)currentThread)->exec(argv, argc);
   
-  // rip
+  VfsSyscall::close(old_fd); 
+  delete old_loader; 
   return 0;
 }
 

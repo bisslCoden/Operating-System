@@ -219,6 +219,7 @@ int UserThread::exec(char* const argv[], size_t argc)
   return 123;
   */
 
+  debug(X_EXECV, "UserThread::exec() called\n");
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
   size_t ppn = PageManager::instance()->allocPPN();
   assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
@@ -232,7 +233,8 @@ int UserThread::exec(char* const argv[], size_t argc)
         end_of_page, start_argv_addr, start_argv_ident);
   for(size_t i = 0; argv[i]; i++)
   {
-    debug(X_USERTHREAD, "start of for loop: ident = %lx, start_argv_addr = %lx, start_argv_ident = %lx\n", ident, start_argv_addr, start_argv_ident);
+    debug(X_USERTHREAD, "start of for loop: ident = %lx, start_argv_addr = %lx, start_argv_ident = %lx\n",ident, start_argv_addr, start_argv_ident);
+    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
     *((size_t*)ident) = start_argv_addr;
     ident += sizeof(size_t);
     debug(X_USERTHREAD, "ident increased to %lx\n", ident);
@@ -243,6 +245,10 @@ int UserThread::exec(char* const argv[], size_t argc)
     debug(X_USERTHREAD, "end of for loop: start_argv_addr = %lx, start_argv_ident = %lx\n", start_argv_addr, start_argv_ident);
     debug(X_USERTHREAD, "---\n");
   }
+
+  user_registers_->rip = (size_t)loader_->getEntryFunction();
+  user_registers_->rdi = (size_t)argv;
+  user_registers_->rsi = (size_t)argc;
   
   debug(X_USERTHREAD, "bevore return from exec()\n");
   return 0;
