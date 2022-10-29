@@ -6,7 +6,6 @@
 extern "C" {
 #endif
 
-#define PAGE_SIZE_US 4096
 //pthread typedefs
 typedef size_t pthread_t;
 
@@ -56,6 +55,7 @@ typedef struct threadattribute
 } pthread_attr_t;
 
 
+#define PAGE_SIZE_US 4096
 
 typedef struct UserMutex{
     size_t initialized_;

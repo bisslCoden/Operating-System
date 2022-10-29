@@ -46,7 +46,7 @@ int pthread_attr_init(pthread_attr_t *attr){
     return -1;
   
   attr->detach_state_ = PTHREAD_CREATE_JOINABLE;
-  attr->guard_size_ = PAGE_SIZE;
+  attr->guard_size_ = PAGE_SIZE_US;
   __syscall(sc_pthread_attr_init, (size_t)&attr->stackaddress_, (size_t)&attr->stacksize_, 0x0, 0x0, 0x0);
   return 0;
 }
@@ -81,7 +81,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 size_t findStackStackStart(size_t inputadress){
   size_t outputadress = inputadress >> 12;
   outputadress = outputadress << 12;
-  outputadress += PAGE_SIZE - sizeof(size_t);
+  outputadress += PAGE_SIZE_US - sizeof(size_t);
   return outputadress;
 }
 
