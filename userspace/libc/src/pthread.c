@@ -24,6 +24,14 @@ void* wrapper(void* (*start_routine)(void*), void* args)
  */
 int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
 {
+  if (attr != 0)
+  {
+    if (attr->initialized_ != 1)
+    {
+      return -1;
+    }
+  }
+  
   return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, (size_t)wrapper);
   // wrapper defined above
 }
@@ -48,6 +56,7 @@ int pthread_attr_init(pthread_attr_t *attr){
   attr->detach_state_ = PTHREAD_CREATE_JOINABLE;
   attr->guard_size_ = PAGE_SIZE_US;
   __syscall(sc_pthread_attr_init, (size_t)&attr->stackaddress_, (size_t)&attr->stacksize_, 0x0, 0x0, 0x0);
+  attr->initialized_ = 1;
   return 0;
 }
 int pthread_attr_destroy(pthread_attr_t *attr){
@@ -60,6 +69,29 @@ int pthread_attr_destroy(pthread_attr_t *attr){
   
 };
 
+pthread_t pthread_self(void){
+  return (pthread_t) __syscall(sc_pthread_self, 0x0, 0x0, 0x0, 0x0, 0x0);
+}
+
+int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate){
+  if(attr == 0)
+    return -1;
+  if (detachstate != PTHREAD_CREATE_JOINABLE && detachstate != PTHREAD_CREATE_DETACHED)
+    return -1;
+  
+  attr->detach_state_ = detachstate;
+  return 0;
+}
+
+int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate){
+  if(attr == 0)
+    return -1;
+  if(detachstate == 0)
+    return -1;
+  
+  *detachstate = attr->detach_state_;
+  return 0;
+}
 
 
 
@@ -75,7 +107,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
   mutex->my_attr_ = (attr == 0) ? (pthread_mutexattr_t) 0 : *attr;
   mutex->firstsleeper_ = 0;
   mutex->initialized_ = 1;
-  return -1;
+  return 0;
 }
 
 size_t findStackStackStart(size_t inputadress){
@@ -146,7 +178,7 @@ int pthread_join(pthread_t thread, void **value_ptr)
  */
 int pthread_detach(pthread_t thread)
 {
-  return -1;
+  return __syscall(sc_pthread_detach, (size_t) thread, 0x0, 0x0, 0x0, 0x0);
 }
 
 /**
@@ -155,7 +187,11 @@ int pthread_detach(pthread_t thread)
  */
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-  return -1;
+  if (mutex->initialized_ != 1)
+    return -1;
+  
+  mutex->initialized_ = 0;
+  return 0;
 }
 
 //userstack:

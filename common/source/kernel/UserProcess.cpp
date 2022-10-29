@@ -234,7 +234,7 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
+size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate)
 {
   // pthread
   UserThread* thread = new UserThread(wrapper, UserProcess::getRandomPageOffset());
@@ -245,6 +245,9 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
     Fifth Argument: R8
     Sixth Argument: R9
   */
+  if (joinstate == PTHREAD_CREATE_JOINABLE);
+  else
+    thread->setJoinState(joinstate);
   thread->user_registers_->rdi = start_routine;
   thread->user_registers_->rsi = args;
   if(thread)

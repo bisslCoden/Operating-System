@@ -31,7 +31,6 @@ typedef unsigned int pthread_mutexattr_t;
 
 
 #define PTHREAD_CANCELED ((void *) -1)
-#define PTHREAD_
 
 //pthread spinlock typedefs
 
@@ -81,6 +80,13 @@ extern void pthread_exit(void *value_ptr);
 extern int pthread_spin_init(pthread_spinlock_t *lock, int pshared);
 extern int pthread_spin_lock(pthread_spinlock_t *lock);
 extern int pthread_spin_unlock(pthread_spinlock_t *lock);
+
+extern int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
+extern int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate);
+
+
+
+extern pthread_t pthread_self(void);
 
 
 

@@ -21,6 +21,11 @@ enum canceltype {
     PTHREAD_CANCEL_ASYNCHRONOUS
 };
 
+enum joinbale {
+    PTHREAD_CREATE_JOINABLE, 
+    PTHREAD_CREATE_DETACHED
+};
+
 
 
 
@@ -30,8 +35,8 @@ typedef struct Threadflags
   int cancelable = PTHREAD_CANCEL_ENABLE;
   int deferred = PTHREAD_CANCEL_DEFERRED;
   //TODO joinable
-  int joinable = true;
   bool cancelreq = false;
+  int joinable = PTHREAD_CREATE_JOINABLE;
   ustl::atomic_flag kcancelreq;
   ustl::atomic_flag knotcancelable;
   ustl::atomic_flag kasynchronous;
@@ -83,6 +88,9 @@ class UserThread : public Thread
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
      * 
      */
+    void setJoinState(int state){myflags_.joinable = state;}
+    int getJoinState(){return myflags_.joinable;}
+
     void lockJoin(){condition_mutex_.acquire();}
     void setJoiner(int32 tid){join_waiter_ = tid;}
     void unlockJoin(){condition_mutex_.release();}

@@ -11,6 +11,15 @@
 
 #define callingThread ((UserThread*) currentThread)
 
+typedef struct threadattribute
+{
+    int initialized_;
+    int detach_state_;
+    size_t guard_size_; 
+    size_t* stackaddress_;
+    size_t  stacksize_;
+} pthread_attr_t;
+
 
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
@@ -95,7 +104,13 @@ after:
       break;
     case sc_pthread_attr_init:
       return_value = pthread_attr_init((size_t**) arg1, (size_t*) arg2);
-      break;;
+      break;
+    case sc_pthread_detach:
+      return_value = pthread_detach(arg1);
+      break;
+    case sc_pthread_self:
+      return_value = pthread_self();
+      break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
@@ -249,7 +264,15 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
     assert(false && "how tf did that happen?");
 
   // calling thread creation and settind return value to user's pthread_t thread adress 
-  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread(start_routine, arg, wrapper);
+  int joinstate = PTHREAD_CREATE_JOINABLE;
+  if(attr == 0);
+  else if (!checkAdressValid((void*) attr))
+    exit(999);
+  else
+    joinstate = ((pthread_attr_t*) attr)->detach_state_;
+  
+  
+  size_t tid = ((UserThread*)currentThread)->getParentProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
   *(size_t*)thread = tid;
 
@@ -286,7 +309,15 @@ void Syscall::pthread_exit(void* value)
       }
     }
     callingthread->unlockJoin();
-    callingthread->getParentProcess()->addToRetvalList(callingthread->getTID(), value);
+    callingthread->lockFlagMutex();
+    if (callingthread->getflags()->joinable == PTHREAD_CREATE_DETACHED)
+      callingthread->unlockFlagMutex();
+    else
+     {  
+        callingthread->unlockFlagMutex();
+        callingthread->getParentProcess()->addToRetvalList(callingthread->getTID(), value);
+     } 
+    
     callingthread->getParentProcess()->removeFromThreadList(callingthread);
     callingthread->getParentProcess()->unLockThreadMutex();
     currentThread->kill();
@@ -361,6 +392,25 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
 
       //  ESRCH  No thread with the ID thread could be found.
   //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
+int Syscall::pthread_detach(size_t thread){
+  callingThread->getParentProcess()->lockThreadMutex();
+  UserThread* to_be_detached = 0x00;
+  if ((to_be_detached = (UserThread*) callingThread->getParentProcess()->findInThreadList(thread)) != 0x00)
+  {
+    to_be_detached->lockFlagMutex();
+    to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
+    to_be_detached->unlockFlagMutex();
+    callingThread->getParentProcess()->unLockThreadMutex();
+  }
+  else
+  {
+    callingThread->getParentProcess()->unLockThreadMutex();
+    return -1;
+  }
+  return 0;
+}
+
+
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
@@ -382,6 +432,16 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   if (callingthread->getParentProcess()->findInThreadList(thread) != 0x00)
   {
     UserThread* join_victim = (UserThread*) callingthread->getParentProcess()->findInThreadList(thread);
+    join_victim->lockFlagMutex();
+    
+    if (join_victim->getflags()->joinable == PTHREAD_CREATE_DETACHED)
+    {
+      join_victim->unlockFlagMutex();
+      callingthread->getParentProcess()->unLockThreadMutex();
+      return -1;
+    }
+    join_victim->unlockFlagMutex();
+    
     join_victim->lockJoin();
     callingthread->lockJoin();
     if (join_victim->getJoiner() != -1 || callingthread->getJoiner() == (int32) thread)
@@ -421,6 +481,11 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   debug(X_USERTHREAD, "[%ld]MANAGED to join [%ld]\n", callingthread->getTID(), thread);
   return 0;
 }
+
+size_t Syscall::pthread_self(){
+  return callingThread->getTID();
+}
+
 
 
 int32 Syscall::pthread_cancel(size_t thread)
