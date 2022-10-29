@@ -155,34 +155,24 @@ void ProcessRegistry::createProcess(const char* path)
 int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 {
   // checking parameter ptr + calling convention: first element must be path, last element must be NULL
-  bool pathptr_ok = (size_t)path < USER_BREAK;
-  bool argvptr_ok = (size_t)argv < USER_BREAK;
+  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
+  bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
   if(!pathptr_ok || !argvptr_ok)
-  {
-    debug(SYSCALL, "ERROR: invalid parameters for execv()\n");
     return -1;
-  }
   bool is_first_path = false;
   bool found_null = false;
   if(!strcmp(path, argv[0]))
     is_first_path = true;
   size_t argc = 1;
   for(; !found_null; argc++)
-    if(argv[argc] == NULL)
+    if(argv[argc] == NULL && argc > 1)
       found_null = true;
   if(!is_first_path || !found_null)
-  {
-    debug(SYSCALL, "EROOR: execv() calling convention for args mistreated!\n");
     return -1;
-  }
 
   // UserProcess::execv()
   debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
   UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
-  size_t ret = currentProcess->execv(path, argv, argc);
-
-  debug(PROCESS_REG, "returned from UserProcess::execv() with val %ld\n", ret);
-  //assert(false);
-  return ret;
+  return currentProcess->execv(path, argv, argc);
 }

@@ -180,13 +180,11 @@ bool UserThread::setupStack()
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
-  loader_ = process_->getLoader();
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  setupStack();
-  name_ = process_->getName();
-  debug(X_USERTHREAD, "loader set, addressspace set, stack set, name changed\n");
-  if(!argc)
-    debug(X_USERTHREAD, "argc = 0, %lx", (size_t)argv);
+  debug(X_USERTHREAD, "argc = %ld\n", argc);
+  for(size_t i = 0; i < argc; i++)
+    debug(USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
+
+
 
   /* needed later for argument passing
   size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
@@ -215,10 +213,14 @@ int UserThread::execv(char* const argv[], size_t argc)
   }
   */
 
+  // important: after this section, the parameters pointing to userspace become null!! 
+  name_ = process_->getName();
+  loader_ = process_->getLoader();
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  setupStack();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  //user_registers_->rdi = (size_t)argv;
-  //user_registers_->rsi = (size_t)argc;
-  
-  debug(X_USERTHREAD, "UserThread::exec() returning\n");
+  //user_registers_->rdi = ; // overwritten
+  //user_registers_->rsi = ;
+  debug(X_USERTHREAD, "loader set, addressspace set, stack set, name change and rip = %lx. returningd\n", user_registers_->rip);
   return 0;
 }

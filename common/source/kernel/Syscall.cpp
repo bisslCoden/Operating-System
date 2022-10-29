@@ -490,5 +490,7 @@ int Syscall::fork()
 int Syscall::execv(const char * path, char *const argv[])
 {
   debug(SYSCALL, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
-  return ProcessRegistry::instance()->execvProcess(path, argv);
+  int ret = ProcessRegistry::instance()->execvProcess(path, argv);
+  debug(SYSCALL, "execProcess returned %d\n", ret);
+  return ret;
 }
