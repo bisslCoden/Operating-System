@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE_US 4096
 //pthread typedefs
 typedef size_t pthread_t;
 
