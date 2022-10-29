@@ -62,6 +62,8 @@ typedef struct UserMutex{
     size_t* firstsleeper_;
     pthread_mutexattr_t my_attr_;
     size_t lock_;
+    size_t held_by_;
+    pthread_spinlock_t held_by_lock_;
 }pthread_mutex_t;
 
 

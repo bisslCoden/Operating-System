@@ -103,10 +103,12 @@ int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate){
 int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 {
   pthread_spin_init(&mutex->sleeperslist_lock_, 0);
+  pthread_spin_init(&mutex->held_by_lock_, 0);
   mutex->lock_ = 1;
   mutex->my_attr_ = (attr == 0) ? (pthread_mutexattr_t) 0 : *attr;
   mutex->firstsleeper_ = 0;
   mutex->initialized_ = 1;
+  mutex->held_by_ = 0;
   return 0;
 }
 
@@ -118,22 +120,27 @@ size_t findStackStackStart(size_t inputadress){
 }
 
 //lock beforeee
-void addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
+int addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
 {
   if(mutex->firstsleeper_ == 0)
   {
     mutex->firstsleeper_ = (size_t*) localvaradress;
-    return;
+    return 0;
   }
 
   size_t* iter = mutex->firstsleeper_;
   while (*iter != 0)
   {
     //printf("iter = %p and points to %p\n", iter, (size_t*) *iter);
+    if ((size_t**)*iter == localvaradress)
+    {
+      return -1;
+    }
+    
     iter = (size_t*) *iter;
   }
   *iter = (size_t) localvaradress;
-  return;
+  return 0;
 }
 
 int pthread_setcancelstate(int state, int *oldstate){
@@ -208,29 +215,58 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
   if(mutex->initialized_ != 1)
     __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
 
+  size_t findstart;
+  size_t my_identifier = findStackStackStart((size_t)&findstart);
+  pthread_spin_lock(&mutex->held_by_lock_);
+  if (mutex->held_by_ == my_identifier)
+  {
+    pthread_spin_unlock(&mutex->held_by_lock_);
+    printf("DEADLOCK! you already have this lock!\n");
+    return -1;
+  }
+  pthread_spin_unlock(&mutex->held_by_lock_);
+
+
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   if(mutex->firstsleeper_ == 0)
   {
     if (atomic_exchange_0(&mutex->lock_))
     {
+      pthread_spin_lock(&mutex->held_by_lock_);
+      mutex->held_by_ = my_identifier;
+      pthread_spin_unlock(&mutex->held_by_lock_);
       pthread_spin_unlock(&mutex->sleeperslist_lock_);
       return 0;
     }
   }  //didnt get the lock now i ll sleep
   
   size_t* next = 0;
-  addToWaitersList(mutex, &next);
+  if(addToWaitersList(mutex, &next) != 0)
+  {
+    pthread_spin_unlock(&mutex->sleeperslist_lock_);
+    printf("DEADLOCK! you already wait on this lock!\n");
+    return -1;
+  }
+    
   size_t setsleep = findStackStackStart((size_t) &next);
   assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
   //printf("added myself to sleep list, setting sleep at %p and there now is %ld\n", (size_t*) setsleep, *(size_t*)setsleep);
   pthread_spin_unlock(&mutex->sleeperslist_lock_);
   sched_yield();
 
+
+
+
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   //printf("flag is now agein free? %ld\n", mutex->lock_);
   assert(atomic_exchange_0(&mutex->lock_) == 1 && "huh? got woken up but still cant get a lock!\n");
   mutex->firstsleeper_ = next;
   pthread_spin_unlock(&mutex->sleeperslist_lock_);
+  
+  pthread_spin_lock(&mutex->held_by_lock_);
+  mutex->held_by_ = my_identifier;
+  pthread_spin_unlock(&mutex->held_by_lock_);
+  
   return 0;
 }
 

@@ -33,7 +33,7 @@ class Syscall
   static size_t pthread_self();
 
 
-  // cancel not 100% working
+  // cancel 100% working
   static int32 pthread_cancel(size_t thread);
   static int32 pthread_setcancelstate(int32 state, int32* oldstate);
   static int32 pthread_setcanceltype(int32 type, int32* oldtype);
