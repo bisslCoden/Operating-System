@@ -86,6 +86,9 @@ after:
     case sc_getpid:
       return_value = get_pid();
       break;
+    case sc_sleep:
+      return_value = sleep(arg1);
+      break;
     case sc_trace:
       trace();
       break;
@@ -501,6 +504,14 @@ int Syscall::get_pid()
   UserThread* callingthread = (UserThread*)currentThread;
   debug(SYSCALL, "Calling Syscall getpid!\n");
   return callingthread->getParentProcess()->getPID();
+}
+
+unsigned int Syscall::sleep(unsigned int seconds)
+{
+  int y = 0;
+  for(unsigned int i = 0; i < seconds * 1000; i++)
+    y = y + i;
+  return 0;
 }
 
 /*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)

@@ -1,4 +1,6 @@
 #include "wait.h"
+#include "../../../common/include/kernel/syscall-definitions.h"
+#include "sys/syscall.h"
 
 /**
  * function stub
