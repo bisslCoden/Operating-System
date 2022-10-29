@@ -31,7 +31,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     return;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
 
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 }
 
@@ -274,7 +274,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
-  //Loader* old_loader = loader_;
+  Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
   if(!setupLoader(new_fd))
   {
@@ -284,6 +284,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
     return -1;
   }
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  name_ = path;
 
   // UserProcess::exit() all old threads except currentThread
   exit(13579, false);
@@ -293,7 +294,8 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   ((UserThread*)currentThread)->execv(argv, argc);
   
   VfsSyscall::close(old_fd); 
-  // delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
   return 0;
 }
 

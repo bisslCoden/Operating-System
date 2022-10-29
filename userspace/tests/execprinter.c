@@ -32,7 +32,7 @@ int main(int argc, const char *argv[])
 	// exec call
 	char* const args[] = {path, arg1, arg2, arg3, arg4, arg5, NULL};
 	printf("before exec\n");
-	if(execv(path, args) == -1)
-    printf("execv failed!\n");
+	int ret = execv(path, args);
+  printf("execv failed with return value %d!\n", ret);
 	return 42;
 }

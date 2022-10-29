@@ -180,47 +180,15 @@ bool UserThread::setupStack()
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
-  // arg convention checking was laready done in Syscall::execv()
-
-  /*
-  // create page for args
-  size_t ppn = PageManager::instance()->allocPPN();
-  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
-  assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
-  size_t argv_addr = ArchMemory::getIdentAddressOfPPN(ppn);
-  debug(USERTHREAD, "exec() ppn = %lx, vpn = %lx, argv_addr = %lx\n", ppn, vpn, argv_addr);
-
-  size_t start = vpn * PAGE_SIZE;
-  
-  // fill page with args
-  size_t argc = 0;
-  size_t offset = 0;
-  for(int i = 0; argv[i]; i++)
-  {
-    size_t arg_size = strlen(argv[i]);
-    debug(X_USERTHREAD, "exec(): argv[%d] = %s | arg_size = %ld\n", i, argv[i], arg_size);
-
-    size_t destination = argv_addr + offset;
-    memcpy((void*)destination, (void*)argv[i], arg_size);
-    debug(X_USERTHREAD, "memcpy(dest = %lx, src = %lx, arg_size = %ld\n", destination, (size_t)argv[i], arg_size);
-    offset += arg_size;
-    argc++;
-    debug(X_USERTHREAD, "offset: %ld\n", offset);
-  }
-  debug(X_USERTHREAD, "exec() argc = %ld, offset = %ld\n", argc, offset);
-
-  // last values
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = argc; 
-  user_registers_->rsi = argv_addr * PAGE_SIZE;
-  debug(X_USERTHREAD, "bevore return from exec()\n");
-  return 123;
-  */
+  setupStack();
+  name_ = process_->getName();
+  debug(X_USERTHREAD, "loader set, addressspace set, stack set, name changed\n");
+  if(!argc)
+    debug(X_USERTHREAD, "argc = 0, %lx", (size_t)argv);
 
-  loader_ = process_->getLoader();
-
+  /* needed later for argument passing
   size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
   size_t ppn = PageManager::instance()->allocPPN();
   assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
@@ -233,7 +201,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   //debug(USERTHREAD, "exec(): end_of_page = %lx, argv_addr = %lx, argv_ident = %lx\n", end_of_page, argv_addr, argv_ident);
   for(size_t i = 0; argv[i]; i++)
   {
-    /*
     debug(X_USERTHREAD, "start of for loop: ident = %lx, argv_addr = %lx, argv_ident = %lx\n",ident, argv_addr, argv_ident);
     debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
     *((size_t*)ident) = argv_addr;
@@ -245,24 +212,12 @@ int UserThread::execv(char* const argv[], size_t argc)
     argv_ident += sizeof(char)*strlen(argv[i]) + 1;
     debug(X_USERTHREAD, "end of for loop: argv_addr = %lx, argv_ident = %lx\n", argv_addr, argv_ident);
     debug(X_USERTHREAD, "---\n");
-    */
-
-    
-    // vvvv the same code as above without debugs vvvv 
-
-    // set content of ident to argument's address
-    *((size_t*)ident) = argv_addr;
-    // copy argument from array to location pointed to by argument's address
-    memcpy((void*)argv_ident, (void*)argv[i], strlen(argv[i]));
-    
-    ident += sizeof(size_t);
-    argv_addr += sizeof(char)*strlen(argv[i]) + 1;
-    argv_ident += sizeof(char)*strlen(argv[i]) + 1;
   }
+  */
 
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = (size_t)argv;
-  user_registers_->rsi = (size_t)argc;
+  //user_registers_->rdi = (size_t)argv;
+  //user_registers_->rsi = (size_t)argc;
   
   debug(X_USERTHREAD, "UserThread::exec() returning\n");
   return 0;

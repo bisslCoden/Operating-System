@@ -66,8 +66,8 @@ int main()
     assert((ret = pthread_create(&tids[i], NULL, (void* (*)(void*))&simple_routine2, (void*) &paramsnow)) == 0 && "couldnt create anymore threads daaamn!\n");
   }
   sched_yield();
-  int busy = 0;
-  int long_ = 0;
+  //int busy = 0;
+  //int long_ = 0;
 //   while (long_ < 4000000000000)
 //   {
 //     busy += long_;
