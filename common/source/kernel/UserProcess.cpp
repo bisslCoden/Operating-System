@@ -11,6 +11,7 @@
 #include "ArchThreads.h"
 #include "offsets.h"
 #include "VfsSyscall.h"
+#include "Scheduler.h"
 
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
@@ -185,10 +186,8 @@ size_t UserProcess::getRandomPageOffset()
 bool UserProcess::checkInList(size_t NR)
 {
   for (auto val : offsets_)
-  {
     if(val == NR)
       return true;
-  }
   return false;
 }
 
@@ -238,9 +237,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     else
     {
       if (!thread.second->checkFlagLock(currentThread))
-      {
         thread.second->lockFlagMutex();
-      }
       
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
@@ -250,7 +247,8 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     }
   }
   threads_lock_.release();
-  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
+  ((UserThread*)currentThread)->setLast();
+  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_, currentThread->getTID());
   if(kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
 }
@@ -286,11 +284,13 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   name_ = path;
 
-  // UserProcess::exit() all old threads except currentThread
+  // UserProcess::exit() all old threads except currentThread + yield to ensure all threads are cleaned up before continuing last thread
   exit(13579, false);
+  while(getNrOfThreads() > 1)
+    Scheduler::instance()->yield();
 
   // exec 
-  debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutable...().\n", path, (size_t)argv);
+  debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads??.\n", path, (size_t)argv);
   ((UserThread*)currentThread)->execv(argv, argc);
   
   VfsSyscall::close(old_fd); 

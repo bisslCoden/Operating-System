@@ -121,10 +121,10 @@ class UserProcess
     void unLockThreadMutex(){threads_lock_.release();}
 
     // getters
-    size_t getPID(){ return pid_; }
-    Loader* getLoader() { return loader_; }
-    FileSystemInfo* getWorkingDir() { return working_dir_; }
-    ustl::string getName() { return name_; }
+    size_t getPID()                         { return pid_; }
+    Loader* getLoader()                     { return loader_; }
+    FileSystemInfo* getWorkingDir()         { return working_dir_; }
+    ustl::string getName()                  { return name_; }
       /**
      * @brief a retval is REMOVED from the retvallist and given to the joining thread
      * 
@@ -139,7 +139,6 @@ class UserProcess
   private:
     // the process ID
     size_t const pid_;
-
 
     // the process' fd. see "FileDescriptor.h"
     ssize_t fd_;
