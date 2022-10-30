@@ -522,6 +522,26 @@ unsigned int Syscall::sleep(unsigned int seconds)
 size_t Syscall::clock()
 {
   debug(CLOCK, "Clock system call started\n");
+  size_t cycles_high0, cycles_low0, cycles_high1, cycles_low1;
+  asm volatile ("cpuid\n\t"
+		  "rdtsc\n\t"
+		  "mov %%edi, %0\n\t"
+		  "mov %%eax, %1\n\t"
+		  : "=r" (cycles_high0), "=r" (cycles_low0)
+		  :: "%rax", "%rbx", "%rcx", "%rdx");
+
+    /* code to measure */
+
+  asm volatile ("rdtscp\n\t"
+		  "mov %%edi, %0\n\t"
+		  "mov %%eax, %1\n\t"
+		  "cpuid\n\t"
+		  : "=r" (cycles_high1), "=r" (cycles_low1)
+		  :: "%rax", "%rbx", "%rcx", "%rdx");
+  debug(CLOCK, "Cycles_high0: %ld\n", cycles_high0);
+  debug(CLOCK, "Cycles_high1: %ld\n", cycles_high1);
+  debug(CLOCK, "Cycles_low0: %ld\n", cycles_low0);
+  debug(CLOCK, "Cycles_low1: %ld\n", cycles_low1);
   return 12345;
 }
 
