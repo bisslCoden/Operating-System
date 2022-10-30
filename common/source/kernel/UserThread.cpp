@@ -14,14 +14,16 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number) : 
+UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}// UserThread's members
+  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  "Thread::join_cond"} // UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = parent_process_->getLoader();
   
   // setup stack, UserRegisters and address space
+  mystack_.page_offset_ = page_offset;
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
                                    getUserstackStart(),
@@ -43,54 +45,25 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
 }
-//test
-bool UserThread::setupStack()
-{
-  debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
-  bool vpn_mapped = false;
-  size_t ppn_for_stack = 0;
-  size_t vpn_for_stack = 0;
-  size_t stack_page_offset = getTID() * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 1 MB
-  size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
-
-  // calc
-  vpn_for_stack = stack_start_ptr / PAGE_SIZE;
-  ppn_for_stack = PageManager::instance()->allocPPN();
-  vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
-
-  // worked?
-  debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx. stack lies at %lx\n", vpn_for_stack, ppn_for_stack, userstack_start_);
-  assert(vpn_for_stack && ppn_for_stack);
-  if(!vpn_mapped)
-  {
-    debug(USERTHREAD, "setupStack() RIP. returning false\n");
-    PageManager::instance()->freePPN(ppn_for_stack);
-    return false;
-  }
-
-  // success man
-  userstack_start_ = stack_start_ptr;
-  debug(USERTHREAD, "setupStack() success. returning true\n");
-  return true;
-}
 
 // pthread_create
-UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
+UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"}
+  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"},
+   condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = parent_process_->getLoader();
-
+  mystack_.page_offset_ = page_offset;
   // set up user registers and adressspace
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    getUserstackStart(), getKernelStackStartPointer());
 
-  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
-    getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
-  ArchThreads::setAddressSpace((Thread*)this, loader_->arch_memory_);
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n", 
+    getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
   // set terminal
@@ -99,16 +72,18 @@ UserThread::UserThread(size_t wrapper, uint32_t terminal_number) :
 
   // add Thread to process to scheduler
   parent_process_->addToThreadList(this);
+
   Scheduler::instance()->addNewThread((Thread*)this);
 
   debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 
-// Constructor of UserThread for fork
+// fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
-  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}
+  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  "Thread::join_cond"}
 {
   loader_ = child->getLoader();
 
@@ -131,18 +106,70 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
+  //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
 
-  parent_process_->lockThreadMutex();
-  parent_process_->removeFromThreadList(this);
-  parent_process_->unLockThreadMutex();
-
+  
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
     delete parent_process_;
   }
-  debug(X_USERTHREAD, "~UserThread called for thread [%ld] parent process died.\n", tid_);
+  //debug(X_USERTHREAD, "returning from my killing\n");
   switch_to_userspace_ = 1;
 }
 
+
+void UserThread::setCancelState(int state){ 
+  myflags_.cancelable = state;
+  if(state == PTHREAD_CANCEL_DISABLE)
+    myflags_.knotcancelable.test_and_set();
+  else
+    myflags_.knotcancelable.clear();
+  return;
+}
+void UserThread::setCancelType(int type) { 
+  myflags_.deferred = type; 
+  if (type == PTHREAD_CANCEL_ASYNCHRONOUS)
+    myflags_.kasynchronous.test_and_set();
+  else
+    myflags_.kasynchronous.clear();
+  return; 
+}
+void UserThread::sendCancelRequest(){ 
+  myflags_.cancelreq = true;
+  myflags_.kcancelreq.test_and_set();
+  return; 
+  }
+
+bool UserThread::setupStack()
+{
+  //debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
+  bool vpn_mapped = false;
+  size_t ppn_for_stack = 0;
+  debug(X_THREADSTACK, "TID[%ld] my offset IIIIS: %ld\n", tid_, mystack_.page_offset_);
+  size_t vpn_for_stack = 0;
+  size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 4 MB
+  size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
+
+  // calc
+  vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
+  ppn_for_stack = PageManager::instance()->allocPPN();
+  debug(X_USERTHREAD, "got my first physical page with number %ld\n", ppn_for_stack);
+  vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
+
+  // worked? 
+  //debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
+  assert(vpn_for_stack && ppn_for_stack);
+  if(!vpn_mapped)
+  {
+    debug(USERTHREAD, "setupStack() RIP. returning false\n");
+    assert(false);
+    PageManager::instance()->freePPN(ppn_for_stack);
+    return false;
+  }
+
+  // success man
+  mystack_.userstack_start_ = stack_start_ptr;
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx\n",tid_, mystack_.userstack_start_);
+  return true;
+}

@@ -12,7 +12,7 @@
 #include "offsets.h"
 #include "VfsSyscall.h"
 
-
+// standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
     fd_(VfsSyscall::open(filename, O_RDONLY)), 
@@ -20,7 +20,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     working_dir_(fs_info),
     name_(filename.c_str()),
     threads_lock_("UserProcess::threads_lock_"),
-    returnvalue_lock_("UserProcess::retvallock")
+    returnvalue_lock_("UserProcess::retvallock"),
+    offsetlist_lock_("UserProcess::offsets")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -32,21 +33,15 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   if (!loader_ || !loader_->loadExecutableAndInitProcess())
   {
     debug(USERPROCESS, "Error: loading %s failed!\n", name_.c_str());
-    // kill(); // not needed anymore, no thread created yet
     return;
   }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
 
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number);
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
-
-  /* moved to addToThreadList()
-  threads_lock_.acquire();
-  threads_.insert(ustl::make_pair(first_thread->getTID(), first_thread));
-  threads_lock_.release();*/
 }
 
-// User Process Constructor for fork
+// fork
 UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   pid_(pid),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
@@ -56,7 +51,9 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   my_terminal_(parent->my_terminal_),
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
-  returnvalue_lock_("UserProcess::retvallock")
+  returnvalue_lock_("UserProcess::retvallock"), 
+  offsetlist_lock_("UserProcess::offsets")
+
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
   if(!working_dir_)
@@ -65,11 +62,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-  loader_ = new Loader(fd_);
-  if(fd_ < 0)
-  {
-    debug(USERPROCESS, "Failed to create Loader!\n");
-  }
+  if (fd_ >= 0)
+    loader_ = new Loader(fd_); 
 
   if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
   {
@@ -84,8 +78,9 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   }
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
+  threads_lock_.acquire();
   ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
-
+  threads_lock_.release();
 
   //local fd
 
@@ -98,10 +93,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-  threads_lock_.acquire();
-  threads_.insert({thread->getTID(),thread});
-  threads_lock_.release();
-
+  addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
   Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
@@ -144,9 +136,11 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_lock_.release();
   return true;
 }
+
 //this function locks internally!
 bool UserProcess::addToRetvalList(size_t tid, void* value){
   returnvalue_lock_.acquire();
+
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     returnvalue_lock_.release();
@@ -157,6 +151,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
 
   returnvalues_.insert(ustl::make_pair(tid, value));
   debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
+  
   returnvalue_lock_.release();
   return true;
 }
@@ -183,8 +178,40 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
+size_t UserProcess::getRandomPageOffset(){
+  size_t firstbits;
+  size_t lastbits;
+  size_t page_offset = 0;
+  size_t rand; 
+  offsetlist_lock_.acquire();
+  do
+  {
+    offsetlist_lock_.release();
+    asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+    rand =  lastbits | firstbits << 32;
+    page_offset = rand % (MAX_STACKS);
+    offsetlist_lock_.acquire();
+  } while (checkInList(page_offset));
+  offsets_.push_back(page_offset);
+  offsetlist_lock_.release();
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  
+  return page_offset;
+}
+
+bool UserProcess::checkInList(size_t NR)
+{
+  for (auto val : offsets_)
+  {
+    if(val == NR)
+      return true;
+  }
+  return false;
+}
+
 //caution! aquire lock before!!!
-Thread* UserProcess::findInThreadList(size_t tid){
+Thread* UserProcess::findInThreadList(size_t tid)
+{
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
@@ -202,7 +229,7 @@ size_t UserProcess::getNrOfThreads()
 size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
 {
   // pthread
-  UserThread* thread = new UserThread(wrapper);
+  UserThread* thread = new UserThread(wrapper, UserProcess::getRandomPageOffset());
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
@@ -221,23 +248,30 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
 void UserProcess::exit(size_t exit_code)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
-  threads_lock_.acquire();
+  if (!threads_lock_.isHeldBy(currentThread))
+    threads_lock_.acquire();
+  
   for(auto thread : threads_) // first = tid, second = *Thread
   {
-    if(unlikely(thread.first == currentThread->getTID()))
+    if(thread.first == currentThread->getTID());
+    else
     {
-      threads_lock_.release();
-      killThread(thread.second);
-      threads_lock_.acquire();
-      removeFromThreadList(thread.second);
+      if (!thread.second->checkFlagLock(currentThread))
+      {
+        thread.second->lockFlagMutex();
+      }
+      
+      debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
+      thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
+      thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
+      thread.second->sendCancelRequest();
+      thread.second->unlockFlagMutex();
     }
   }
-
-  
-  debug(USERPROCESS, "PID: [%ld] exit killed all except for currentThread->tid_ = %ld\n", pid_, currentThread->getTID());
-  killThread((UserThread*)currentThread);
-
   threads_lock_.release();
+  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
+  Syscall::pthread_exit((void*) exit_code);
+
 }
 
 void UserProcess::killThread(UserThread* thread)
@@ -251,6 +285,7 @@ bool UserProcess::getRetVal(size_t tid, void** value){
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     *value = returnvalues_[tid];
+    returnvalues_.erase(tid);
     returnvalue_lock_.release();
     return true;
   }

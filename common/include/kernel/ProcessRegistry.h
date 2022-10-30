@@ -63,15 +63,8 @@ class ProcessRegistry : public Thread
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
 
-    //prevous ID creation for fork for fork
-    //size_t process_pids_ = 0;
-    //ustl::map<long int, UserProcess*> processes_running_;
-
-    // Mutexes
-
     // ensures unique IDs for TID AND PID
     size_t next_id_ = 1;
-    Mutex next_id_lock_;
     // keeping track of processes alive
     ustl::map<size_t, UserProcess*> list_of_processes_;
     Mutex list_of_processes_lock_;
