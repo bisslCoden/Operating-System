@@ -521,29 +521,14 @@ unsigned int Syscall::sleep(unsigned int seconds)
 
 size_t Syscall::clock()
 {
-  debug(CLOCK, "Clock system call started\n");
-  size_t cycles_high0, cycles_low0, cycles_high1, cycles_low1;
-  asm volatile ("cpuid\n\t"
-		  "rdtsc\n\t"
-		  "mov %%edi, %0\n\t"
-		  "mov %%eax, %1\n\t"
-		  : "=r" (cycles_high0), "=r" (cycles_low0)
-		  :: "%rax", "%rbx", "%rcx", "%rdx");
-
-    /* code to measure */
-
-  asm volatile ("rdtscp\n\t"
-		  "mov %%edi, %0\n\t"
-		  "mov %%eax, %1\n\t"
-		  "cpuid\n\t"
-		  : "=r" (cycles_high1), "=r" (cycles_low1)
-		  :: "%rax", "%rbx", "%rcx", "%rdx");
-  debug(CLOCK, "Cycles_high0: %ld\n", cycles_high0);
-  debug(CLOCK, "Cycles_high1: %ld\n", cycles_high1);
-  debug(CLOCK, "Cycles_low0: %ld\n", cycles_low0);
-  debug(CLOCK, "Cycles_low1: %ld\n", cycles_low1);
-  return 12345;
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
 }
+
 
 /*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
