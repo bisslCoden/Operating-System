@@ -29,7 +29,7 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
   mystack_.page_offset_ = page_offset;
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   getUserstackStart(),
+                                   (void*) mystack_.userstack_start_,
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
 
@@ -55,6 +55,7 @@ bool UserThread::schedulable(){
   {
     //testsystem
     //checks if exit is called
+    debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!getflags()->knotcancelable.test_and_set())
       {
         if (getflags()->kasynchronous.test_and_set())
@@ -89,6 +90,7 @@ bool UserThread::schedulable(){
     {
       assert(false && "Sleep flag was neither 1 nor 0?\n");
     }
+    debug(X_THREADSTACK, "schedulable finished!\n");
   }
   return false;
 }
@@ -110,7 +112,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   // set up user registers and adressspace
   setupStack();
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
-                                   getUserstackStart(), getKernelStackStartPointer());
+                                   (void*) mystack_.userstack_start_, getKernelStackStartPointer());
 
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n", 
     getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
@@ -132,22 +134,38 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
 // fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
-  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
+  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
   parent_process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"}
 {
   loader_ = child->getLoader();
 
+  //cant we somehow just write a new setupstack... this makes me uncomfortable as we have 3 different constructors where we
+  // play around with stacks
+
+  StackInfo parent_stack = parent_thread->getStackInfo(); 
+  mystack_ = parent_stack;
+
+
+  ArchMemoryMapping map = loader_->arch_memory_.resolveMapping(mystack_.userstack_start_ / PAGE_SIZE);
+  size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
+  location += PAGE_SIZE - sizeof(size_t);
+  mystack_.UserMutex = (size_t*) location;
+  *mystack_.UserMutex = 0;
+
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
-                                   parent_thread->getUserstackStart(),
+                                   (void*) mystack_.userstack_start_,
                                    parent_thread->getKernelStackStartPointer());
+
 
   memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
   Userthread = true;
+
+
 
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 

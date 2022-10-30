@@ -71,8 +71,8 @@ void Thread::kill()
 
   if (currentThread == this)
   {
-    debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
     ArchInterrupts::enableInterrupts();
+    debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
     Scheduler::instance()->yield();
   }
 }

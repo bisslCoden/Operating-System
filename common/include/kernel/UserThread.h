@@ -97,7 +97,7 @@ class UserThread : public Thread
     size_t getPageOffset(){return mystack_.page_offset_;}
 
 
-    void* getUserstackStart() { return (void*)mystack_.userstack_start_; }
+    StackInfo getStackInfo() { return mystack_; }
 
     // tells if thread is the last thread of its process
     bool isLast() { return last_; }

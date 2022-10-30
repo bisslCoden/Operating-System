@@ -68,12 +68,14 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
   {
     debug(USERPROCESS, "Failed to create Loader!\n");
+    assert(false);
     return;
   }
 
   if(!loader_->loadExecutableAndInitProcess())
   {
     debug(USERPROCESS, "Failed to init Process\n");
+    assert(false);
     return;
   }
 

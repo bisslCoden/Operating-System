@@ -8,7 +8,7 @@ int main(int argc, char** argv)
 {
   printf("Call to Fork w 3!\n");
   int pid = 0;
-  for(int i = 0; i < 6; i++)
+  //for(int i = 0; i < 2; i++)
     pid = fork();
   if (!pid)
   {
