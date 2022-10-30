@@ -101,3 +101,5 @@ const size_t X_THREADSTACK      = Ansi_Red     | OUTPUT_ENABLED;
 const size_t FORK               = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t FORK_PAGESRC       = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t DBEK               = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t CLOCK              = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t SLEEP              = Ansi_Magenta | OUTPUT_ENABLED;

@@ -19,7 +19,6 @@
 
 #define sc_waitpid 263
 #define sc_getpid 264
-#define sc_sleep 265
 
 #define sc_pthread_create 400
 #define sc_pthread_cancel 401
@@ -27,4 +26,7 @@
 #define sc_pthread_join 403
 #define sc_pthread_setcancelstate 404
 #define sc_pthread_setcanceltype 405
+
+#define sc_sleep 500
+#define sc_clock 501
 

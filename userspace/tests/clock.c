@@ -2,7 +2,7 @@
 #include "time.h"
 
 int main(int argc, char *argv[]) {
-  clock_t time = 0;
-  printf("Threadcount: %d", time);
+  clock_t time = clock();
+  printf("SYSCALL CLOCK has been started and the return value is: %d", time);
   return 0;
 }

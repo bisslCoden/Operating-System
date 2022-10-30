@@ -89,6 +89,9 @@ after:
     case sc_sleep:
       return_value = sleep(arg1);
       break;
+    case sc_clock:
+      return_value = clock();
+      break;
     case sc_trace:
       trace();
       break;
@@ -508,10 +511,18 @@ int Syscall::get_pid()
 
 unsigned int Syscall::sleep(unsigned int seconds)
 {
+  debug(SLEEP, "Sleep system call started\n");
   int y = 0;
-  for(unsigned int i = 0; i < seconds * 1000; i++)
-    y = y + i;
-  return 0;
+  for(unsigned int i = 0; i < seconds * 100; i++)
+    for(unsigned int j = 0; j < seconds * 1000; j++)
+        y = j + i;
+  return y;
+}
+
+size_t Syscall::clock()
+{
+  debug(CLOCK, "Clock system call started\n");
+  return 12345;
 }
 
 /*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)

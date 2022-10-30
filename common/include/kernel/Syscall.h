@@ -26,6 +26,7 @@ class Syscall
   static size_t wait_pid(size_t arg1, size_t* arg2, size_t arg3);
   static int get_pid();
   static unsigned int sleep(unsigned int seconds);
+  static size_t clock();
 
   // pthreads
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);

@@ -8,7 +8,7 @@
 int main(int argc, char** argv)
 {
   printf("Sleep test started!\n");
-  int x = sleep(5000);
+  int x = sleep(50);
   printf("Sleep test enden!\n");
   return x;
 }
