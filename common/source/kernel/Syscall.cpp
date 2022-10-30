@@ -7,6 +7,7 @@
 #include "UserProcess.h"
 #include "ProcessRegistry.h"
 #include "File.h"
+#include "../../../userspace/libc/include/time.h"
 
 
 #define callingThread (UserThread*) currentThread 
@@ -518,14 +519,28 @@ unsigned int Syscall::sleep(unsigned int seconds)
         y = j + i;
   return y;
 }
+// The clock() function returns an approximation of processor time used by the program
+unsigned int Syscall::clock()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  // The processor monotonically increments the time-stamp counter MSR
+  // every clock cycle and resets it to 0 whenever the processor is reset.
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  size_t return_ = firstbits << 32 | lastbits;
+  //uint32 new_ticks = Scheduler::instance()->getTicks(); 
+  //size_t reuturn_d_ticks = return_ / new_ticks;
+  //size_t return_final = reuturn_d_ticks/1000000;
+  return ((return_/54) / CLOCKS_PER_SEC); //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
+}
 
-size_t Syscall::clock()
+size_t Syscall::getRDTSC()
 {
   size_t firstbits;
   size_t lastbits; 
   asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
-  size_t return_ = firstbits << 32 | lastbits;
+  size_t return_ = lastbits << 32 | firstbits;
   return return_;
 }
 
