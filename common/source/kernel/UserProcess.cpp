@@ -175,7 +175,7 @@ size_t UserProcess::getRandomPageOffset()
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
     offsetlist_lock_.acquire();
-  } while (checkInList(page_offset));
+  } while (checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
@@ -183,7 +183,7 @@ size_t UserProcess::getRandomPageOffset()
   return page_offset;
 }
 
-bool UserProcess::checkInList(size_t NR)
+bool UserProcess::checkInOffsetList(size_t NR)
 {
   for (auto val : offsets_)
     if(val == NR)
@@ -209,7 +209,7 @@ size_t UserProcess::getNrOfThreads()
 size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
 {
   // pthread
-  UserThread* thread = new UserThread(wrapper, UserProcess::getRandomPageOffset());
+  UserThread* thread = new UserThread(wrapper, getRandomPageOffset());
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
@@ -284,13 +284,9 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   name_ = path;
 
-  // UserProcess::exit() all old threads except currentThread + yield to ensure all threads are cleaned up before continuing last thread
-  exit(13579, false);
-  while(getNrOfThreads() > 1)
-    Scheduler::instance()->yield();
-
   // exec 
   debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads??.\n", path, (size_t)argv);
+  removeOldProcessInformation();
   ((UserThread*)currentThread)->execv(argv, argc);
   
   VfsSyscall::close(old_fd); 
@@ -311,4 +307,19 @@ bool UserProcess::setupLoader(ssize_t fd)
 
   loader_ = new_loader;
   return true;
+}
+
+void UserProcess::removeOldProcessInformation()
+{
+  // UserProcess::exit() all old threads except currentThread + yield to ensure all threads are cleaned up before continuing last thread  
+  exit(13579, false);
+  while(getNrOfThreads() > 1)
+    Scheduler::instance()->yield();
+  returnvalue_lock_.acquire();
+  returnvalues_.clear();
+  returnvalue_lock_.release();
+  offsetlist_lock_.acquire();
+  offsets_.clear();
+  
+  offsetlist_lock_.release();
 }

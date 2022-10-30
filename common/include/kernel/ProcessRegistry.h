@@ -59,7 +59,6 @@ class ProcessRegistry : public Thread
      */
     size_t createID();
   private:
-
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;

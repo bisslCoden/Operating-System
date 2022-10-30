@@ -182,8 +182,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   for(size_t i = 0; i < argc; i++)
     debug(USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
 
-
-
   /* needed later for argument passing
   size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
   size_t ppn = PageManager::instance()->allocPPN();
@@ -215,6 +213,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   name_ = process_->getName();
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  mystack_.page_offset_ = process_->getRandomPageOffset();
   setupStack();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   //user_registers_->rdi = ; // overwritten

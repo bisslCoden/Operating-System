@@ -48,6 +48,8 @@ class UserProcess
      */
     int execv(const char* path, char *const argv[], size_t argc);
 
+    void removeOldProcessInformation();
+
     /**
      * @brief does the Loader setup + fd check
      * 
@@ -121,10 +123,10 @@ class UserProcess
     void unLockThreadMutex(){threads_lock_.release();}
 
     // getters
-    size_t getPID()                         { return pid_; }
-    Loader* getLoader()                     { return loader_; }
-    FileSystemInfo* getWorkingDir()         { return working_dir_; }
-    ustl::string getName()                  { return name_; }
+    size_t getPID()                 { return pid_; }
+    Loader* getLoader()             { return loader_; }
+    FileSystemInfo* getWorkingDir() { return working_dir_; }
+    ustl::string getName()          { return name_; }
       /**
      * @brief a retval is REMOVED from the retvallist and given to the joining thread
      * 
@@ -134,7 +136,7 @@ class UserProcess
      * @return false if the Thread was not in the list
      */
     bool getRetVal(size_t tid, void** value);
-    bool checkInList(size_t NR);
+    bool checkInOffsetList(size_t NR);
 
   private:
     // the process ID
@@ -166,9 +168,8 @@ class UserProcess
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
-    Mutex offsetlist_lock_;
+    // the offsets of the thread's stack
     ustl::vector<size_t> offsets_;
-
-    // map with tid + return value for join
+    Mutex offsetlist_lock_;
 };
 
