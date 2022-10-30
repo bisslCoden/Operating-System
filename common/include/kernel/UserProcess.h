@@ -146,9 +146,15 @@ class UserProcess
     
     void setWaitStatus(bool arg);
 
+    ProcessState getProcessState() const {return state_; }
+
     void setProcessState(ProcessState state);
 
-  ProcessState getProcessState() const;
+    size_t getDuaration(){ return duaration_; }
+    
+    void setDuaration(size_t duaration);
+
+
   //set these to protected to children can access aswell
   volatile ProcessState state_;
 
@@ -187,11 +193,14 @@ class UserProcess
 
     // for wait_pid
     bool wait_status_;
-
+    
+    // for clock
+    size_t duaration_;
 
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
 
     // map with tid + return value for join
+
 };
 

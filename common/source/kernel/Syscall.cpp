@@ -520,18 +520,21 @@ unsigned int Syscall::sleep(unsigned int seconds)
   return y;
 }
 // The clock() function returns an approximation of processor time used by the program
-unsigned int Syscall::clock()
+size_t Syscall::clock()
 {
   size_t firstbits;
   size_t lastbits; 
-  // The processor monotonically increments the time-stamp counter MSR
+  // MAN PAGE: The processor monotonically increments the time-stamp counter MSR
   // every clock cycle and resets it to 0 whenever the processor is reset.
+  // INTEL PAGE: The processor time stamp records the number of clock cycles since the last reset.
   asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
-  size_t return_ = firstbits << 32 | lastbits;
+  unsigned int return_ = (unsigned int) (firstbits << 32 | lastbits);
+  UserThread* thread = (UserThread*) currentThread;
+  return (return_ - (unsigned int) thread->getParentProcess()->getDuaration());
   //uint32 new_ticks = Scheduler::instance()->getTicks(); 
   //size_t reuturn_d_ticks = return_ / new_ticks;
   //size_t return_final = reuturn_d_ticks/1000000;
-  return ((return_/54) / CLOCKS_PER_SEC); //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
+   //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
 }
 
 size_t Syscall::getRDTSC()

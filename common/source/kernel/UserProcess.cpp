@@ -37,6 +37,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 }
@@ -92,6 +93,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
   setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
   addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
   Scheduler::instance()->addNewThread(thread);
@@ -304,7 +306,7 @@ void UserProcess::setProcessState(ProcessState state)
   state_ = state; 
 }
 
-ProcessState UserProcess::getProcessState() const
+void UserProcess::setDuaration(size_t duaration)
 { 
-  return state_; 
+  duaration_ = duaration; 
 }
