@@ -120,7 +120,7 @@ extern int pthread_cond_destroy(pthread_cond_t *cond);
 extern int pthread_cond_signal(pthread_cond_t *cond);
 
 extern int pthread_cond_broadcast(pthread_cond_t *cond);
-
+//com
 extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 
 #ifdef __cplusplus

@@ -130,7 +130,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   switch_to_userspace_ = 1;
 }
 
-// Constructor of UserThread for fork
+// fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD,parent_thread->getTID()),
   parent_process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
