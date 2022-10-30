@@ -21,18 +21,11 @@ enum canceltype {
     PTHREAD_CANCEL_ASYNCHRONOUS
 };
 
-<<<<<<< HEAD
 enum joinbale {
     PTHREAD_CREATE_JOINABLE, 
     PTHREAD_CREATE_DETACHED
 };
 
-
-
-
-
-=======
->>>>>>> master
 typedef struct Threadflags
 {
   int cancelable = PTHREAD_CANCEL_ENABLE;
