@@ -42,7 +42,7 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-  debug(SCHEDULER, "schedule called!\n");
+  //debug(SCHEDULER, "schedule called!\n");
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {

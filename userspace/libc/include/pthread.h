@@ -35,14 +35,36 @@ typedef unsigned int pthread_mutexattr_t;
 //pthread spinlock typedefs
 
 //pthread cond typedefs
-typedef unsigned int pthread_cond_t;
 typedef unsigned int pthread_condattr_t;
+
 
 typedef struct spinlock{
     size_t mylock_;
     size_t initialized_;
     int pshared_;
 }pthread_spinlock_t;
+
+typedef struct UserMutex{
+    size_t initialized_;
+    pthread_spinlock_t sleeperslist_lock_;
+    size_t* firstsleeper_;
+    pthread_mutexattr_t my_attr_;
+    size_t lock_;
+    size_t held_by_;
+    pthread_spinlock_t held_by_lock_;
+}pthread_mutex_t;
+
+
+typedef struct UserCV
+{
+    size_t initialized_;
+    pthread_spinlock_t CV_sleeperslist_lock_;
+    size_t* firstsleeper_;
+    pthread_condattr_t my_attr_;
+    size_t lock_;
+    size_t threads_waiting_;
+} pthread_cond_t;
+
 
 typedef struct threadattribute
 {
@@ -55,16 +77,6 @@ typedef struct threadattribute
 
 
 #define PAGE_SIZE_US 4096
-
-typedef struct UserMutex{
-    size_t initialized_;
-    pthread_spinlock_t sleeperslist_lock_;
-    size_t* firstsleeper_;
-    pthread_mutexattr_t my_attr_;
-    size_t lock_;
-    size_t held_by_;
-    pthread_spinlock_t held_by_lock_;
-}pthread_mutex_t;
 
 
 extern int pthread_create(pthread_t *thread,
