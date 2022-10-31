@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types.h"
+#include "assert.h"
+#include "stdio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,7 +100,7 @@ extern int pthread_spin_unlock(pthread_spinlock_t *lock);
 extern int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
 extern int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate);
 
-
+extern int checkAdress(void* adress);
 
 extern pthread_t pthread_self(void);
 

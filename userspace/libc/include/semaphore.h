@@ -1,14 +1,26 @@
 #pragma once
 
+#include "pthread.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 //semaphores typedefs
-#ifndef SEM_T_DEFINED_
-#define SEM_T_DEFINED_
-typedef unsigned int sem_t;
-#endif // SEM_T_DEFINED_
+//#ifndef SEM_T_DEFINED_
+//#define SEM_T_DEFINED_
+
+typedef struct semaphore
+{
+    int initialized_;
+    int pshared_;
+    pthread_cond_t sem_cond_;
+    pthread_mutex_t counter_lock_;
+    pthread_mutex_t condition_lock_;
+    size_t counter_;
+}sem_t;
+
+//#endif // SEM_T_DEFINED_
 
 extern int sem_init(sem_t *sem, int pshared, unsigned value);
 

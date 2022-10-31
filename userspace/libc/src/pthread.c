@@ -2,8 +2,6 @@
 #include "syscall.h"
 #include "sched.h"
 #include "../../../common/include/kernel/syscall-definitions.h"
-#include "assert.h"
-#include "stdio.h"
 
 
 /**
@@ -18,23 +16,7 @@ void* wrapper(void* (*start_routine)(void*), void* args)
   pthread_exit(start_routine(args));
   return 0;
 }
-/**
- * function stub
- * posix compatible signature - do not change the signature!
- */
-int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
-{
-  if (attr != 0)
-  {
-    if (attr->initialized_ != 1)
-    {
-      return -1;
-    }
-  }
-  
-  return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, (size_t)wrapper);
-  // wrapper defined above
-}
+
 
 size_t atomic_exchange_0(size_t *lock){
   size_t myval = 0;
@@ -49,74 +31,14 @@ size_t atomic_exchange_1(size_t* lock){
 }
 
 
-int pthread_attr_init(pthread_attr_t *attr){
-  if (attr->initialized_ == 1)
-    return -1;
-  
-  attr->detach_state_ = PTHREAD_CREATE_JOINABLE;
-  attr->guard_size_ = PAGE_SIZE_US;
-  __syscall(sc_pthread_attr_init, (size_t)&attr->stackaddress_, (size_t)&attr->stacksize_, 0x0, 0x0, 0x0);
-  attr->initialized_ = 1;
-  return 0;
-}
-int pthread_attr_destroy(pthread_attr_t *attr){
-  if (attr->initialized_ != 1)
+int checkAdress(void* adress){
+  if (adress < (void*) 0x1000 || (unsigned long long) adress > 0x0000800000000000ULL)
   {
+    printf("invalid address!\n");
     return -1;
   }
-  attr->initialized_ = 0;
-  return 0;
-  
-};
-
-pthread_t pthread_self(void){
-  return (pthread_t) __syscall(sc_pthread_self, 0x0, 0x0, 0x0, 0x0, 0x0);
-}
-
-int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate){
-  if(attr == 0)
-    return -1;
-  if (detachstate != PTHREAD_CREATE_JOINABLE && detachstate != PTHREAD_CREATE_DETACHED)
-    return -1;
-  
-  attr->detach_state_ = detachstate;
-  return 0;
-}
-
-int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate){
-  if(attr == 0)
-    return -1;
-  if(detachstate == 0)
-    return -1;
-  
-  *detachstate = attr->detach_state_;
-  return 0;
-}
-
-
-
-
-/**
- * function stub
- * posix compatible signature - do not change the signature!
- */
-int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
-{
-  pthread_spin_init(&mutex->sleeperslist_lock_, 0);
-  pthread_spin_init(&mutex->held_by_lock_, 0);
-  mutex->lock_ = 1;
-  mutex->my_attr_ = (attr == 0) ? (pthread_mutexattr_t) 0 : *attr;
-  mutex->firstsleeper_ = 0;
-  mutex->initialized_ = 1;
-  mutex->held_by_ = 0;
-  return 0;
-}
-
-size_t findStackStackStart(size_t inputadress){
-  size_t outputadress = inputadress >> 12;
-  outputadress = outputadress << 12;
-  outputadress += PAGE_SIZE_US - sizeof(size_t);
-  return outputadress;
+  else 
+    return 0;
 }
 
 //lock beforeee
@@ -143,6 +65,13 @@ int addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
   return 0;
 }
 
+size_t findStackStackStart(size_t inputadress){
+  size_t outputadress = inputadress >> 12;
+  outputadress = outputadress << 12;
+  outputadress += PAGE_SIZE_US - sizeof(size_t);
+  return outputadress;
+}
+
 int addToCVWaitersList(pthread_cond_t* cond, size_t** localvaradress)
 {
   if(cond->firstsleeper_ == 0)
@@ -165,6 +94,105 @@ int addToCVWaitersList(pthread_cond_t* cond, size_t** localvaradress)
   *iter = (size_t) localvaradress;
   return 0;
 }
+
+
+
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
+int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
+{
+  if(checkAdress((void*) thread) != 0 || checkAdress((void*)start_routine) != 0)
+    return -1;
+  if (attr != 0x0)
+  {
+    if (checkAdress((void*) attr) != 0 || attr->initialized_ != 1)
+      return -1;
+  }
+  
+  return __syscall(sc_pthread_create, (size_t)thread, (size_t)attr, (size_t)start_routine, (size_t)arg, (size_t)wrapper);
+  // wrapper defined above
+}
+
+
+
+
+int pthread_attr_init(pthread_attr_t *attr){
+  if(checkAdress((void*) attr) != 0)
+    return -1;
+  if (attr->initialized_ == 1)
+    return -1;
+  
+  attr->detach_state_ = PTHREAD_CREATE_JOINABLE;
+  attr->guard_size_ = PAGE_SIZE_US;
+  __syscall(sc_pthread_attr_init, (size_t)&attr->stackaddress_, (size_t)&attr->stacksize_, 0x0, 0x0, 0x0);
+  attr->initialized_ = 1;
+  return 0;
+}
+int pthread_attr_destroy(pthread_attr_t *attr){
+  if(checkAdress((void*) attr) != 0)
+    return -1;
+  if (attr->initialized_ != 1)
+    return -1;
+  attr->initialized_ = 0;
+  return 0;
+  
+};
+
+pthread_t pthread_self(void){
+  return (pthread_t) __syscall(sc_pthread_self, 0x0, 0x0, 0x0, 0x0, 0x0);
+}
+
+int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate){
+  
+  if(checkAdress((void*) attr) != 0)
+    return -1;
+  if (detachstate != PTHREAD_CREATE_JOINABLE && detachstate != PTHREAD_CREATE_DETACHED)
+    return -1;
+  
+  attr->detach_state_ = detachstate;
+  return 0;
+}
+
+int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate){
+  
+  if(checkAdress((void*) attr) != 0 || checkAdress((void*) detachstate)!= 0)
+    return -1;
+  
+  *detachstate = attr->detach_state_;
+  return 0;
+}
+
+
+
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
+int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
+{
+  if(checkAdress((void*) mutex) != 0)
+    return -1;
+  if (mutex->initialized_ == 1)
+    return -1;
+  
+  pthread_spin_init(&mutex->sleeperslist_lock_, 0);
+  pthread_spin_init(&mutex->held_by_lock_, 0);
+  mutex->lock_ = 1;
+  mutex->my_attr_ = (attr == 0) ? (pthread_mutexattr_t) 0 : ((checkAdress((void*)attr) == 0) ? 
+  *attr : (pthread_mutexattr_t)-1);
+  if (mutex->my_attr_ == (pthread_mutexattr_t) -1)
+    return -1;
+  
+  mutex->firstsleeper_ = 0;
+  mutex->initialized_ = 1;
+  mutex->held_by_ = 0;
+  return 0;
+}
+
 
 
 int pthread_setcancelstate(int state, int *oldstate){
@@ -199,8 +227,9 @@ int pthread_cancel(pthread_t thread)
  */
 int pthread_join(pthread_t thread, void **value_ptr)
 {
+  if(checkAdress((void*) value_ptr) != 0)
+    return -1;
   return __syscall(sc_pthread_join, (size_t) thread, (size_t) value_ptr, 0x0, 0x0, 0x0);
-  
 }
 
 /**
@@ -218,6 +247,8 @@ int pthread_detach(pthread_t thread)
  */
 int pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
+  if(checkAdress((void*) mutex) != 0)
+    return -1;
   if (mutex->initialized_ != 1)
     return -1;
   
@@ -236,8 +267,13 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex)
  */
 int pthread_mutex_lock(pthread_mutex_t *mutex)
 {
+  if(checkAdress((void*) mutex) != 0)
+    return -1;
   if(mutex->initialized_ != 1)
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+  {
+    printf("tried to lock uninitialized mutex!\n");
+    return -1;
+  } 
 
   size_t findstart;
   size_t my_identifier = findStackStackStart((size_t)&findstart);
@@ -296,10 +332,13 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
  */
 int pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
-  //size_t adress = 0x685c00000000 - 8;
+  if(checkAdress((void*) mutex) != 0)
+    return -1;
   if(mutex->initialized_ != 1)
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
-
+  {
+    printf("tried to unlock uninitialized mutex!\n");
+    return -1;
+  } 
 
   size_t findstart;
   size_t my_identifier = findStackStackStart((size_t)&findstart);
@@ -310,6 +349,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
     printf("What are you trying to unlock here? you dont have this lock\n");
     return -1;
   }
+  mutex->held_by_ = 0;
   pthread_spin_unlock(&mutex->held_by_lock_);
 
 
@@ -333,13 +373,18 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
  */
 int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
 {
-  if (cond->initialized_ == 1)
-  {
+  if(checkAdress((void*) cond) != 0)
     return -1;
-  }  
+  if(cond->initialized_ == 1)
+    return -1;
+  
   pthread_spin_init(&cond->CV_sleeperslist_lock_, 0);
   cond->firstsleeper_ = 0;
-  cond->my_attr_ = (attr == 0) ? (pthread_condattr_t) 0 : *attr;
+  cond->my_attr_ = (attr == 0) ? (pthread_condattr_t) 0 : (checkAdress((void*)attr) == 0 ? *attr : (pthread_condattr_t) -1);
+ 
+  if (cond->my_attr_ == (pthread_condattr_t) -1)
+    return -1;
+  
   cond->threads_waiting_ = 0;
   cond->lock_ = 1;
   cond->initialized_ = 1;
@@ -352,6 +397,8 @@ int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
  */
 int pthread_cond_destroy(pthread_cond_t *cond)
 {
+  if(checkAdress((void*) cond) != 0)
+    return -1;
   if (cond->initialized_ != 1)
   {
     return -1;
@@ -366,8 +413,13 @@ int pthread_cond_destroy(pthread_cond_t *cond)
  */
 int pthread_cond_signal(pthread_cond_t *cond)
 {
+  if(checkAdress((void*) cond) != 0)
+    return -1;
   if(cond->initialized_ != 1)
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+  {
+    printf("tried to signal on uninit cond!\n");
+    return -1;
+  }
 
   pthread_spin_lock(&cond->CV_sleeperslist_lock_);
   if(cond->firstsleeper_ != 0){
@@ -389,9 +441,13 @@ int pthread_cond_signal(pthread_cond_t *cond)
  */
 int pthread_cond_broadcast(pthread_cond_t *cond)
 {
-   if(cond->initialized_ != 1)
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
-
+  if(checkAdress((void*) cond) != 0)
+    return -1;
+  if(cond->initialized_ != 1)
+  {
+    printf("tried to broadcast on uninit cond!\n");
+    return -1;
+  }
   pthread_spin_lock(&cond->CV_sleeperslist_lock_);
   if(cond->firstsleeper_ != 0){
     size_t* iter = cond->firstsleeper_;
@@ -414,8 +470,13 @@ int pthread_cond_broadcast(pthread_cond_t *cond)
  */
 int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
 {
-    if(mutex->initialized_ != 1 || cond->initialized_ != 1)
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
+  if(checkAdress((void*) cond) != 0 || checkAdress((void*) mutex) != 0)
+    return -1;
+  if(cond->initialized_ != 1 || mutex->initialized_ != 1)
+  {
+    printf("tried to wait on uninit cond or mutex!\n");
+    return -1;
+  }
 
   size_t findstart;
   size_t my_identifier = findStackStackStart((size_t)&findstart);
@@ -441,11 +502,7 @@ int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
   assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
   sched_yield();
 
-
   pthread_mutex_lock(mutex);
-  pthread_spin_lock(&cond->CV_sleeperslist_lock_);
-  //printf("flag is now agein free? %ld\n", mutex->lock_);
-  pthread_spin_unlock(&cond->CV_sleeperslist_lock_);
   
   return 0;
 }
@@ -465,6 +522,9 @@ int pthread_spin_destroy(pthread_spinlock_t *lock)
  */
 int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
+  if(checkAdress((void*) lock) != 0)
+    return -1;
+
   lock->mylock_ = 1;
   lock->initialized_ = 1;
   lock->pshared_ = pshared;
@@ -477,6 +537,9 @@ int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
  */
 int pthread_spin_lock(pthread_spinlock_t *lock)
 {
+  if(checkAdress((void*) lock) != 0)
+    return -1;
+  
   if (lock->initialized_ != 1)
   {
     __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
@@ -505,6 +568,9 @@ int pthread_spin_trylock(pthread_spinlock_t *lock)
  */
 int pthread_spin_unlock(pthread_spinlock_t *lock)
 {
+  if(checkAdress((void*) lock) != 0)
+    return -1;
+  
   if(atomic_exchange_1(&lock->mylock_) != 0)
     return -1;
   return 0;
