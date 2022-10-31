@@ -154,7 +154,6 @@ class UserProcess
     
     void setDuaration(size_t duaration);
 
-    size_t getTSC();
 
 
   //set these to protected to children can access aswell

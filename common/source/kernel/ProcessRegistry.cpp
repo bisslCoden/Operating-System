@@ -162,10 +162,13 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
     list = ProcessRegistry::getProcessList();
     UserThread* callingthread = (UserThread*)currentThread;
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
     auto search_child = list.find(arg1);
+    list_of_processes_lock_.release();
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
     if (search_child != list.end())
     {
+      list_of_processes_lock_.acquire();
       callingthread->getParentProcess()->setWaitStatus(1);
       size_t process_state = search_child->second->getProcessState();
       //debug(DBEK, "arg1: %ld, parent %ld, second: %ld \n", arg1, callingthread->getParentProcess()->getPID(),  search_child->second->getPID());
@@ -188,7 +191,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
           callingthread->getParentProcess()->setWaitStatus(0);
         }
       }
-      //list_of_processes_lock_.release();
+      list_of_processes_lock_.release();
     }
     else
     {
