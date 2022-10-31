@@ -529,16 +529,7 @@ size_t Syscall::clock()
   // INTEL PAGE: The processor time stamp records the number of clock cycles since the last reset.
   asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
   unsigned int current_cycles = (unsigned int) (firstbits << 32 | lastbits);
-  UserThread* thread = (UserThread*) currentThread;
-  if((unsigned int) thread->getParentProcess()->getDuaration() == 0)
-  {
-    thread->getParentProcess()->setDuaration(current_cycles);
-    return 0;
-  }
-  else
-  {
-    return (current_cycles - (unsigned int) thread->getParentProcess()->getDuaration());
-  }
+  return current_cycles;
   //uint32 new_ticks = Scheduler::instance()->getTicks(); 
   //size_t reuturn_d_ticks = return_ / new_ticks;
   //size_t return_final = reuturn_d_ticks/1000000;
