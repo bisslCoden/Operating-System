@@ -348,8 +348,8 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
       PageDirPointerTableEntry *pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
       memcpy((void*) pdpt_dest, (void*) pdpt, PAGE_SIZE);
-      /*debug(A_MEMORY, "Copying the pdpt!\n");
-      debug(SYSCALL, "pdpt      %p\n", (void*) pdpt);
+      debug(A_MEMORY, "Copying the pdpt!\n");
+      /*debug(SYSCALL, "pdpt      %p\n", (void*) pdpt);
       debug(SYSCALL, "pdpt_dest %p\n\n", (void*) pdpt_dest);*/
       for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
       {
@@ -359,8 +359,8 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
           PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
           PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
           memcpy((void*) pd_dest, (void*) pd, PAGE_SIZE);
-          /*debug(A_MEMORY, "Copying the pd!\n");
-          debug(SYSCALL, "pd      %p\n", (void*) pd);
+          debug(A_MEMORY, "Copying the pd!\n");
+          /*debug(SYSCALL, "pd      %p\n", (void*) pd);
           debug(SYSCALL, "pd_dest %p\n\n", (void*) pd_dest);*/
           for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
           {
@@ -370,8 +370,8 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
               PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
               memcpy((void*) pt_dest, (void*) pt, PAGE_SIZE);
-              /*debug(A_MEMORY, "Copying the pt!\n");
-              debug(SYSCALL, "pt      %p\n", (void*) pt);
+              debug(A_MEMORY, "Copying the pt!\n");
+              /*debug(SYSCALL, "pt      %p\n", (void*) pt);
               debug(SYSCALL, "pt_dest %p\n\n", (void*) pt_dest);*/
               for (size_t pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
               {
@@ -381,9 +381,9 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
                   void* page = (void*)getIdentAddressOfPPN(pt[pti].page_ppn);
                   void* page_dest = (void*)getIdentAddressOfPPN(pt_dest[pti].page_ppn);
                   memcpy(page_dest, page, PAGE_SIZE);
-                  debug(A_MEMORY, "Copying the page!\n");
                   debug(SYSCALL, "page      %p\n", (void*) page);
                   debug(SYSCALL, "page_dest %p\n\n", (void*) page_dest);*/
+                  debug(A_MEMORY, "Setting page for Copy on write!\n");
                   pt[pti].writeable = 0;
                   pt[pti].cow = 1;
 
@@ -422,7 +422,7 @@ void ArchMemory::copyOnWrite(size_t address)
 
   if(cow_counter_.find(used_page) == cow_counter_.end())
   {
-      debug(A_MEMORY,"Page %ld not in the cow_counter even tho flags are set!\n",used_page);
+      debug(A_MEMORY,"Page %d not in the cow_counter even tho flags are set!\n",used_page);
       cow_cnt_lock_.release();
       arch_memory_lock_.release();
       return;

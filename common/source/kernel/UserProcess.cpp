@@ -65,10 +65,10 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
     return;
   }
 
-
+  loader_ = new Loader(fd_);
   if(fd_ >= 0)
   {
-    loader_ = new Loader(fd_);
+    //loader_ = new Loader(fd_);
     //debug(USERPROCESS, "Failed to create Loader!\n");
   }
 
@@ -85,17 +85,15 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   }
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
-  ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
+  currentThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
 
-
-  //local fd
 
   debug(USERPROCESS, "Creating new Thread for Fork\n");
   auto thread = new UserThread(this,(UserThread*) currentThread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
-    delete thread;
+    //delete thread;
     return;
   }
 

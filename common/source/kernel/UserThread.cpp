@@ -112,6 +112,10 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 {
   loader_ = child->getLoader();
 
+  if(!loader_)
+  {
+    return;
+  }
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
                                    getUserstackStart(),

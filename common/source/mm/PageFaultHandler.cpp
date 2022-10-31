@@ -63,6 +63,10 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
+    if (present){
+    debug(PAGEFAULT, "Entering Valid Pagefault\n");
+
+    }
     if  (present && writing)
     {
       debug(PAGEFAULT, "Copy on Write will execute now\n");
