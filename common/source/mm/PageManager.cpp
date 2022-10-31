@@ -225,7 +225,7 @@ uint32 PageManager::allocPPN(uint32 page_size)
   }
 
   memset((void*)ArchMemory::getIdentAddressOfPPN(found), 0, page_size);
-  debug(X_PAGEMANAGER, "allocPPN() found page at %x                   \n", found);
+  debug(X_PAGEMANAGER, "allocPPN() found page at %x\n", found);
   return found;
 }
 

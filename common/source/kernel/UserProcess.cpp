@@ -13,6 +13,8 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
+#define currentUserThread ((UserThread*)currentThread)
+
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
@@ -62,7 +64,7 @@ UserProcess::UserProcess(UserProcess *parent) :
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
   threads_lock_.acquire();
-  ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
+  currentUserThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
   threads_lock_.release();
 
   //local fd
@@ -227,7 +229,7 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
 
 void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
-  debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  debug(X_USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
   
@@ -247,10 +249,10 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     }
   }
   threads_lock_.release();
-  ((UserThread*)currentThread)->setLast();
-  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_, currentThread->getTID());
+  currentUserThread->setLast();
   if(kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
+  debug(X_USERPROCESS, "exit(): finished, currentProcess %s killed\n", kill_currentThread ? "also": "not");
 }
 
 bool UserProcess::getRetVal(size_t tid, void** value)
@@ -270,7 +272,7 @@ bool UserProcess::getRetVal(size_t tid, void** value)
 // TODO: kill all old threads - tried.
 int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
-  debug(USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
+  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
@@ -285,9 +287,9 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   name_ = path;
 
   // exec 
-  debug(USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads??.\n", path, (size_t)argv);
+  debug(X_USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path, (size_t)argv);
   removeOldProcessInformation();
-  ((UserThread*)currentThread)->execv(argv, argc);
+  currentUserThread->execv(argv, argc);
   
   VfsSyscall::close(old_fd); 
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
@@ -311,15 +313,17 @@ bool UserProcess::setupLoader(ssize_t fd)
 
 void UserProcess::removeOldProcessInformation()
 {
-  // UserProcess::exit() all old threads except currentThread + yield to ensure all threads are cleaned up before continuing last thread  
+  debug(X_USERPROCESS, "removingOldProcessInformation() entered\n");
   exit(13579, false);
   while(getNrOfThreads() > 1)
     Scheduler::instance()->yield();
+
   returnvalue_lock_.acquire();
   returnvalues_.clear();
   returnvalue_lock_.release();
+
   offsetlist_lock_.acquire();
   offsets_.clear();
-  
   offsetlist_lock_.release();
+  debug(X_USERPROCESS, "removingOldProcessInformation() finished\n");
 }

@@ -5,6 +5,7 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "uvector.h"
+#include "Loader.h"
 
 #define NO_EXEC_CALL 123454321
 

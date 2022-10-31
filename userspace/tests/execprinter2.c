@@ -6,6 +6,12 @@
 #define MAX_THREADS 10
 #define MAX_LOOPS 1000
 
+/**
+ * This program tests if all threads are killed before exec is starting 
+ * the new program. also arguments are passed. 
+ * 
+ */
+
 void simple_routine()
 {
   size_t value = 123;
@@ -26,7 +32,7 @@ int main(int argc, const char *argv[])
   if((size_t)ret_pthread > 3)
     printf("ahelo\n");
  
-  // hardcoded args :(
+  // hardcoded args :( - MAX_ARGS
   char* const path = "/usr/printer.sweb";
 	char* const arg1 = "Eier";
 	char* const arg2 = "Mehl";
