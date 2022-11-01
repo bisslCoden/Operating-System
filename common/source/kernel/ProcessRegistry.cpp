@@ -233,11 +233,11 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       size_t process_state = search_child->second->getProcessState();
       return_pid = search_child->second->getPID();
       list_of_processes_lock_.release();
-      while (parent_process->getWaitStatus()) 
+      while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() 
+      && search_child->second->getProcessState() == 2) 
       {
         Scheduler::instance()->yield();
-        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0
-        || parent_process->getProcessState() == 0)
+        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
         {
           list_of_processes_lock_.acquire();
           parent_process->setWaitStatus(0);
