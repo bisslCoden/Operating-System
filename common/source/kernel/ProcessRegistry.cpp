@@ -159,39 +159,27 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
   ustl::map<size_t, UserProcess*> list;
   if((long int) arg1 > 0) // any specifed process
   {
+    list_of_processes_lock_.acquire();
     list = ProcessRegistry::getProcessList();
     UserThread* callingthread = (UserThread*)currentThread;
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
-    //list_of_processes_lock_.acquire();
     auto search_child = list.find(arg1);
-    //list_of_processes_lock_.release();
+    list_of_processes_lock_.release();
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
     if (search_child != list.end())
     {
-      //list_of_processes_lock_.acquire();
       callingthread->getParentProcess()->setWaitStatus(1);
       size_t process_state = search_child->second->getProcessState();
-      //debug(DBEK, "arg1: %ld, parent %ld, second: %ld \n", arg1, callingthread->getParentProcess()->getPID(),  search_child->second->getPID());
       return_pid = search_child->second->getPID();
-      //debug(DBEK, "PID of the return1: %ld\n", return_pid);
-      //list_of_processes_lock_.acquire();
       while (callingthread->getParentProcess()->getWaitStatus()) 
       {
         Scheduler::instance()->yield();
-       // search_child = list.find(arg1);
-        //search_parent = list.find(callingthread->getParentProcess()->getPID());
-      
-        //debug(DBEK, "In while loop: %ld\n waiting for %ld\n", callingthread->getParentProcess()->getPID(),
-        //search_child->second->getPID());
-      
-        //debug(DBEK, "In while loop calling: %ld\n waiting for child in state: %ld\n process_state: %ld\n", callingthread->getParentProcess()->getProcessState(),
-        //search_child->second->getProcessState(), process_state);
-        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0
+        || callingthread->getParentProcess()->getProcessState() == 0)
         {
           callingthread->getParentProcess()->setWaitStatus(0);
         }
       }
-      //list_of_processes_lock_.release();
     }
     else
     {
