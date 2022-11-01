@@ -155,33 +155,92 @@ void ProcessRegistry::createProcess(const char* path)
 
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
 {
+  /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
+       points.  This integer can be inspected with the following macros (which take the integer itself
+       as an argument, not a pointer to it, as is done in wait() and waitpid()!):
+
+       WIFEXITED(wstatus)
+              returns true if the child terminated normally, that is, by calling exit(3) or  _exit(2),
+              or by returning from main().
+
+       WEXITSTATUS(wstatus)
+              returns  the exit status of the child.  This consists of the least significant 8 bits of
+              the status argument that the child specified in a call to exit(3) or _exit(2) or as  the
+              argument for a return statement in main().  This macro should be employed only if WIFEX‐
+              ITED returned true.
+
+       WIFSIGNALED(wstatus)
+              returns true if the child process was terminated by a signal.
+
+       WTERMSIG(wstatus)
+              returns the number of the signal that caused the child process to terminate.  This macro
+              should be employed only if WIFSIGNALED returned true.
+
+       WCOREDUMP(wstatus)
+              returns  true if the child produced a core dump (see core(5)).  This macro should be em‐
+              ployed only if WIFSIGNALED returned true.
+
+              This macro is not specified in POSIX.1-2001 and is not available on some UNIX  implemen‐
+              tations (e.g., AIX, SunOS).  Therefore, enclose its use inside #ifdef WCOREDUMP ... #en‐
+              dif.
+
+       WIFSTOPPED(wstatus)
+              returns true if the child process was stopped by delivery of a signal; this is  possible
+              only  if  the  call  was  done  using  WUNTRACED  or when the child is being traced (see
+              ptrace(2)).
+
+       WSTOPSIG(wstatus)
+              returns the number of the signal which caused the child to stop.  This macro  should  be
+              employed only if WIFSTOPPED returned true.
+
+       WIFCONTINUED(wstatus)
+              (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
+              CONT.
+*/
+  if(arg2 != 0)
+  {
+    debug(DBEK, "arg2 different 0, process %ld\n", arg1);
+  }
+  /*The value of options is an OR of zero or more of the following constants:
+
+       WNOHANG
+              return immediately if no child has exited.
+
+       WUNTRACED
+              also  return  if  a child has stopped (but not traced via ptrace(2)).  Status for traced
+              children which have stopped is provided even if this option is not specified.
+
+       WCONTINUED (since Linux 2.6.10)
+              also return if a stopped child has been resumed by delivery of SIGCONT.
+*/
+  if(arg3 > 0) 
+  {
+    debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
+  }
   debug(DBEK, "id: %ld\n", parent_process->getPID());
   int return_pid = 0;
   if((long int) arg1 > 0) // any specifed process
   {
     list_of_processes_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list;
-    list = ProcessRegistry::getProcessList();
-    UserThread* callingthread = (UserThread*)currentThread;
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
     auto search_child = list.find(arg1);
     list_of_processes_lock_.release();
-   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
     if (search_child != list.end())
     {
       list_of_processes_lock_.acquire();
-      callingthread->getParentProcess()->setWaitStatus(1);
+      parent_process->setWaitStatus(1);
       size_t process_state = search_child->second->getProcessState();
       return_pid = search_child->second->getPID();
       list_of_processes_lock_.release();
-      while (callingthread->getParentProcess()->getWaitStatus()) 
+      while (parent_process->getWaitStatus()) 
       {
         Scheduler::instance()->yield();
         if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0
-        || callingthread->getParentProcess()->getProcessState() == 0)
+        || parent_process->getProcessState() == 0)
         {
           list_of_processes_lock_.acquire();
-          callingthread->getParentProcess()->setWaitStatus(0);
+          parent_process->setWaitStatus(0);
           list_of_processes_lock_.release();
         }
       }
@@ -239,10 +298,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(DBEK, "arg1 smaller -1\n");
+    return -1;
   }
   else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
   {
     debug(DBEK, "arg1 equals 0\n");
+    return -1;
   }
   else //   something went wrong
   {
@@ -250,11 +311,6 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     //list_of_processes_lock_.release();
     return -1;
   } 
-  if(arg2 != 0)
-    debug(DBEK, "arg2 different 0, process %ld\n", arg1);
-  if(arg3 > 0) 
-    debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
-
   // for printing the elements of the map
   //ustl::map<size_t, UserProcess*>::iterator i;
   //for (i = list.begin(); i != list.end(); ++i) 
