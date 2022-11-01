@@ -38,6 +38,7 @@ int isWaitingHere(size_t identifier, pthread_mutex_t* mutex){
     return 0;
   }
   size_t* iter = mutex->firstsleeper_;
+  printf("lock: %p: ", mutex);
   while (iter != 0)
   {
     if (findStackStackStart((size_t)iter) == identifier)
@@ -45,8 +46,10 @@ int isWaitingHere(size_t identifier, pthread_mutex_t* mutex){
       pthread_spin_unlock(&mutex->sleeperslist_lock_);
       return 1;
     }
+    printf(" %p ", (size_t*)findStackStackStart((size_t) iter));
     iter = (size_t*) *iter;
   }
+  printf("\n");
   pthread_spin_unlock(&mutex->sleeperslist_lock_);
   return 0;
 }
@@ -57,12 +60,31 @@ int detectThreadWaitingAnotherLock(size_t identifier, pthread_mutex_t* desired_l
 }
 
 
+
+int detectThreadWaiting(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
+  
+  for (pthread_mutex_t* iter = firstmutex; iter->next_mutex_ != 0; iter = iter->next_mutex_)
+  {
+    if (iter == lock_wanted)
+      continue;
+    
+    if (isWaitingHere(waiter_identifier, iter))
+    {
+      assert(0 && "how?? thread is waiting on another lock already??\n");
+    }
+  }
+  return 0;
+}
+  
+
+
 int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
   pthread_spin_lock(&lock_wanted->held_by_lock_);
   size_t held_by_cur = lock_wanted->held_by_;
   
   for (pthread_mutex_t* iter = firstmutex; iter->next_mutex_ != 0; iter = iter->next_mutex_)
   {
+    printf("checking dl for mutex: %p held by %p\n", iter, (size_t*) iter->held_by_);
     if (iter == lock_wanted)
       continue;
     
@@ -372,7 +394,8 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
     assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
     //printf("going to sleep now...\n");
     pthread_spin_unlock(&mutex->sleeperslist_lock_);
-    
+    detectThreadWaiting(my_identifier, mutex);
+    detectCircularDeadlock(my_identifier, mutex);
     sched_yield();
   }
 
