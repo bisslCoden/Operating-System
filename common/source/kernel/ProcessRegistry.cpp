@@ -157,10 +157,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
 {
   debug(DBEK, "id: %ld\n", parent_process->getPID());
   int return_pid = 0;
-  ustl::map<size_t, UserProcess*> list;
   if((long int) arg1 > 0) // any specifed process
   {
     list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list;
     list = ProcessRegistry::getProcessList();
     UserThread* callingthread = (UserThread*)currentThread;
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
@@ -178,7 +178,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
         if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0
         || callingthread->getParentProcess()->getProcessState() == 0)
         {
+          list_of_processes_lock_.acquire();
           callingthread->getParentProcess()->setWaitStatus(0);
+          list_of_processes_lock_.release();
         }
       }
     }
@@ -258,3 +260,4 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
 }
 
 // 49.6%
+// 53.4%
