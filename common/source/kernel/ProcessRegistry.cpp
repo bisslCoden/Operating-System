@@ -158,20 +158,16 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   int return_pid = 0;
   if((long int) arg1 > 0) // any specifed process
   {
-    wait_pid_lock_.acquire();
     ustl::map<size_t, UserProcess*> list;
     list = ProcessRegistry::getProcessList();
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
     auto search_child = list.find(arg1);
-    wait_pid_lock_.release();
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
     if (search_child != list.end())
     {
-      wait_pid_lock_.acquire();
       parent_process->setWaitStatus(1);
       size_t process_state = search_child->second->getProcessState();
       return_pid = search_child->second->getPID();
-      wait_pid_lock_.release();
       while (parent_process->getWaitStatus() && search_child->second->getProcessState() != 0) 
       {
         Scheduler::instance()->yield();
@@ -182,7 +178,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
           parent_process->setWaitStatus(0);
           wait_pid_lock_.release();
         }
-      }
+      } 
     }
     else
     {
