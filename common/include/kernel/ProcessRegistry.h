@@ -45,7 +45,7 @@ class ProcessRegistry : public Thread
     /**
      * Makes the process wait
      */
-    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3);
+    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process);
 
 
     /**
@@ -83,5 +83,6 @@ class ProcessRegistry : public Thread
     // keeping track of processes alive
     ustl::map<size_t, UserProcess*> list_of_processes_;
     Mutex list_of_processes_lock_;
+    Mutex wait_pid_lock_;
 };
 

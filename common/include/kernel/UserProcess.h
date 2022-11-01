@@ -146,6 +146,10 @@ class UserProcess
     
     void setWaitStatus(bool arg);
 
+    bool getChildStatus(){ return child_; }
+    
+    void setChildStatus(bool arg);
+
     ProcessState getProcessState() const {return state_; }
 
     void setProcessState(ProcessState state);
@@ -194,7 +198,8 @@ class UserProcess
 
     // for wait_pid
     bool wait_status_;
-    
+    bool child_;
+
     // for clock
     size_t duaration_;
 

@@ -15,7 +15,8 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
+    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_"),
+    wait_pid_lock_("ProcessRegistry::wait_pid_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
   instance_ = this; // instance_ is static! -> Singleton-like behaviour
@@ -152,50 +153,78 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3)
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
 {
-  //list_of_processes_lock_.acquire();
   int return_pid = 0;
-  ustl::map<size_t, UserProcess*> list;
   if((long int) arg1 > 0) // any specifed process
   {
-    list_of_processes_lock_.acquire();
+    wait_pid_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list;
     list = ProcessRegistry::getProcessList();
-    UserThread* callingthread = (UserThread*)currentThread;
     debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
     auto search_child = list.find(arg1);
-    list_of_processes_lock_.release();
+    //wait_pid_lock_.release();
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
     if (search_child != list.end())
     {
-      callingthread->getParentProcess()->setWaitStatus(1);
+      parent_process->setWaitStatus(1);
       size_t process_state = search_child->second->getProcessState();
       return_pid = search_child->second->getPID();
-      while (callingthread->getParentProcess()->getWaitStatus()) 
+      wait_pid_lock_.release();
+      while (parent_process->getWaitStatus() && search_child->second->getProcessState() != 0) 
       {
         Scheduler::instance()->yield();
         if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0
-        || callingthread->getParentProcess()->getProcessState() == 0)
+        || parent_process->getProcessState() == 0)
         {
-          callingthread->getParentProcess()->setWaitStatus(0);
+          wait_pid_lock_.acquire();
+          parent_process->setWaitStatus(0);
+          wait_pid_lock_.release();
         }
       }
     }
     else
     {
       debug(DBEK, "Not found, process %ld\n", arg1);
-      //list_of_processes_lock_.release();
+      wait_pid_lock_.release();
       return -1;
     }
-    debug(DBEK, "PID of the return2: %ld\n", search_child->second->getPID());
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    wait_pid_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list;
+    list = ProcessRegistry::getProcessList();
+    debug(DBEK, "arg1 equals -1, process %ld\n", arg1);
+    ustl::map<size_t, UserProcess*>::iterator i;
+    UserProcess* child;
+    for (i = list.begin(); i != list.end(); ++i) 
+    {
+      if(i->second->getChildStatus() == 1)
+      {
+        child = i->second;
+      }
+    }
+    parent_process->setWaitStatus(1);
+    size_t process_state = child->getProcessState();
+    return_pid = child->getPID();
+    wait_pid_lock_.release();
+    while (parent_process->getWaitStatus() && child->getProcessState() != 0) 
+    {
+      Scheduler::instance()->yield();
+      if(process_state != child->getProcessState() || child->getProcessState() == 0
+      || parent_process->getProcessState() == 0)
+      {
+        wait_pid_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        wait_pid_lock_.release();
+      }
+    }
+   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
   }
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(DBEK, "arg1 smaller -1\n");
-  }
-  else if((long int) arg1 == -1) // any child process.
-  {
-    debug(DBEK, "arg1 equals -1\n");
   }
   else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
   {

@@ -499,8 +499,9 @@ int Syscall::fork()
 
 size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
+  UserThread* callingthread = (UserThread*)currentThread;
   debug(SYSCALL, "Calling Syscall waitpid!\n");
-  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3);
+  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3, callingthread->getParentProcess());
 }
 
 int Syscall::get_pid()
@@ -542,7 +543,7 @@ size_t Syscall::clock()
   //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
 }*/
 
-size_t Syscall::getRDTSC()
+/*size_t Syscall::getRDTSC()
 {
   size_t firstbits;
   size_t lastbits; 
@@ -550,7 +551,7 @@ size_t Syscall::getRDTSC()
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   size_t return_ = firstbits << 32 | lastbits;
   return return_;
-}
+}*/
 
 
 /*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
