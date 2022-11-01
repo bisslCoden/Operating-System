@@ -514,7 +514,7 @@ int Syscall::get_pid()
 unsigned int Syscall::sleep(unsigned int seconds)
 {
   debug(SLEEP, "Sleep system call started\n");
-  int y = 0;
+  int y = 0; 
   for(unsigned int i = 0; i < seconds * 100; i++)
     for(unsigned int j = 0; j < seconds * 1000; j++)
         y = j + i;

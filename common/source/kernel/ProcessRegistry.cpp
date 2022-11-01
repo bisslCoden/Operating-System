@@ -197,6 +197,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
               (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
               CONT.
 */
+  debug(DBEK, "arg2 : %ln\n", arg2);
   if(arg2 != 0)
   {
     debug(DBEK, "arg2 different 0, process %ld\n", arg1);
