@@ -54,6 +54,7 @@ typedef struct UserMutex{
     size_t lock_;
     size_t held_by_;
     pthread_spinlock_t held_by_lock_;
+    struct UserMutex* next_mutex_;
 }pthread_mutex_t;
 
 

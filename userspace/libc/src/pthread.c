@@ -4,6 +4,11 @@
 #include "../../../common/include/kernel/syscall-definitions.h"
 
 
+//not rly that threadsafe i think...
+pthread_mutex_t* firstmutex = (pthread_mutex_t*) 0;
+pthread_spinlock_t mutexlist_lock;
+
+
 /**
  * @brief we are in userspace. now the start routine + arguments gets called and after it's done, pthread_exit is called.
  * 
@@ -16,6 +21,66 @@ void* wrapper(void* (*start_routine)(void*), void* args)
   pthread_exit(start_routine(args));
   return 0;
 }
+
+
+size_t findStackStackStart(size_t inputadress){
+  size_t outputadress = inputadress >> 12;
+  outputadress = outputadress << 12;
+  outputadress += PAGE_SIZE_US - sizeof(size_t);
+  return outputadress;
+}
+
+int isWaitingHere(size_t identifier, pthread_mutex_t* mutex){
+  pthread_spin_lock(&mutex->sleeperslist_lock_);
+  if (mutex->firstsleeper_ == 0)
+  {
+    pthread_spin_unlock(&mutex->sleeperslist_lock_);
+    return 0;
+  }
+  size_t* iter = mutex->firstsleeper_;
+  while (iter != 0)
+  {
+    if (findStackStackStart((size_t)iter) == identifier)
+    {
+      pthread_spin_unlock(&mutex->sleeperslist_lock_);
+      return 1;
+    }
+    iter = (size_t*) *iter;
+  }
+  pthread_spin_unlock(&mutex->sleeperslist_lock_);
+  return 0;
+}
+
+//to be continued...
+int detectThreadWaitingAnotherLock(size_t identifier, pthread_mutex_t* desired_lock){
+  return -1;
+}
+
+
+int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
+  pthread_spin_lock(&lock_wanted->held_by_lock_);
+  size_t held_by_cur = lock_wanted->held_by_;
+  
+  for (pthread_mutex_t* iter = firstmutex; iter->next_mutex_ != 0; iter = iter->next_mutex_)
+  {
+    if (iter == lock_wanted)
+      continue;
+    
+    pthread_spin_lock(&iter->held_by_lock_);
+    size_t held_by = iter->held_by_;
+    if (held_by == waiter_identifier && isWaitingHere(held_by_cur, iter))
+    {
+      printf("CIRCULAR deadlock found!\n");
+      int circ = 1;
+      assert(circ == 0);
+    }
+    pthread_spin_unlock(&iter->held_by_lock_);           
+    }
+    pthread_spin_unlock(&lock_wanted->held_by_lock_);
+    return 0;
+}
+  
+
 
 
 size_t atomic_exchange_0(size_t *lock){
@@ -63,13 +128,6 @@ int addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
   }
   *iter = (size_t) localvaradress;
   return 0;
-}
-
-size_t findStackStackStart(size_t inputadress){
-  size_t outputadress = inputadress >> 12;
-  outputadress = outputadress << 12;
-  outputadress += PAGE_SIZE_US - sizeof(size_t);
-  return outputadress;
 }
 
 int addToCVWaitersList(pthread_cond_t* cond, size_t** localvaradress)
@@ -190,6 +248,19 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
   mutex->firstsleeper_ = 0;
   mutex->initialized_ = 1;
   mutex->held_by_ = 0;
+  if (firstmutex == 0)
+  {
+    pthread_spin_init(&mutexlist_lock, 0);
+    firstmutex = mutex;
+  }
+  else{
+    pthread_spin_lock(&mutexlist_lock);
+    pthread_mutex_t* iter = firstmutex;
+    for(; iter->next_mutex_ != 0; iter = iter->next_mutex_);
+    iter->next_mutex_ = mutex;
+    pthread_spin_unlock(&mutexlist_lock);
+  } 
+  
   return 0;
 }
 
