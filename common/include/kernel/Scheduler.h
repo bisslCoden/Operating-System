@@ -30,6 +30,8 @@ class Scheduler
     uint32 getTicks();
     uint32 getThreadCount();
 
+    size_t getRDTSC();
+
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
      * this is the method that decides which threads will be scheduled next

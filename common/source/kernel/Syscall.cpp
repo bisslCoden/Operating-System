@@ -519,16 +519,28 @@ unsigned int Syscall::sleep(unsigned int seconds)
         y = j + i;
   return y;
 }
-// The clock() function returns an approximation of processor time used by the program
+
 size_t Syscall::clock()
+{
+  //UserThread* thread = (UserThread*) currentThread;
+  return Scheduler::instance()->getTicks();
+}
+
+// commented out bc testing
+// The clock() function returns an approximation of processor time used by the program
+/*size_t Syscall::clock()
 {
   UserThread* thread = (UserThread*) currentThread;
   return getRDTSC() - thread->getParentProcess()->getDuaration();
+
+  //else
+  //  return (clock_t) -1;
+
   //uint32 new_ticks = Scheduler::instance()->getTicks(); 
   //size_t reuturn_d_ticks = return_ / new_ticks;
   //size_t return_final = reuturn_d_ticks/1000000;
-   //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
-}
+  //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
+}*/
 
 size_t Syscall::getRDTSC()
 {
