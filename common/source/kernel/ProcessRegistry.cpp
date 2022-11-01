@@ -190,7 +190,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       return -1;
     }
   }
-  else if((long int) arg1 == -1) // any child process.
+  /*else if((long int) arg1 == -1) // any child process.
   {
     wait_pid_lock_.acquire();
     ustl::map<size_t, UserProcess*> list;
@@ -198,13 +198,17 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(DBEK, "arg1 equals -1, process %ld\n", arg1);
     ustl::map<size_t, UserProcess*>::iterator i;
     UserProcess* child;
+    wait_pid_lock_.release();
     for (i = list.begin(); i != list.end(); ++i) 
     {
       if(i->second->getChildStatus() == 1)
       {
+        wait_pid_lock_.acquire();
         child = i->second;
+        wait_pid_lock_.release();
       }
     }
+    wait_pid_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = child->getProcessState();
     return_pid = child->getPID();
@@ -221,6 +225,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       }
     }
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
+  }*/
+  else if((long int) arg1 == -1)
+    {
+    debug(DBEK, "arg1 equals -1\n");
   }
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
