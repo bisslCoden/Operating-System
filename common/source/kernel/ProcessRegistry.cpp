@@ -155,7 +155,100 @@ void ProcessRegistry::createProcess(const char* path)
 
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
 {
-  /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
+  debug(WAITPID, "id: %ld\n", parent_process->getPID());
+  int return_pid = 0;
+  if((long int) arg1 > 0) // any specifed process
+  {
+    debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
+    auto search_child = list.find(arg1);
+    list_of_processes_lock_.release();
+    if (search_child != list.end())
+    {
+      list_of_processes_lock_.acquire();
+      parent_process->setWaitStatus(1);
+      size_t process_state = search_child->second->getProcessState();
+      return_pid = search_child->second->getPID();
+      list_of_processes_lock_.release();
+      while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() 
+      && search_child->second->getProcessState() == 2) 
+      {
+        Scheduler::instance()->yield();
+        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+        {
+          list_of_processes_lock_.acquire();
+          parent_process->setWaitStatus(0);
+          list_of_processes_lock_.release();
+        }
+      }
+    }
+    else
+    {
+      debug(WAITPID, "Not found, process %ld\n", arg1);
+      //list_of_processes_lock_.release();
+      return -1;
+    }
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list;
+    list = ProcessRegistry::getProcessList();
+    ustl::map<size_t, UserProcess*>::iterator i;
+    UserProcess* child = parent_process;
+    list_of_processes_lock_.release();
+    for (i = list.begin(); i != list.end(); ++i) 
+    {
+      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) 
+      && (child->getWaitStatus() == 0))
+      {
+        list_of_processes_lock_.acquire();
+        child = i->second;
+        list_of_processes_lock_.release();
+        break;
+      }
+    }
+    list_of_processes_lock_.acquire();
+    parent_process->setWaitStatus(1);
+    size_t process_state = child->getProcessState();
+    return_pid = child->getPID();
+    list_of_processes_lock_.release();
+    debug(WAITPID, "before while \n");
+    while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
+    {
+      debug(WAITPID, "in while  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
+       arg1, parent_process->getProcessState(), child->getProcessState(),
+       parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
+       parent_process->getWaitStatus(), child->getWaitStatus());
+      Scheduler::instance()->yield();
+      if(process_state != child->getProcessState() || child->getProcessState() == 0)
+      {
+        list_of_processes_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        list_of_processes_lock_.release();
+      }
+    }
+   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
+  }
+
+  else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
+    return 0;
+  }
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(WAITPID, "arg1 equals 0\n"); // dont need to implement process groups
+    return 0;
+  }
+  else //   something went wrong
+  {
+    debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
+    return -1;
+  } 
+    /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
        points.  This integer can be inspected with the following macros (which take the integer itself
        as an argument, not a pointer to it, as is done in wait() and waitpid()!):
 
@@ -197,10 +290,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
               (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
               CONT.
 */
-  debug(DBEK, "arg2 : %ln\n", arg2);
+  debug(WAITPID, "arg2 is : %ln\n", arg2);
   if(arg2 != 0)
   {
-    debug(DBEK, "arg2 different 0, process %ld\n", arg1);
+    debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
   }
   /*The value of options is an OR of zero or more of the following constants:
 
@@ -216,107 +309,8 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
 */
   if(arg3 > 0) 
   {
-    debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
+    debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
   }
-  debug(DBEK, "id: %ld\n", parent_process->getPID());
-  int return_pid = 0;
-  if((long int) arg1 > 0) // any specifed process
-  {
-    list_of_processes_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
-    debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
-    auto search_child = list.find(arg1);
-    list_of_processes_lock_.release();
-    if (search_child != list.end())
-    {
-      list_of_processes_lock_.acquire();
-      parent_process->setWaitStatus(1);
-      size_t process_state = search_child->second->getProcessState();
-      return_pid = search_child->second->getPID();
-      list_of_processes_lock_.release();
-      while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() 
-      && search_child->second->getProcessState() == 2) 
-      {
-        Scheduler::instance()->yield();
-        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
-        {
-          list_of_processes_lock_.acquire();
-          parent_process->setWaitStatus(0);
-          list_of_processes_lock_.release();
-        }
-      }
-    }
-    else
-    {
-      debug(DBEK, "Not found, process %ld\n", arg1);
-      //list_of_processes_lock_.release();
-      return -1;
-    }
-    debug(DBEK, "PID of the return2: %ld\n", search_child->second->getPID());
-  }
-  else if((long int) arg1 == -1) // any child process.
-  {
-    list_of_processes_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list;
-    list = ProcessRegistry::getProcessList();
-    debug(DBEK, "arg1 equals -1, process %ld\n", arg1);
-    ustl::map<size_t, UserProcess*>::iterator i;
-    UserProcess* child = parent_process;
-    list_of_processes_lock_.release();
-    for (i = list.begin(); i != list.end(); ++i) 
-    {
-      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) 
-      && (child->getWaitStatus() == 0))
-      {
-        list_of_processes_lock_.acquire();
-        child = i->second;
-        list_of_processes_lock_.release();
-        break;
-      }
-    }
-    list_of_processes_lock_.acquire();
-    parent_process->setWaitStatus(1);
-    size_t process_state = child->getProcessState();
-    return_pid = child->getPID();
-    list_of_processes_lock_.release();
-    while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
-    {
-      debug(DBEK, "in nw hile  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
-       arg1, parent_process->getProcessState(), child->getProcessState(),
-       parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
-       parent_process->getWaitStatus(), child->getWaitStatus());
-      Scheduler::instance()->yield();
-      if(process_state != child->getProcessState() || child->getProcessState() == 0)
-      {
-        list_of_processes_lock_.acquire();
-        parent_process->setWaitStatus(0);
-        list_of_processes_lock_.release();
-      }
-    }
-   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
-  }
-
-  else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
-  {
-    debug(DBEK, "arg1 smaller -1\n");
-    return -1;
-  }
-  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
-  {
-    debug(DBEK, "arg1 equals 0\n");
-    return -1;
-  }
-  else //   something went wrong
-  {
-    debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
-    //list_of_processes_lock_.release();
-    return -1;
-  } 
-  // for printing the elements of the map
-  //ustl::map<size_t, UserProcess*>::iterator i;
-  //for (i = list.begin(); i != list.end(); ++i) 
-   // debug(DBEK, "element %ld\n", i->first);
-  //list_of_processes_lock_.release();
   return return_pid;
 }
 
