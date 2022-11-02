@@ -120,6 +120,11 @@ class UserProcess
      */
     void exit(size_t exit_code, bool kill_currentThread = true);
 
+    void lockKill(){kill_lock_.acquire();}
+    void unlockKill(){kill_lock_.release();}
+    bool checkKill(){ return KILLED_;}
+
+
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}
 
@@ -172,5 +177,9 @@ class UserProcess
     // the offsets of the thread's stack
     ustl::vector<size_t> offsets_;
     Mutex offsetlist_lock_;
+
+    Mutex kill_lock_;
+    bool KILLED_ = false;
+    // map with tid + return value for join
 };
 

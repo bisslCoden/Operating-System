@@ -45,8 +45,19 @@ UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl:
   process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: UserThread() for first thread finished\n", getTID());
-  switch_to_userspace_ = 1;
+  //should be threadsafe??
+  process_->lockKill();
+  if (process_->checkKill())
+  {
+    switch_to_userspace_ = 0;
+    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
+    process_->unlockKill();
+  }
+  else
+  {
+    process_->unlockKill();
+    switch_to_userspace_ = 1;
+  }
 }
 
 bool UserThread::schedulable(){
@@ -128,8 +139,18 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: UserThread() for pthread_create finished\n", getTID());
-  switch_to_userspace_ = 1;
+  process_->lockKill();
+  if (process_->checkKill())
+  {
+    switch_to_userspace_ = 0;
+    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
+    process_->unlockKill();
+  }
+  else
+  {
+    process_->unlockKill();
+    switch_to_userspace_ = 1;
+  }
 }
 
 // fork
@@ -169,8 +190,18 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
-  switch_to_userspace_ = 1;
-  debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor for fork finished\n", getTID());
+  process_->lockKill();
+  if (process_->checkKill())
+  {
+    switch_to_userspace_ = 0;
+    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
+    process_->unlockKill();
+  }
+  else
+  {
+    process_->unlockKill();
+    switch_to_userspace_ = 1;
+  }
   //ArchThreads::printThreadRegisters(this);
 }
 

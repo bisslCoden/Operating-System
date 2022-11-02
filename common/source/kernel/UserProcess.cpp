@@ -24,7 +24,9 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     name_(filename.c_str()),
     threads_lock_("UserProcess::threads_lock_"),
     returnvalue_lock_("UserProcess::retvallock"),
-    offsetlist_lock_("UserProcess::offsets")
+    offsetlist_lock_("UserProcess::offsets"),
+    kill_lock_("UserProcess::kill_lock_"),
+    KILLED_(false)
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -49,7 +51,10 @@ UserProcess::UserProcess(UserProcess *parent) :
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock"), 
-  offsetlist_lock_("UserProcess::offsets")
+  offsetlist_lock_("UserProcess::offsets"),
+  kill_lock_("UserProcess::kill_lock_"),
+  KILLED_(false)
+
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
@@ -154,6 +159,13 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   }
 
   // sets Thread::last_ if it's last thread
+  debug(X_USERPROCESS, "%ld threads left in my process\n", threads_.size());
+  // for (size_t i = 0; i < threads_.size(); i++)
+  // {
+  //   debug(X_USERPROCESS, "  %ld  ", threads_[i]->getTID());
+  // }
+  // debug(X_USERPROCESS, "\n");
+
   if(threads_.size() == 1)
     thread->setLast();
 
@@ -234,7 +246,10 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
 
 void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
-  debug(X_USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  kill_lock_.acquire();
+  KILLED_ = true;
+
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
   
@@ -254,9 +269,16 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     }
   }
   threads_lock_.release();
-  if(kill_currentThread)
+  kill_lock_.release();
+  debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
+  // callingThread->lockFlagMutex();
+  // callingThread->setCancelState(PTHREAD_CANCEL_ENABLE);
+  // callingThread->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
+  // callingThread->sendCancelRequest();
+  // callingThread->unlockFlagMutex();
+  if(kill_currentThread)  
     Syscall::pthread_exit((void*) exit_code);
-  debug(X_USERPROCESS, "exit(): finished, currentProcess %s killed\n", kill_currentThread ? "also": "not");
+
 }
 
 bool UserProcess::getRetVal(size_t tid, void** value)
