@@ -72,6 +72,9 @@ class Scheduler
 
     size_t ticks_;
 
+    size_t frequency;
+    size_t rdtsc_value;
+
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;
 };

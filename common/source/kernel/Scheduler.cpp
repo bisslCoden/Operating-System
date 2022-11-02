@@ -30,6 +30,8 @@ Scheduler::Scheduler()
 {
   block_scheduling_ = 0;
   ticks_ = 0;
+  frequency = 0;
+  rdtsc_value = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
