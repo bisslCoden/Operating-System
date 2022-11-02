@@ -105,6 +105,11 @@ class UserProcess
      */
     void killThread(UserThread* thread);
 
+    void lockKill(){kill_lock_.acquire();}
+    void unlockKill(){kill_lock_.release();}
+    bool checkKill(){ return KILLED_;}
+
+
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}
 
@@ -158,6 +163,8 @@ class UserProcess
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
 
+    Mutex kill_lock_;
+    bool KILLED_ = false;
     // map with tid + return value for join
 };
 

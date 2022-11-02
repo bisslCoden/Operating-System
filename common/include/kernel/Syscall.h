@@ -6,6 +6,8 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
+#define callingThread ((UserThread*) currentThread)
+
 
 class Syscall
 {
