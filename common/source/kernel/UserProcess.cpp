@@ -188,8 +188,10 @@ size_t UserProcess::getRandomPageOffset()
 bool UserProcess::checkInOffsetList(size_t NR)
 {
   for (auto val : offsets_)
+  {
     if(val == NR)
       return true;
+  }
   return false;
 }
 
@@ -252,7 +254,6 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     }
   }
   threads_lock_.release();
-  currentUserThread->setLast();
   if(kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
   debug(X_USERPROCESS, "exit(): finished, currentProcess %s killed\n", kill_currentThread ? "also": "not");
