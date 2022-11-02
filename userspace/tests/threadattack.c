@@ -4,7 +4,7 @@
 #include "assert.h"
 
 
-#define NUM_THREADS1 150
+#define NUM_THREADS1 100
 #define NUM_THREADS2 100
 
 pthread_t tids[NUM_THREADS1 + NUM_THREADS2];
