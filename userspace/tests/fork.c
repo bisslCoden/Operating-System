@@ -8,7 +8,7 @@ int main(int argc, char** argv)
 {
   printf("Call to Fork w 3!\n");
   int pid = 0;
-  //for(int i = 0; i < 2; i++)
+  for(int i = 0; i < 1; i++)
     pid = fork();
   if (!pid)
   {
@@ -68,4 +68,7 @@ int main(int argc, char** argv)
     printf("Error while forking!");
   }
   printf("Call to Fork finished!\n");*/
+
+  printf("main() returning\n");
+  return 0;
 }

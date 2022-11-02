@@ -14,13 +14,15 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
+UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  parent_process_(parent_process), flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
-  "Thread::join_cond"} // UserThread's members
+  process_(process_), 
+  flag_mutex_{"thread::flag_mutex_"}, 
+  condition_mutex_{"Thread::cond_mutex_"},
+  join_cond_{ &condition_mutex_, "Thread::join_cond" } // UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
-  loader_ = parent_process_->getLoader();
+  loader_ = process_->getLoader();
   Userthread = true;
   //  size_t sleepflag = 1;
   // size_t res = __atomic_exchange_n(&sleepflag, 0, ustl::memory_order_seq_cst);
@@ -32,20 +34,18 @@ UserThread::UserThread(UserProcess* parent_process, FileSystemInfo* working_dir,
                                    (void*) mystack_.userstack_start_,
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
-  debug(X_USERTHREAD, "TID [%ld]: Stack, Registers and AddressSpace set.\n", getTID());
 
   // set terminal
   if (main_console->getTerminal(terminal_number))
     setTerminal(main_console->getTerminal(terminal_number));
 
   // add Thread to process to scheduler
-  parent_process_->addToThreadList(this);
+  process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: first thread constructor finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: UserThread() for first thread finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 
@@ -100,11 +100,11 @@ bool UserThread::schedulable(){
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
   Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(((UserThread*)currentThread)->parent_process_), flag_mutex_{"thread::flag_mutex_"},
+  process_(((UserThread*)currentThread)->process_), flag_mutex_{"thread::flag_mutex_"},
    condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
-  loader_ = parent_process_->getLoader();
+  loader_ = process_->getLoader();
   mystack_.page_offset_ = page_offset;
 
   Userthread = true;
@@ -124,18 +124,18 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
     setTerminal(main_console->getTerminal(terminal_number));
 
   // add Thread to process to scheduler
-  parent_process_->addToThreadList(this);
+  process_->addToThreadList(this);
 
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  debug(X_USERTHREAD, "TID [%ld]: pthread thread constructor finished\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: UserThread() for pthread_create finished\n", getTID());
   switch_to_userspace_ = 1;
 }
 
 // fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
-  parent_process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"}
 {
   loader_ = child->getLoader();
@@ -177,15 +177,13 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
-  //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, parent_process_->getPID(), name_.c_str());
-
+  //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
   
   if(isLast())
   {
-    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting parent_process_\n", getTID(), parent_process_->getPID());
-    delete parent_process_;
+    debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
+    delete process_;
   }
-  //debug(X_USERTHREAD, "returning from my killing\n");
   switch_to_userspace_ = 1;
 }
 
@@ -214,30 +212,23 @@ void UserThread::sendCancelRequest(){
 
 bool UserThread::setupStack()
 {
-  //debug(USERTHREAD, "TID: [%ld] setupStack()\n", getTID());
-  bool vpn_mapped = false;
-  size_t ppn_for_stack = 0;
-  debug(X_THREADSTACK, "TID[%ld] my offset IIIIS: %ld\n", tid_, mystack_.page_offset_);
-  size_t vpn_for_stack = 0;
+  debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
+
+  // virtual address
   size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 4 MB
   size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
-
-  // calc
-  vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
-  ppn_for_stack = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "got my first physical page with number %ld\n", ppn_for_stack);
-  vpn_mapped = loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1);
-
-  // worked? 
-  //debug(USERTHREAD, "setupStack() trying to map: vpn %lx to ppn %lx.\n", vpn_for_stack, ppn_for_stack);
-  assert(vpn_for_stack && ppn_for_stack);
-  if(!vpn_mapped)
+  size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
+  // ppn
+  size_t ppn_for_stack = PageManager::instance()->allocPPN();
+  // check stack vpn and ppn + mapPage()
+  if(!vpn_for_stack || !ppn_for_stack || !loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
   {
-    debug(USERTHREAD, "setupStack() RIP. returning false\n");
+    debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
     assert(false);
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
+  debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
 
 
   mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
@@ -251,4 +242,58 @@ bool UserThread::setupStack()
 
 
   return true;
+}
+
+int UserThread::execv(char* const argv[], size_t argc)
+{
+  debug(X_USERTHREAD, "argc = %ld\n", argc);
+  for(size_t i = 0; i < argc; i++)
+    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
+
+  /*
+  // vaddr... virtual address for old archmemory
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
+  size_t vaddr_end = vpn * PAGE_SIZE;
+  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
+  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
+  // ident... identMapping of freshly allocated PPN
+  size_t ppn = PageManager::instance()->allocPPN();
+  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
+  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
+  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", vpn, ident_start, ident_end);
+  // map vpn to ppn (this is still the old loader_->arch_memory_)
+  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "UserThread::execv() mapPage() failed");
+  // iterate and copy from old archmem to ident
+  debug(X_USERTHREAD, "mapped vpn and ppn. copying from old archmem to ident:\n");
+  size_t vaddr_i = vaddr_start;
+  size_t ident_i = ident_start;
+  for(size_t i = 0; (i < argc) && (ident_i != ident_end); i++)
+  {
+    // copy pointer to char ptr to ident address
+    *((size_t*)ident_i) = vaddr_i;
+    memcpy((void*)ident_i, (void*)argv[i], strlen(argv[i]));
+    // 
+    ident_i += sizeof(size_t);
+    vaddr_i += sizeof(char)*strlen(argv[i]) + 1;
+    ident_i += sizeof(char)*strlen(argv[i]) + 1;
+  }
+  */
+
+  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
+  name_ = process_->getName();
+  loader_ = process_->getLoader();
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  mystack_.page_offset_ = process_->getRandomPageOffset();
+  setupStack();
+  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
+
+  // iterate and copy from ident to new virtual memory
+
+  // passing new virtual memory to userspace 
+  user_registers_->rsp = (size_t)getUserstackStart();
+  user_registers_->rip = (size_t)loader_->getEntryFunction();
+  // user_registers_->rdi = (size_t)argv; 
+  // user_registers_->rsi = argc;
+  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  return 0;
 }

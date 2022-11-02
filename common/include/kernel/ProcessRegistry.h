@@ -49,6 +49,9 @@ class ProcessRegistry : public Thread
     static ProcessRegistry* instance();
     void createProcess(const char* path);
 
+    int execvProcess(const char* path, char *const argv[]);
+
+
     /**
      * creates an unique ID for every process OR thread ID
      *
@@ -56,7 +59,6 @@ class ProcessRegistry : public Thread
      */
     size_t createID();
   private:
-
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;

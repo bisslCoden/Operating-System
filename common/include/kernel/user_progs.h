@@ -18,6 +18,8 @@ char const *user_progs[] = {
                             //"/usr/mudead2.sweb",
                             //"/usr/mudead2.sweb",
                             //"/usr/mudead.sweb",
+                            // "/usr/threadattack.sweb",
+                            "/usr/execprinter.sweb",
                             0
                            };
 

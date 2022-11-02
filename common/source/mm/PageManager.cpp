@@ -225,6 +225,7 @@ uint32 PageManager::allocPPN(uint32 page_size)
   }
 
   memset((void*)ArchMemory::getIdentAddressOfPPN(found), 0, page_size);
+  debug(X_PAGEMANAGER, "allocPPN() found page at %x\n", found);
   return found;
 }
 
@@ -244,6 +245,4 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
     page_usage_table_->unsetBit(p);
   }
   lock_.release();
-
-  //debug(X_PAGEMANAGER, "freePPN(page_numer = %x, page_size = %d) finished.\n", page_number, page_size);
 }

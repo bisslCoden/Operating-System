@@ -5,7 +5,9 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "uvector.h"
+#include "Loader.h"
 
+#define NO_EXEC_CALL 123454321
 
 class UserThread;
 class Syscall;
@@ -22,11 +24,10 @@ class UserProcess
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
     /**
      * Constructor
-     * @param parent parent process to fork
-     * @param pid the id of the parent
+     * @param parent parent process that shall be forked
      *
      */
-    UserProcess(UserProcess* parent, size_t pid);
+    UserProcess(UserProcess* parent);
 
     ~UserProcess();
 
@@ -40,6 +41,26 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
+     * @brief creates a thread that starts the binary of the program
+     * 
+     * @param path the path to the binary
+     * @param argv the arguments 
+     * @param argc the argument count
+     */
+    int execv(const char* path, char *const argv[], size_t argc);
+
+    void removeOldProcessInformation();
+
+    /**
+     * @brief does the Loader setup + fd check
+     * 
+     * @param fd the fd that's used in the Loader constructor (use local variable, not member fd_)
+     * @return true if success,
+     * @return false if rip
+     */
+    bool setupLoader(ssize_t fd);
+
+    /**
      * @brief UNSAFELY removes userthread from threads_ 
      * 
      * @param thread the userthread
@@ -49,7 +70,7 @@ class UserProcess
     bool removeFromThreadList(UserThread* thread);
 
     /**
-     * @brief UNSAFELY searches TID in threads_
+     * @brief UNSAFELY searches TID in threads_ LOCK BEFORE AND RELEASE AFTER CALL
      * 
      * @param tid the tid
      * @return Thread* pointer to the thread (0 if not found)
@@ -62,7 +83,7 @@ class UserProcess
      * 
      * @param tid the tid
      * @param value pointer to the value
-     * @return true if success
+     * @return true if success, 
      * @return false if already in list (assert)
      */
     bool addToRetvalList(size_t tid, void* value);
@@ -91,28 +112,22 @@ class UserProcess
     size_t createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate);
 
     /**
-     * @brief pushes all threads of process onto list and destroys (currentThread last)
+     * @brief exits the whole userprogram if kill_last is true. 
+     * otherwise only destroys all except currentThread
      * 
-     * @param exit_code 
-     * @return size_t 
+     * @param exit_code the exit code
+     * @param kill_last bool that says whether currentThread should be killed.
      */
-    void exit(size_t exit_code);
-
-    /**
-     * @brief calls thread->kill() which sets state to toBeDestroyed
-     * 
-     * @param thread pointer to the thread
-     */
-    void killThread(UserThread* thread);
+    void exit(size_t exit_code, bool kill_currentThread = true);
 
     void lockThreadMutex(){threads_lock_.acquire();}
     void unLockThreadMutex(){threads_lock_.release();}
 
     // getters
-    size_t getPID(){ return pid_; }
-    Loader* getLoader() { return loader_; }
+    size_t getPID()                 { return pid_; }
+    Loader* getLoader()             { return loader_; }
     FileSystemInfo* getWorkingDir() { return working_dir_; }
-    ustl::string getName() { return name_; }
+    ustl::string getName()          { return name_; }
       /**
      * @brief a retval is REMOVED from the retvallist and given to the joining thread
      * 
@@ -122,15 +137,14 @@ class UserProcess
      * @return false if the Thread was not in the list
      */
     bool getRetVal(size_t tid, void** value);
-    bool checkInList(size_t NR);
+    bool checkInOffsetList(size_t NR);
 
   private:
     // the process ID
     size_t const pid_;
 
-
     // the process' fd. see "FileDescriptor.h"
-    ssize_t const fd_;
+    ssize_t fd_;
 
     // information about the program. path...
     FileSystemInfo* const fs_info_;
@@ -155,9 +169,8 @@ class UserProcess
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
-    Mutex offsetlist_lock_;
+    // the offsets of the thread's stack
     ustl::vector<size_t> offsets_;
-
-    // map with tid + return value for join
+    Mutex offsetlist_lock_;
 };
 

@@ -57,12 +57,29 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* parent_process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
     
+    /**
+     * @brief Construct a new User Thread object for pthread_create()
+     * 
+     * @param wrapper the wrapper for implicit pthread_exit() call
+     * @param page_offset offset for stack location
+     * @param terminal_number the terminal to run in (default 0)
+     */
     UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
 
+    /**
+     * @brief Construct a new User Thread object for fork()
+     * 
+     * @param child the UserProcess of this new thread
+     * @param parent_thread the thread of the parent_thread that called fork()
+     */
     UserThread(UserProcess* child, UserThread* parent_thread);
 
+    /**
+     * @brief Destroy the User Thread object and check if(isLast()) { destroy parent_; } 
+     * 
+     */
     ~UserThread();
 
     /**
@@ -79,6 +96,16 @@ class UserThread : public Thread
      * @return false stack not setup.
      */
     bool setupStack();
+
+    /**
+     * @brief UserThread-part of constructor. sets few members, creates stack in new archemory and 
+     * copies arguments from userspace via ident mapping to location pointed to by rsi and rdi
+     * 
+     * @param argv the userspace arggument vector
+     * @param argc the userspace argument count
+     * @return error return values
+     */
+    int execv(char* const argv[], size_t argc);
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
@@ -100,9 +127,8 @@ class UserThread : public Thread
     StackInfo getStackInfo() { return mystack_; }
 
     // tells if thread is the last thread of its process
-    bool isLast() { return last_; }
     // return process of thread
-    UserProcess* getParentProcess() { return parent_process_; }
+    UserProcess* getParentProcess() { return process_; }
 
     bool schedulable() override;
 
@@ -113,34 +139,40 @@ class UserThread : public Thread
     void setCancelState(int state);
     void setCancelType(int type);
     void sendCancelRequest();
-
-    // setters
-    void setLast() { last_ = true; }
-
-    
-
-    //lock before!
-    Threadflags* getflags(){return &myflags_;}
-    
-    //lock before!
-    int32 getJoiner(){return join_waiter_;}
-  
+    void setLast(){last_ = true;}    
+    // getters
+    Threadflags*  getflags()          { return &myflags_;}     //lock before!
+    int32         getJoiner()         { return join_waiter_;}  //lock before!
+    void*         getUserstackStart() { return (void*)mystack_.userstack_start_; }
+    UserProcess*  getProcess()        { return process_; }
+    bool          isLast()            { return last_; }        // tells if thread is the last thread of its process (important: on thread destuction, the process is destroyed if set!)
   private:
     // the process that contains this thread
-    UserProcess* parent_process_;
-
-    // safe stack start + end ppn
-  
+    UserProcess* process_;
 
     int32 join_waiter_ = -1;
     Mutex flag_mutex_;
     Mutex condition_mutex_;
     Condition join_cond_;
 
+    /**
+      int cancelable  = PTHREAD_CANCEL_ENABLE or PTHREAD_CANCEL_DISABLE
+      int deferred    = PTHREAD_CANCEL_DEFERRED or PTHREAD_CANCEL_ASYNCHRONOUS
+      int joinable;
+      bool cancelreq = false;
+      ustl::atomic_flag kcancelreq;
+      ustl::atomic_flag knotcancelable;
+      ustl::atomic_flag kasynchronous;
+     * 
+     */
     Threadflags myflags_;
+    /** userstack_start_
+        size_t userstack_end_
+        size_t page_offset_
+     */
     StackInfo mystack_;
     
-    // only true if removeFromThreadList() detects last thread
+    // only true if removeFromThreadList() detects last thread to delete process
     bool last_ = false; 
 };
 

@@ -11,6 +11,7 @@
 #include "kstring.h"
 #include "Stabs2DebugInfo.h"
 #include "backtrace.h"
+#include "Thread.h"
 extern Stabs2DebugInfo const* kernel_debug_info;
 
 KernelMemoryManager kmm;
@@ -437,6 +438,15 @@ bool KernelMemoryManager::mergeWithFollowingFreeSegment(MallocSegment *this_one)
 pointer KernelMemoryManager::ksbrk(ssize_t size)
 {
   assert(base_break_ <= (size_t)kernel_break_ + size && "kernel heap break value corrupted");
+  /* // extremely simple and completely uneffective attempt to fix a crash when running out of kernel heap. :)
+  if(!((reserved_max_ == 0 || ((kernel_break_ - base_break_) + size) <= reserved_max_)))
+  {
+    debug(KMM, "ERROR: maximum kernel heap size reached with ksbrk(size = %ld)\n", size);
+    lock_.release();
+    if(currentThread->getType() == Thread::TYPE::USER_THREAD)
+      Syscall::pthread_cancel(currentThread->getTID());
+  }
+  */
   assert((reserved_max_ == 0 || ((kernel_break_ - base_break_) + size) <= reserved_max_) && "maximum kernel heap size reached");
   assert(DYNAMIC_KMM && "ksbrk should only be called if DYNAMIC_KMM is 1 - not in baseline SWEB");
   if(size != 0)

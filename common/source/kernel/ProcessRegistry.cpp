@@ -6,7 +6,7 @@
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
-
+#include "offsets.h"
 
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
@@ -107,15 +107,13 @@ size_t ProcessRegistry::createID()
 
 size_t ProcessRegistry::processFork()
 {
-  size_t pid = createID();
-
-  debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
-  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "processFork() called starting process creation\n");
+  auto parent = ((UserThread*)currentThread)->getProcess();
   //debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent,pid);
+  auto process = new UserProcess(parent);
 
   debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID()==0)
+  if (!process || process->getPID() == 0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
     delete process;
@@ -123,24 +121,30 @@ size_t ProcessRegistry::processFork()
   }
 
   list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
   list_of_processes_lock_.release();
-  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
   
-  return pid;
+  debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
+  return process->getPID();
 }
-
-
 
 void ProcessRegistry::createProcess(const char* path)
 {
-  debug(PROCESS_REG, "create process %s\n", path);
-  FileSystemInfo test = *working_dir_;
-  debug(PROCESS_REG, "was able to deref that\n");
-  UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
-  assert(process && "Process creation failed miserably o_O");
+  debug(PROCESS_REG, "createProcess(path = %s)\n", path);
+  FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
+  if(!fs_info)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
+    return;
+  }
+  UserProcess* process = new UserProcess(path, fs_info);
+  if(!process || process->getPID() == 0)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
+    return;
+  }
 
-  debug(PROCESS_REG, "created process successfully!\n");
+  debug(X_PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
@@ -148,3 +152,27 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
+int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+{
+  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
+  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
+  bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
+  if(!pathptr_ok || !argvptr_ok)
+    return -1;
+  bool is_first_path = false;
+  bool found_null = false;
+  if(!strcmp(path, argv[0]))
+    is_first_path = true;
+  size_t argc = 1;
+  for(; !found_null; argc++)
+    if(argv[argc] == NULL && argc > 1)
+      found_null = true;
+  if(!is_first_path || !found_null)
+    return -1;
+
+  // UserProcess::execv()
+  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
+  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  return currentProcess->execv(path, argv, argc);
+}
