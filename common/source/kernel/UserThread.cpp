@@ -55,7 +55,7 @@ bool UserThread::schedulable(){
   {
     //testsystem
     //checks if exit is called
-    debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
+    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!getflags()->knotcancelable.test_and_set())
       {
         if (getflags()->kasynchronous.test_and_set())
@@ -75,7 +75,7 @@ bool UserThread::schedulable(){
     
     
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, 0, ustl::memory_order_seq_cst);
-    debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
+    //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
     if (sleepy == 0)
     {
       return true;

@@ -8,6 +8,15 @@ char const *user_progs[] = {
                             //"/usr/threadattack.sweb",
                             //"/usr/mutest.sweb",
                             "/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
+                            //"/usr/mudead2.sweb",
                             //"/usr/mudead.sweb",
                             0
                            };

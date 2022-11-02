@@ -3,8 +3,8 @@
 #include "assert.h"
 #include "sched.h"
 
-#define NUM_THREADS1 2
-#define NUM_THREADS2 2
+#define NUM_THREADS1 100
+#define NUM_THREADS2 100
 
 
 pthread_mutex_t mutex1;
@@ -47,12 +47,14 @@ int simple_routine()
 //
 int simple_routine2()
 {
-  int mutret = 0;
+  //int mutret = 0;
   //printf("hi i ll try to get the mutex!\n");
-  mutret = pthread_mutex_lock(&mutex2);
+  //mutret = 
+  pthread_mutex_lock(&mutex2);
   sched_yield();
   //printf("lock1 returned %d.\n", mutret);
-  mutret = pthread_mutex_lock(&mutex1);
+  //mutret =
+   pthread_mutex_lock(&mutex1);
   //printf("lock2 returned %d\n", mutret);
   //assert(never_false == 1 && "never false aint 1? whaat?\n");
   never_false = 0;
@@ -60,9 +62,11 @@ int simple_routine2()
   sched_yield();
   never_false = 1;
   never_false2 = 1;
-  mutret = pthread_mutex_unlock(&mutex2);
-  mutret = pthread_mutex_unlock(&mutex1);
-  printf("mutex UNLOCK returned me %d!\n", mutret);
+  //mutret = 
+  pthread_mutex_unlock(&mutex2);
+  //mutret = 
+  pthread_mutex_unlock(&mutex1);
+  //printf("mutex UNLOCK returned me %d!\n", mutret);
   return 0;
 }
 
@@ -70,7 +74,7 @@ int main()
 {
   int ret;
   int rets;
-  printf("Hello!\n");
+ // printf("Hello!\n");
   pthread_mutex_init(&mutex1, NULL);
   pthread_mutex_init(&mutex2, NULL);
 
