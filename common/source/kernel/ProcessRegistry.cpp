@@ -219,7 +219,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
   }
   debug(DBEK, "id: %ld\n", parent_process->getPID());
-  int return_pid = -1;
+  int return_pid = 0;
   if((long int) arg1 > 0) // any specifed process
   {
     list_of_processes_lock_.acquire();
