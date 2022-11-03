@@ -600,10 +600,10 @@ int pthread_spin_destroy(pthread_spinlock_t *lock)
 {
   if (checkAdress((void*)lock) != 0)
     return -1;
-  if (lock->initialzied_ != 1)
+  if (lock->initialized_ != 1)
     return -1;
 
-  lock->initialzed_ = 0;
+  lock->initialized_ = 0;
   return 0;
 }
 
@@ -632,9 +632,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
     return -1;
   
   if (lock->initialized_ != 1)
-  {
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
-  }
+    return -1;
   
   while (!atomic_exchange_0(&lock->mylock_))
   {
@@ -650,7 +648,18 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
  */
 int pthread_spin_trylock(pthread_spinlock_t *lock)
 {
+  if(checkAdress((void*) lock) != 0)
+    return -1;
+  
+  if (lock->initialized_ != 1)
   return -1;
+  
+  if (!atomic_exchange_0(&lock->mylock_))
+  {
+    //not suuper safe but okay for now
+    return -1;
+  }
+  return 0;
 }
 
 /**
