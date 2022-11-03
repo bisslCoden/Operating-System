@@ -1,10 +1,11 @@
 #include "pthread.h"
 #include <stdio.h>
 
-#define SIMPLE1 1
-#define SIMPLE2 1
-#define SIMPLE3 1
-#define FORKS 123
+// everything on 2 or we run out of memory
+#define SIMPLE1 2
+#define SIMPLE2 2
+#define SIMPLE3 2
+#define FORKS 2
 
 void simple_routine()
 {

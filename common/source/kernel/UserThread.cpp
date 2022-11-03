@@ -252,7 +252,8 @@ bool UserThread::setupStack()
   // ppn
   size_t ppn_for_stack = PageManager::instance()->allocPPN();
   // check stack vpn and ppn + mapPage()
-  if(!vpn_for_stack || !ppn_for_stack || !loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
+  assert(vpn_for_stack && ppn_for_stack);
+  if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
     assert(false);
