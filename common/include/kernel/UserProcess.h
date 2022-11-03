@@ -150,6 +150,8 @@ class UserProcess
     // the process ID
     size_t const pid_;
 
+    UserThread* waiting_exec_;
+
     // the process' fd. see "FileDescriptor.h"
     ssize_t fd_;
 
