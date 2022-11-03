@@ -35,12 +35,14 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   if(!setupLoader(fd_))
     return;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
-
+  setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
+  setChildStatus(0);
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 }
 
-// fork
+// User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent) :
   pid_(ProcessRegistry::instance()->createID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
@@ -50,11 +52,10 @@ UserProcess::UserProcess(UserProcess *parent) :
   my_terminal_(parent->my_terminal_),
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
-  returnvalue_lock_("UserProcess::retvallock"), 
+  returnvalue_lock_("UserProcess::retvallock"),
   offsetlist_lock_("UserProcess::offsets"),
   kill_lock_("UserProcess::kill_lock_"),
   KILLED_(false)
-
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
@@ -82,7 +83,9 @@ UserProcess::UserProcess(UserProcess *parent) :
     delete thread;
     return;
   }
-
+  setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
+  setChildStatus(1);
   addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
   Scheduler::instance()->addNewThread(thread);
@@ -361,6 +364,26 @@ bool UserProcess::setupLoader(ssize_t fd)
 
   loader_ = new_loader;
   return true;
+}
+
+void UserProcess::setWaitStatus(bool arg)
+{ 
+  wait_status_ = arg; 
+}
+
+void UserProcess::setChildStatus(bool arg)
+{ 
+  child_ = arg; 
+}
+
+void UserProcess::setProcessState(ProcessState state)
+{ 
+  state_ = state; 
+}
+
+void UserProcess::setDuaration(size_t duaration)
+{ 
+  duaration_ = duaration; 
 }
 
 void UserProcess::removeOldProcessInformation()

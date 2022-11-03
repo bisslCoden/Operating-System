@@ -1,6 +1,8 @@
 #pragma once
 
 #include "types.h"
+#include "sys/syscall.h"
+#include "../../../common/include/kernel/syscall-definitions.h"
 #include "assert.h"
 #include "stdio.h"
 
@@ -141,5 +143,3 @@ extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 #ifdef __cplusplus
 }
 #endif
-
-

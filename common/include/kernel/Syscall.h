@@ -27,7 +27,11 @@ class Syscall
   static void trace();
   static int fork();
   static int execv(const char * path, char *const argv[]);
-
+  static size_t wait_pid(size_t arg1, size_t* arg2, size_t arg3);
+  static int get_pid();
+  static unsigned int sleep(unsigned int seconds);
+  static size_t clock();
+  static size_t getRDTSC();
   // pthreads
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
   static void pthread_exit(void* value);

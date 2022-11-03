@@ -5,6 +5,7 @@
 #define fd_stderr 2
 
 #define sc_exit 1
+#define sc_fork 222
 #define sc_read 3
 #define sc_write 4
 #define sc_open 5
@@ -16,6 +17,9 @@
 #define sc_createprocess 191
 #define sc_trace 252
 
+#define sc_waitpid 263
+#define sc_getpid 264
+
 #define sc_pthread_create 400
 #define sc_pthread_cancel 401
 #define sc_pthread_exit 402
@@ -25,6 +29,9 @@
 #define sc_pthread_attr_init 406
 #define sc_pthread_detach 407
 #define sc_pthread_self 408
+#define sc_sleep 500
+#define sc_clock 501
+
 
 #define sc_fork 501
 #define sc_execv 502

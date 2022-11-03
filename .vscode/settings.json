@@ -6,6 +6,22 @@
     },
     "cmake.buildTask": true,
     "files.associations": {
-        "memory": "cpp"
+        "memory": "cpp",
+        "sleep.h": "c",
+        "unistd.h": "c",
+        "wait.h": "c",
+        "assert.h": "c",
+        "getpid.h": "c",
+        "features.h": "c",
+        "time.h": "c",
+        "array": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp"
     }
 }
