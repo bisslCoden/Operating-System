@@ -295,7 +295,33 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   return false;
 }
 
-// TODO: kill all old threads - tried.
+int UserProcess::execv(const char* path)
+{
+  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
+  ssize_t old_fd = fd_;
+  Loader* old_loader = loader_;
+  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+  if(!setupLoader(new_fd))
+  {
+    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
+  }
+  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  name_ = path;
+
+  // exec 
+  debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
+  removeOldProcessInformation();
+  currentUserThread->execv();
+  
+  VfsSyscall::close(old_fd); 
+  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
+  return 0;
+}
+
 int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);

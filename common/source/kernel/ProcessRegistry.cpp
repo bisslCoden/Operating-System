@@ -176,3 +176,18 @@ int ProcessRegistry::execvProcess(const char* path, char *const argv[])
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path, argv, argc);
 }
+
+int ProcessRegistry::execvProcess(const char* path)
+{
+  debug(X_PROCESS_REG, "execvProcess() WITHOUT ARGS!!!\n");
+  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
+  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
+  if(!pathptr_ok)
+    return -1;
+
+  // UserProcess::execv()
+  debug(PROCESS_REG, "execvProcess(path = %s\n", path);
+  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  return currentProcess->execv(path);
+}

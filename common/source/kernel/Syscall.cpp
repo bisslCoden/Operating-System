@@ -8,7 +8,6 @@
 #include "ProcessRegistry.h"
 #include "File.h"
 
-
 #define callingThread ((UserThread*) currentThread)
 
 typedef struct threadattribute
@@ -565,7 +564,12 @@ int Syscall::fork()
 int Syscall::execv(const char * path, char *const argv[])
 {
   debug(SYSCALL, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
-  int ret = ProcessRegistry::instance()->execvProcess(path, argv);
+  int ret = -234;
+  bool with_args = false;
+  if(with_args)
+    ret = ProcessRegistry::instance()->execvProcess(path, argv);
+  else
+    ret = ProcessRegistry::instance()->execvProcess(path);
   debug(SYSCALL, "execProcess returned %d\n", ret);
   return ret;
 }

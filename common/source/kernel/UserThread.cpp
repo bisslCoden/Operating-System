@@ -329,3 +329,22 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
+
+int UserThread::execv()
+{
+  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
+  name_ = process_->getName();
+  loader_ = process_->getLoader();
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  mystack_.page_offset_ = process_->getRandomPageOffset();
+  setupStack();
+  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
+
+  // passing new virtual memory to userspace 
+  user_registers_->rsp = (size_t)getUserstackStart();
+  user_registers_->rip = (size_t)loader_->getEntryFunction();
+  // user_registers_->rdi = (size_t)argv; 
+  // user_registers_->rsi = argc;
+  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  return 0;
+}

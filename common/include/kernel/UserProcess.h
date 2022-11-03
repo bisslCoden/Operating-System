@@ -48,6 +48,8 @@ class UserProcess
      * @param argc the argument count
      */
     int execv(const char* path, char *const argv[], size_t argc);
+    // this is non-args version of execv
+    int execv(const char* path);
 
     void removeOldProcessInformation();
 

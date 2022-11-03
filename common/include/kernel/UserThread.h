@@ -106,6 +106,9 @@ class UserThread : public Thread
      * @return error return values
      */
     int execv(char* const argv[], size_t argc);
+    // no-args here
+    int execv();
+
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
