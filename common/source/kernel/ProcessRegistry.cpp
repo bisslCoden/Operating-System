@@ -254,59 +254,22 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
     return -1;
   } 
-    /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
-       points.  This integer can be inspected with the following macros (which take the integer itself
-       as an argument, not a pointer to it, as is done in wait() and waitpid()!):
-
-       WIFEXITED(wstatus)
-              returns true if the child terminated normally, that is, by calling exit(3) or  _exit(2),
-              or by returning from main().
-
-       WEXITSTATUS(wstatus)
-              returns  the exit status of the child.  This consists of the least significant 8 bits of
-              the status argument that the child specified in a call to exit(3) or _exit(2) or as  the
-              argument for a return statement in main().  This macro should be employed only if WIFEX‐
-              ITED returned true.
-
-       WIFSIGNALED(wstatus)
-              returns true if the child process was terminated by a signal.
-
-       WTERMSIG(wstatus)
-              returns the number of the signal that caused the child process to terminate.  This macro
-              should be employed only if WIFSIGNALED returned true.
-
-       WCOREDUMP(wstatus)
-              returns  true if the child produced a core dump (see core(5)).  This macro should be em‐
-              ployed only if WIFSIGNALED returned true.
-
-              This macro is not specified in POSIX.1-2001 and is not available on some UNIX  implemen‐
-              tations (e.g., AIX, SunOS).  Therefore, enclose its use inside #ifdef WCOREDUMP ... #en‐
-              dif.
-
-       WIFSTOPPED(wstatus)
-              returns true if the child process was stopped by delivery of a signal; this is  possible
-              only  if  the  call  was  done  using  WUNTRACED  or when the child is being traced (see
-              ptrace(2)).
-
-       WSTOPSIG(wstatus)
-              returns the number of the signal which caused the child to stop.  This macro  should  be
-              employed only if WIFSTOPPED returned true.
-
-       WIFCONTINUED(wstatus)
-              (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
-              CONT.
-*/
   debug(WAITPID, "arg2 is : %ln\n", arg2);
   if(arg2 != 0)
   {
     debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
   }
-  /*The value of options is an OR of zero or more of the following constants:
+  if(arg3 > 0) 
+  {
+    debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
+  }
+  return return_pid;
+}
 
-       WNOHANG
-              return immediately if no child has exited.
-int ProcessRegistry::execvProcess(const char* path, char *const argv[])
-{
+
+
+  int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+  {
   // checking parameter ptr + calling convention: first element must be path, last element must be NULL
   bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
   bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
@@ -343,19 +306,6 @@ int ProcessRegistry::execvProcess(const char* path)
   UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
-}
-       WUNTRACED
-              also  return  if  a child has stopped (but not traced via ptrace(2)).  Status for traced
-              children which have stopped is provided even if this option is not specified.
-
-       WCONTINUED (since Linux 2.6.10)
-              also return if a stopped child has been resumed by delivery of SIGCONT.
-*/
-  if(arg3 > 0) 
-  {
-    debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
-  }
-  return return_pid;
 }
 
 // 49.6%
