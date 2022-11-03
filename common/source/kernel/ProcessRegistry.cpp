@@ -162,7 +162,7 @@ void ProcessRegistry::createProcess(const char* path)
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
 {
   debug(WAITPID, "id: %ld\n", parent_process->getPID());
-  int return_pid = 1;
+  int return_pid = 0;
   if((long int) arg1 > 0) // any specifed process
   {
     debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
