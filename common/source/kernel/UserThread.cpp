@@ -280,9 +280,9 @@ int UserThread::execv(char* const argv[], size_t argc)
 {
   debug(X_USERTHREAD, "argc = %ld\n", argc);
   for(size_t i = 0; i < argc; i++)
-    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
-
-  /*
+    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]? argv[i]: "NULL");
+  
+  /* OUTDATED TRY.
   // vaddr... virtual address for old archmemory
   size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
   size_t vaddr_end = vpn * PAGE_SIZE;
@@ -311,6 +311,23 @@ int UserThread::execv(char* const argv[], size_t argc)
   }
   */
 
+  // identMapping to access freshly allocated PPN
+  size_t ppn = PageManager::instance()->allocPPN();
+  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
+  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
+  size_t ident_i = ident_start;
+  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", ppn, ident_start, ident_end);
+
+  // copy char* to ident address until argv[i] is NULL
+  for(size_t i = 0; i < argc - 1; i++)
+  {
+    strcpy((char*)ident_i, argv[i]);
+    // increase ident_i by srtlen + 1 byte for null termination
+    ident_i += strlen(argv[i]) + sizeof(char);
+  }
+  ident_i = ident_start;
+  debug(X_USERTHREAD, "finished copy char* to ident address\n");
+
   // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
   name_ = process_->getName();
   loader_ = process_->getLoader();
@@ -320,13 +337,31 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
 
   // iterate and copy from ident to new virtual memory
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
+  size_t vaddr_end = vpn * PAGE_SIZE;
+  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
+  size_t vaddr_i = vaddr_start;
+  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
+  size_t ppn_new = PageManager::instance()->allocPPN();
+  assert(loader_->arch_memory_.mapPage(vpn, ppn_new, 1));
+  debug(X_USERTHREAD, "ppn_new = %lx\n", ppn_new);
+  debug(X_USERTHREAD, "entering for-loop\n");
+  for(size_t i = 0; i < argc; i++)
+  {
+    strcpy((char*)vaddr_i, (char*)ident_i);
+    // increase ident_i by srtlen + 1 byte for null termination
+    ident_i += strlen(argv[i]) + sizeof(char);
+    vaddr_i += strlen(argv[i]) + sizeof(char);
+  }
+  debug(X_USERTHREAD, "left for-loop\n");
 
   // passing new virtual memory to userspace 
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  // user_registers_->rdi = (size_t)argv; 
-  // user_registers_->rsi = argc;
-  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  user_registers_->rdi = vaddr_start; 
+  user_registers_->rsi = argc;
+  debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  PageManager::instance()->freePPN(ppn);
   return 0;
 }
 
@@ -343,8 +378,6 @@ int UserThread::execv()
   // passing new virtual memory to userspace 
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  // user_registers_->rdi = (size_t)argv; 
-  // user_registers_->rsi = argc;
   debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }

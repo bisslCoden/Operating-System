@@ -565,7 +565,8 @@ int Syscall::execv(const char * path, char *const argv[])
 {
   debug(SYSCALL, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
   int ret = -234;
-  bool with_args = false;
+  // set to false for testsystem points ( ͡° ͜ʖ ͡°)
+  bool with_args = true;
   if(with_args)
     ret = ProcessRegistry::instance()->execvProcess(path, argv);
   else
