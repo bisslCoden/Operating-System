@@ -598,7 +598,13 @@ int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
  */
 int pthread_spin_destroy(pthread_spinlock_t *lock)
 {
-  return -1;
+  if (checkAdress((void*)lock) != 0)
+    return -1;
+  if (lock->initialzied_ != 1)
+    return -1;
+
+  lock->initialzed_ = 0;
+  return 0;
 }
 
 /**
