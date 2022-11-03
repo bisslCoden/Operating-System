@@ -162,7 +162,7 @@ void ProcessRegistry::createProcess(const char* path)
 size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
 {
   debug(WAITPID, "id: %ld\n", parent_process->getPID());
-  int return_pid = 0;
+  int return_pid = 1;
   if((long int) arg1 > 0) // any specifed process
   {
     debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
@@ -205,17 +205,20 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     ustl::map<size_t, UserProcess*>::iterator i;
     UserProcess* child = parent_process;
     list_of_processes_lock_.release();
+    debug(WAITPID, "before for\n");
     for (i = list.begin(); i != list.end(); ++i) 
     {
       if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) 
       && (child->getWaitStatus() == 0))
       {
+        debug(WAITPID, "in if\n");
         list_of_processes_lock_.acquire();
         child = i->second;
         list_of_processes_lock_.release();
         break;
       }
     }
+    debug(WAITPID, "after for\n");
     list_of_processes_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = child->getProcessState();
@@ -225,9 +228,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
     {
       debug(WAITPID, "in while  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
-       arg1, parent_process->getProcessState(), child->getProcessState(),
-       parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
-       parent_process->getWaitStatus(), child->getWaitStatus());
+      arg1, parent_process->getProcessState(), child->getProcessState(),
+      parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
+      parent_process->getWaitStatus(), child->getWaitStatus());
       Scheduler::instance()->yield();
       if(process_state != child->getProcessState() || child->getProcessState() == 0)
       {
@@ -236,9 +239,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
         list_of_processes_lock_.release();
       }
     }
+    debug(WAITPID, "after while \n");
    // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
   }
-
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
@@ -254,7 +257,6 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
     return -1;
   } 
-  debug(WAITPID, "arg2 is : %ln\n", arg2);
   if(arg2 != 0)
   {
     debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
@@ -263,13 +265,13 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   {
     debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
   }
+  debug(WAITPID, "After arg3 if %ld\n", arg1);
+  debug(WAITPID, "before return\n");
   return return_pid;
 }
 
-
-
-  int ProcessRegistry::execvProcess(const char* path, char *const argv[])
-  {
+int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+{
   // checking parameter ptr + calling convention: first element must be path, last element must be NULL
   bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
   bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
@@ -307,6 +309,3 @@ int ProcessRegistry::execvProcess(const char* path)
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
 }
-
-// 49.6%
-// 53.4%
