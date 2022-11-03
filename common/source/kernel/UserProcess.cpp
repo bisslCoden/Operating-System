@@ -366,26 +366,6 @@ bool UserProcess::setupLoader(ssize_t fd)
   return true;
 }
 
-void UserProcess::setWaitStatus(bool arg)
-{ 
-  wait_status_ = arg; 
-}
-
-void UserProcess::setChildStatus(bool arg)
-{ 
-  child_ = arg; 
-}
-
-void UserProcess::setProcessState(ProcessState state)
-{ 
-  state_ = state; 
-}
-
-void UserProcess::setDuaration(size_t duaration)
-{ 
-  duaration_ = duaration; 
-}
-
 void UserProcess::removeOldProcessInformation()
 {
   debug(X_USERPROCESS, "removingOldProcessInformation() entered\n");

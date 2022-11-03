@@ -166,19 +166,19 @@ class UserProcess
 
     bool getWaitStatus(){ return wait_status_; }
     
-    void setWaitStatus(bool arg);
+    void setWaitStatus(bool arg) { wait_status_ = arg; };
 
     bool getChildStatus(){ return child_; }
     
-    void setChildStatus(bool arg);
+    void setChildStatus(bool arg){ child_ = arg; }
 
     ProcessState getProcessState() const {return state_; }
 
-    void setProcessState(ProcessState state);
+    void setProcessState(ProcessState state) { state_ = state; };
 
     size_t getDuaration(){ return duaration_; }
     
-    void setDuaration(size_t duaration);
+    void setDuaration(size_t duaration) { duaration_ = duaration; };
 
 
 
