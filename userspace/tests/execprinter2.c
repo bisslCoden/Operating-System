@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include "pthread.h"
+#include "sched.h"
 
 #define MAX_ARGS 5
 #define MAX_THREADS 10
@@ -16,9 +17,10 @@ void simple_routine()
 {
   size_t value = 123;
   for(int i = 0; i < MAX_LOOPS; i++)
+  {
     value *= i;
-  if(value)
     printf("lalalala\n");
+  }
 }
 
 int main(int argc, const char *argv[])
@@ -29,6 +31,7 @@ int main(int argc, const char *argv[])
   for(size_t i = 0; i < MAX_THREADS; ++i)
     ret_pthread[i] = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
   // exec should be called after threads are destroyed.
+  sched_yield();
   if((size_t)ret_pthread > 3)
     printf("ahelo\n");
  
