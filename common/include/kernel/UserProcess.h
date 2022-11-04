@@ -150,7 +150,6 @@ class UserProcess
     // the process ID
     size_t const pid_;
 
-    UserThread* waiting_exec_;
 
     // the process' fd. see "FileDescriptor.h"
     ssize_t fd_;
@@ -184,6 +183,9 @@ class UserProcess
 
     Mutex kill_lock_;
     bool KILLED_ = false;
+
+    UserThread* waiting_exec_;
+    Mutex waiting_exec_lock_;
     // map with tid + return value for join
 };
 
