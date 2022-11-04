@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv)
 {
-  int max_calls = 6;
+  int max_calls = 2;
   for (int i = 0; i < max_calls; i++)
   {
     int pid = fork();
