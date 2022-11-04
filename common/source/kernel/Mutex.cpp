@@ -32,7 +32,7 @@ bool Mutex::acquireNonBlocking(pointer called_by)
   // There may be some cases where the pre-checks may not be wished here.
   // But these cases are usually dirty implemented, and it would not be necessary to call this method there.
   // So in case you see this comment, re-think your implementation and don't just comment out this line!
-  doChecksBeforeWaiting();
+  doChecksBeforeWaiting();//
 
   if(ArchThreads::testSetLock(mutex_, 1))
   {

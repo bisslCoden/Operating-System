@@ -30,6 +30,8 @@ Scheduler::Scheduler()
 {
   block_scheduling_ = 0;
   ticks_ = 0;
+  frequency = 0;
+  rdtsc_value = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
@@ -42,7 +44,7 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-
+  //debug(SCHEDULER, "schedule called!\n");
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
@@ -71,6 +73,34 @@ uint32 Scheduler::schedule()
     ret = 0;
   }
 
+
+  if (currentThread->switch_to_userspace_)
+  {
+     UserThread* current = (UserThread*) currentThread;
+
+    //do atomic checks
+    if (!current->getflags()->knotcancelable.test_and_set())
+    {
+      if (current->getflags()->kasynchronous.test_and_set())
+      {
+        if (current->getflags()->kcancelreq.test_and_set())
+        {
+          currentThreadRegisters = currentThread->kernel_registers_;
+          ret = 0;
+          currentThreadRegisters->rdi = (uint64_t) PTHREAD_CANCELED;
+          currentThread->switch_to_userspace_ = 0;
+          ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
+        }
+        else
+          current->getflags()->kcancelreq.clear();
+      }
+      else
+        current->getflags()->kasynchronous.clear();
+    }
+    else 
+      current->getflags()->knotcancelable.clear();
+  }
+
   return ret;
 }
 
@@ -96,9 +126,11 @@ void Scheduler::sleep()
 
 void Scheduler::wake(Thread* thread_to_wake)
 {
+
   // wait until the thread is sleeping
   while(thread_to_wake->getState() != Sleeping)
     yield();
+
   thread_to_wake->setState(Running);
 }
 
@@ -189,10 +221,26 @@ uint32 Scheduler::getTicks()
   return ticks_;
 }
 
+size_t Scheduler::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}
+
 void Scheduler::incTicks()
 {
-  ++ticks_;
+  ticks_++;
 }
+
+
+uint32 Scheduler::getThreadCount() {
+  return threads_.size();
+}
+
 
 void Scheduler::printStackTraces()
 {

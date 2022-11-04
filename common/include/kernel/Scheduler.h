@@ -4,6 +4,9 @@
 #include <ulist.h>
 #include "IdleThread.h"
 #include "CleanupThread.h"
+#include "UserThread.h"
+#include "Syscall.h"
+#include "ArchMemory.h"
 
 class Thread;
 class Mutex;
@@ -26,6 +29,9 @@ class Scheduler
     bool isCurrentlyCleaningUp();
     void incTicks();
     uint32 getTicks();
+    uint32 getThreadCount();
+
+    size_t getRDTSC();
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
@@ -66,6 +72,9 @@ class Scheduler
     size_t block_scheduling_;
 
     size_t ticks_;
+
+    size_t frequency;
+    size_t rdtsc_value;
 
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;

@@ -56,6 +56,8 @@ class Thread
 
     void* getKernelStackStartPointer();
 
+    bool isUserThread(){return Userthread;}
+
     bool isStackCanaryOK();
 
     const char* getName();
@@ -90,7 +92,7 @@ class Thread
      * Tells the scheduler if this thread is ready for scheduling
      * @return true if ready for scheduling
      */
-    bool schedulable();
+    virtual bool schedulable();
   
   
     uint32 kernel_stack_[2048];
@@ -143,6 +145,7 @@ class Thread
     FileSystemInfo* working_dir_;
 
     ustl::string name_;
+    bool Userthread = false;
 
 };
 

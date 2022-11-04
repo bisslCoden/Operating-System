@@ -4,6 +4,7 @@
 #include "Mutex.h"
 #include "Thread.h"
 #include "UserProcess.h"
+#include "types.h"
 
 class ProcessRegistry : public Thread
 {
@@ -42,6 +43,12 @@ class ProcessRegistry : public Thread
     size_t processFork();
 
     /**
+     * Makes the process wait
+     */
+    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process);
+
+
+    /**
      * @brief The instance of the ProcessRegistry. inherits from Thread
      *
      * @return ProcessRegistry* to access membermethods
@@ -50,30 +57,42 @@ class ProcessRegistry : public Thread
     void createProcess(const char* path);
 
     /**
+     * @brief handles argument checking for execv and calls UserProcess::(path, argv, argc)
+     * 
+     * @param path the path to the programm (c string)
+     * @param argv the args as handeled by calling convention
+     * @return int return value, -1 on fail, shouldn't return on success
+     */
+    int execvProcess(const char* path, char *const argv[]);
+    // this is the version without args
+    int execvProcess(const char* path);
+
+    /**
      * creates an unique ID for every process OR thread ID
      *
      * @return size_t the ID
      */
     size_t createID();
-  private:
+    
+    /**
+     * gives the list of processes back
+     *
+     * @ustl::map<size_t, UserProcess*> List with processes
+     */
+    ustl::map<size_t, UserProcess*> getProcessList();
 
+  private:
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;
     Condition all_processes_killed_;
     static ProcessRegistry* instance_;
 
-    //prevous ID creation for fork for fork
-    //size_t process_pids_ = 0;
-    //ustl::map<long int, UserProcess*> processes_running_;
-
-    // Mutexes
-
     // ensures unique IDs for TID AND PID
     size_t next_id_ = 1;
-    Mutex next_id_lock_;
     // keeping track of processes alive
     ustl::map<size_t, UserProcess*> list_of_processes_;
     Mutex list_of_processes_lock_;
+    Mutex wait_pid_lock_;
 };
 

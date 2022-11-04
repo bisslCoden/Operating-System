@@ -1,4 +1,4 @@
-#include <pthread.h>
+#include "pthread.h"
 #include <stdio.h>
 
 void simple_routine()
@@ -35,7 +35,7 @@ void simple_routine3()
 
 int main()
 {
-  printf("1 - main: Hello! simple_routine lies at %lx\n", (size_t)simple_routine);
+  printf("1 - main: Hello!\n");
   pthread_t tids[11]; 
   int retvals[11];
 
