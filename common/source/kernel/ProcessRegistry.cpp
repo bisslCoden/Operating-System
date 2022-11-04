@@ -257,6 +257,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
     return -1;
   } 
+  debug(WAITPID, "arg2 different 0, process %ln\n", arg1);
   if(arg2 != 0)
   {
     debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
