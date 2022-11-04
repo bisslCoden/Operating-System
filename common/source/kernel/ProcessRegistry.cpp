@@ -193,12 +193,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     {
       debug(WAITPID, "Not found, process %ld\n", arg1);
       //list_of_processes_lock_.release();
-      return -1;
+      return 0;
     }
   }
   else if((long int) arg1 == -1) // any child process.
   {
-    debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
+    /*debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
     list_of_processes_lock_.acquire();
     ustl::map<size_t, UserProcess*> list;
     list = ProcessRegistry::getProcessList();
@@ -240,7 +240,8 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       }
     }
     debug(WAITPID, "after while \n");
-   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
+   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());*/
+   return 0;
   }
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
