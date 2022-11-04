@@ -11,6 +11,9 @@ extern "C" {
 //pthread typedefs
 typedef size_t pthread_t;
 
+#define SLEEPING_US 0x46334234
+#define AWAKE_US 0x54321432
+
 enum cancelstate {
     PTHREAD_CANCEL_ENABLE,
     PTHREAD_CANCEL_DISABLE

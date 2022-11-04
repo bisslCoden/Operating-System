@@ -7,7 +7,9 @@
 #include "uatomic.h"
 
 #define PTHREAD_CANCELED ((void *) -1)
-#define STACK_SIZE_MAX_IN_MB 1ULL
+#define STACK_SIZE_IN_PAGES 16ULL
+#define SLEEPING_KS 0x46334234
+#define AWAKE_KS 0x54321432
 
 class UserProcess;
 

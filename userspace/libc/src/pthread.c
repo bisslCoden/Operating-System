@@ -33,6 +33,11 @@ size_t findStackStackStart(size_t inputadress){
   size_t outputadress = inputadress >> 12;
   outputadress = outputadress << 12;
   outputadress += PAGE_SIZE_US - sizeof(size_t);
+  if (*((size_t*)outputadress) != SLEEPING_US && *((size_t*)outputadress) != AWAKE_US)
+  {
+    return findStackStackStart(outputadress + 2* sizeof(size_t));
+  }
+  
   return outputadress;
 }
 
@@ -125,8 +130,17 @@ int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wante
     return 0;
 }
   
+size_t atomic_exchange_sleep(size_t *flag){
+  size_t myval = SLEEPING_US;
+  asm("xchg %0, %1\n\t" : "=r" (myval) : "m" (*flag), "0" (myval) : "memory" );
+  return myval;
+};
 
-
+size_t atomic_exchange_wake(size_t* flag){
+  size_t myval = AWAKE_US;
+  asm("xchg %0, %1\n\t" : "=r" (myval) : "m" (*flag), "0" (myval) : "memory" );
+  return myval;
+}
 
 size_t atomic_exchange_0(size_t *lock){
   size_t myval = 0;
@@ -465,7 +479,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
       return -1;
     }
     size_t setsleep = findStackStackStart((size_t) &next);
-    assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
+    assert(atomic_exchange_sleep((size_t*) setsleep) == AWAKE_US && "tried to sleep but was alreafy?\n");
     //printf("going to sleep now...\n");
     pthread_spin_unlock(&mutex->sleeperslist_lock_);
     
@@ -508,7 +522,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
   if(mutex->firstsleeper_ != 0){
     //printf("first sleeper ist %p\n", mutex->firstsleeper_);
     size_t setwake = findStackStackStart((size_t) mutex->firstsleeper_);
-    assert(atomic_exchange_0((size_t*) setwake) == 1 && "tried to wake but was alreay woke?\n");
+    assert(atomic_exchange_wake((size_t*) setwake) == SLEEPING_US && "tried to wake but was alreay woke?\n");
     // mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;
   }
   mutex->firstsleeper_ = mutex->firstsleeper_ == 0 ? (size_t*) 0 : (size_t*) *mutex->firstsleeper_;
@@ -580,7 +594,7 @@ int pthread_cond_signal(pthread_cond_t *cond)
   if(cond->firstsleeper_ != 0){
   
     size_t setwake = findStackStackStart((size_t) cond->firstsleeper_);
-    assert(atomic_exchange_0((size_t*) setwake) == 1 && "CV: tried to wake but was alreay woke?\n");
+    assert(atomic_exchange_wake((size_t*) setwake) == AWAKE_US && "CV: tried to wake but was alreay woke?\n");
     // mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;
   }
   //printf("flag is now again unlocked: %ld\n", mutex->lock_);
@@ -609,7 +623,7 @@ int pthread_cond_broadcast(pthread_cond_t *cond)
     for (size_t i = 0; i < cond->threads_waiting_; i++)
     {
       size_t setwake = findStackStackStart((size_t) iter);
-      assert(atomic_exchange_0((size_t*) setwake) == 1 && "CV: tried to wake but was alreay woke?\n");  
+      assert(atomic_exchange_wake((size_t*) setwake) == AWAKE_US && "CV: tried to wake but was alreay woke?\n");  
       iter = (size_t*)*iter;
     }
   }
@@ -654,7 +668,7 @@ int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
   pthread_mutex_unlock(mutex);
   printf("now going to sleep on condition\n");
   size_t setsleep = findStackStackStart((size_t) &next);
-  assert(atomic_exchange_1((size_t*) setsleep) == 0 && "tried to sleep but was alreafy?\n");
+  assert(atomic_exchange_sleep((size_t*) setsleep) == SLEEPING_US && "tried to sleep but was alreafy?\n");
   sched_yield();
 
   pthread_mutex_lock(mutex);

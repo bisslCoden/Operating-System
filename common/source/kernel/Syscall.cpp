@@ -550,7 +550,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
   *stackaddr = (size_t*)callingThread->getStackInfo().userstack_start_;
-  *stacksize = STACK_SIZE_MAX_IN_MB * PAGE_SIZE * 512ULL * 512;
+  *stacksize = STACK_SIZE_IN_PAGES * PAGE_SIZE;
   return 0;
 }
 

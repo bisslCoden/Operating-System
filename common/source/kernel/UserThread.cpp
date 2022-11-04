@@ -85,21 +85,21 @@ bool UserThread::schedulable(){
         getflags()->knotcancelable.clear();
     
     
-    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, 0, ustl::memory_order_seq_cst);
+    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (sleepy == 0)
+    if (sleepy == AWAKE_KS)
     {
       return true;
     }
-    else if(sleepy == 1)
+    else if(sleepy == SLEEPING_KS)
     {
       //get the right flag back
-      __atomic_exchange_n(mystack_.UserMutex, 1, ustl::memory_order_seq_cst);
+      __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
       return false;
     }
     else
     {
-      assert(false && "Sleep flag was neither 1 nor 0?\n");
+      assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
@@ -172,7 +172,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
   location += PAGE_SIZE - sizeof(size_t);
   mystack_.UserMutex = (size_t*) location;
-  *mystack_.UserMutex = 0;
+  *mystack_.UserMutex = AWAKE_KS;
 
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
@@ -257,12 +257,13 @@ bool UserThread::setupStack()
   debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
 
   // virtual address
-  size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB; // 4096KB * 512 * 512 = 4 MB
+  size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE  * (STACK_SIZE_IN_PAGES + 2); 
   size_t stack_start_ptr = USER_BREAK - sizeof(size_t) - stack_page_offset;
   size_t frontguard = stack_start_ptr / PAGE_SIZE;
-  size_t stackend = stack_start_ptr - PAGE_SIZE * PAGE_TABLE_ENTRIES * PAGE_DIR_ENTRIES * STACK_SIZE_MAX_IN_MB + PAGE_SIZE + sizeof(size_t);
   stack_start_ptr -= PAGE_SIZE;
-  size_t endguard = (stackend - sizeof(size_t)) / PAGE_SIZE;
+
+  size_t stackend = stack_start_ptr - PAGE_SIZE * STACK_SIZE_IN_PAGES;
+  size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
   // ppn
   size_t ppn_for_stack = PageManager::instance()->allocPPN();
@@ -282,7 +283,7 @@ bool UserThread::setupStack()
   size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn_for_stack);
   location += PAGE_SIZE - sizeof(size_t);
   mystack_.UserMutex = (size_t*) location;
-  *mystack_.UserMutex = 0;
+  *mystack_.UserMutex = AWAKE_KS;
   mystack_.guardpage_front_nr_ = frontguard;
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
