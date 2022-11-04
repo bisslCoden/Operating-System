@@ -7,7 +7,7 @@
 #include "uatomic.h"
 
 #define PTHREAD_CANCELED ((void *) -1)
-#define STACK_SIZE_MAX_IN_MB 8
+#define STACK_SIZE_MAX_IN_MB 1ULL
 
 class UserProcess;
 
@@ -43,6 +43,8 @@ typedef struct StackInfo
   size_t userstack_start_ = 0;
   size_t userstack_end_ = 0;
   size_t page_offset_ = 0;
+  size_t guardpage_front_nr_ = 0;
+  size_t guardpage_back_nr_ = 0;
   size_t* UserMutex;
 } StackInfo;
 
@@ -116,6 +118,8 @@ class UserThread : public Thread
      */
     void setJoinState(int state){myflags_.joinable = state;}
     int getJoinState(){return myflags_.joinable;}
+
+    void getNewStackPage(size_t adress);
 
     void lockJoin(){condition_mutex_.acquire();}
     void setJoiner(int32 tid){join_waiter_ = tid;}

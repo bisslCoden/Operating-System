@@ -7,6 +7,7 @@
 #include "Loader.h"
 #include "Syscall.h"
 #include "ArchThreads.h"
+
 extern "C" void arch_contextSwitch();
 
 const size_t PageFaultHandler::null_reference_check_border_ = PAGE_SIZE;
@@ -32,6 +33,13 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   else if(user && address >= USER_BREAK)
   {
     debug(PAGEFAULT, "You are accessing a kernel address in user-mode.\n");
+  }
+  else if (switch_to_us && 
+  ((address / PAGE_SIZE) == ((UserThread*) currentThread)->getStackInfo().guardpage_front_nr_ ||
+  (address / PAGE_SIZE) == ((UserThread*) currentThread)->getStackInfo().guardpage_back_nr_ ))
+  {
+    debug(PAGEFAULT, "Pagefault on a guardpage!\n");
+    kprintf("STACKOVERFLOW DETECTED!\n");
   }
   else if(present)
   {
@@ -65,7 +73,13 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
-    currentThread->loader_->loadPage(address);
+    if (switch_to_us && address < callingThread->getStackInfo().userstack_start_ && 
+    address > callingThread->getStackInfo().userstack_end_)
+    {
+      callingThread->getNewStackPage(address);
+    }
+    else
+      currentThread->loader_->loadPage(address);
   }
   else
   {
