@@ -20,7 +20,7 @@ int main(int argc, char** argv)
     assert (pid != 0);  // hello
   }else
   {
-    printf("Error while forking!");
+    printf("Error while forking!\n");
   }
 
   // if (!pid)

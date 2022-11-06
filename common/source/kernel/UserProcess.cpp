@@ -76,14 +76,12 @@ UserProcess::UserProcess(UserProcess *parent) :
   currentUserThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
   threads_lock_.release();
 
-  //local fd
-
   debug(USERPROCESS, "Creating new Thread for Fork\n");
   auto thread = new UserThread(this, (UserThread*) currentThread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
-    delete thread;
+    //delete thread;
     return;
   }
 

@@ -4,6 +4,7 @@
 #include "offsets.h"
 #include "paging-definitions.h"
 #include "Mutex.h"
+#include "umap.h"
 
 //vpn to adress shift by 12 or divide through Page size
 //userbreak ends 0x8000000
@@ -122,7 +123,11 @@ public:
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
   void copyVirtualMem(ArchMemory &destination);
+  void copyOnWrite(size_t add);
+  ustl::map<size_t, size_t> cow_counter_;
   Mutex arch_memory_lock_;
+  Mutex cow_cnt_lock_;
+
 private:
 
 /** 
