@@ -15,6 +15,7 @@ pthread_t tids[NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3];
 int returnvalues [NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3];
 size_t never_false = 1;
 size_t result = 0;
+size_t threads3 = NUM_THREADS3;
 
 pthread_mutex_t never_false_lock;
 pthread_mutex_t result_lock;
@@ -46,14 +47,25 @@ void simple_routine()
     if (result + 1 < MAX_RES)
       result++;
     
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    assert(pthread_create(tids[NUM_THREADS1 + NUM_THREADS2 + threads3 - 1], &attr, (void*(*)(void*))&simple_routine3, 
+    (void*) 20) == 0 && "could not vreate thred");
+    pthread_t mychild = tids[NUM_THREADS1 + NUM_THREADS2 + threads3 - 1];
+    threads3--;
+    
     sched_yield();
     never_false = 1;
     pthread_mutex_unlock(&never_false_lock);
   }
   pthread_mutex_unlock(&result_lock);
+  int ret;
+  assert(pthread_join(mychild, (void**) ret)  == 0 && "couldnt join?");
+  printf("got %d from my child!\n", ret);
   pthread_mutex_lock(&CV_mutex);
   pthread_cond_wait(&condition, &CV_mutex);
   pthread_mutex_unlock(&CV_mutex);
+
   return;
 }
 
@@ -61,6 +73,7 @@ void simple_routine()
 size_t simple_routine2(args2* params)
 {
   int old;
+  pthread_t mychild;
   int mat[MATSIZE][MATSIZE];
   sem_wait(&semy);
   sched_yield();
@@ -75,6 +88,16 @@ size_t simple_routine2(args2* params)
       mat[i][j] = ((params->a) * (params->b + i)) % MATSIZE;
     }
   }
+  if (*params->xy > 0)
+  {
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    assert(pthread_create(tids[NUM_THREADS1 + NUM_THREADS2 + *params->xy -1], &attr, (void*(*)(void*))&simple_routine3, 
+    (void*) 10) == 0 && "could not vreate thred");
+    *(params->xy)--;
+  }
+  
   pthread_mutex_lock(&result_lock);
   
   for (int i = 0; i < MATSIZE; i++)
@@ -88,10 +111,13 @@ size_t simple_routine2(args2* params)
       }
     }
   }
+
   pthread_mutex_unlock(&result_lock);
   never_false = 1;
   pthread_mutex_unlock(&never_false_lock);
   sem_post(&semy);
+  assert(pthread_join(mychild, (void**) ret)  == 0 && "couldnt join?");
+  printf("got %d from my child!\n", ret);
 }
 
 int simple_routine3(int count){
