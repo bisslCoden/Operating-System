@@ -98,10 +98,10 @@ class UserProcess
     size_t getNrOfThreads();
 
    /**
-     * @brief returns a random stack offset generated with rdtsc. This can then be set in the
-     * Userthread() to get a stack. 
-     * 
-     * @return the offset
+     * @brief returns a random offset generated with rdtsc. This should only be used to set
+     * UserThread::mystack_.page_offset_!!
+     *  
+     * @return the offset AS VPN
      */
     size_t getRandomPageOffset();
 
@@ -182,6 +182,5 @@ class UserProcess
 
     Mutex kill_lock_;
     bool KILLED_ = false;
-    // map with tid + return value for join
 };
 

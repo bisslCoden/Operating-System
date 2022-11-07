@@ -54,7 +54,7 @@ UserProcess::UserProcess(UserProcess *parent) :
   offsetlist_lock_("UserProcess::offsets"),
   kill_lock_("UserProcess::kill_lock_"),
   KILLED_(false)
-
+  
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
@@ -166,6 +166,7 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   // }
   // debug(X_USERPROCESS, "\n");
 
+  // about to remove the last thread.. better set a flag that leads to process deletion aswell..
   if(threads_.size() == 1)
     thread->setLast();
 
@@ -367,6 +368,7 @@ void UserProcess::removeOldProcessInformation()
 {
   debug(X_USERPROCESS, "removingOldProcessInformation() entered\n");
   exit(13579, false);
+
   while(getNrOfThreads() > 1)
     Scheduler::instance()->yield();
 

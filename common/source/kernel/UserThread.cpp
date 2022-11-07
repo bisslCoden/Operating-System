@@ -311,6 +311,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   }
   */
 
+  /* OUTDATED TRY
   // identMapping to access freshly allocated PPN
   size_t ppn = PageManager::instance()->allocPPN();
   size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
@@ -354,14 +355,28 @@ int UserThread::execv(char* const argv[], size_t argc)
     vaddr_i += strlen(argv[i]) + sizeof(char);
   }
   debug(X_USERTHREAD, "left for-loop\n");
+  */
+
+  /** CURRENT PLAN:
+   *  1 create new page for the arguments
+   *  2 getIdentAddress()
+   *  3 argv will lie direcly below USER_BREAK
+   *  4 mapPage(ppn)
+   *  5 set length of pointer array + create pointer array (char**)
+   *  6 first iteration
+   *    6.1 set length of string
+   *    6.2 check if length of pointer + length of string is below PAGE_SIZE
+   *    6.3 copy the address AFTER the pointer array (pointer array addr + length of pointer array) into first element of pointer array
+   *    6.4 copy string from argv to first address after pointer array
+   *    6.5 repeat 6 with with i++ and offset += length of string until i = argc
+   */ 
 
   // passing new virtual memory to userspace 
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = vaddr_start; 
-  user_registers_->rsi = argc;
+  user_registers_->rdi = argc; 
+  user_registers_->rsi = argc; // NOT ARGC but array with pointers. 
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
-  PageManager::instance()->freePPN(ppn);
   return 0;
 }
 
