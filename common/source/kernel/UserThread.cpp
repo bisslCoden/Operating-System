@@ -308,9 +308,9 @@ int UserThread::execv(char* const argv[], size_t argc)
   size_t new_argv = vpn * PAGE_SIZE;
   size_t str_offset = argc * sizeof(char*);
   debug(X_USERTHREAD, "execv(): before for-loop: new_argv = %ld, str_offset = %ld\n\n", new_argv, str_offset);
-  for(size_t i = 0; argv[i]; i++)
+  for(size_t i = 0; i < new_argc; i++)
   {
-    debug(X_USERTHREAD, "execv(): loop start: %ld from %ld args copied\n", i, argc);
+    debug(X_USERTHREAD, "execv(): loop start: %ld from %ld args copied\n", i, new_argc);
     // + 1 for null termination
     size_t str_len = strlen(argv[i]) + 1;
     if(str_offset + str_len >= PAGE_SIZE)
@@ -323,7 +323,7 @@ int UserThread::execv(char* const argv[], size_t argc)
     memcpy((void*)(ident_start + str_offset), argv[i], str_len);
 
     str_offset += str_len;
-    debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, argc);
+    debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, new_argc);
   }
   debug(X_USERTHREAD, "execv(): found NULL\n");
 
@@ -333,10 +333,10 @@ int UserThread::execv(char* const argv[], size_t argc)
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   mystack_.page_offset_ = process_->getRandomPageOffset();
   setupStack();
+  user_registers_->rsp = (size_t)getUserstackStart();
   debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
 
   // passing new virtual memory to userspace 
-  user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = new_argc; 
   user_registers_->rsi = new_argv; 
@@ -349,6 +349,9 @@ int UserThread::execv()
   // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
   name_ = process_->getName();
   loader_ = process_->getLoader();
+  ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
+                                   (void*) mystack_.userstack_start_,
+                                   getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   mystack_.page_offset_ = process_->getRandomPageOffset();
   setupStack();
