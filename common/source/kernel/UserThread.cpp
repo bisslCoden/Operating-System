@@ -329,14 +329,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   ident_i = ident_start;
   debug(X_USERTHREAD, "finished copy char* to ident address\n");
 
-  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
-  name_ = process_->getName();
-  loader_ = process_->getLoader();
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  mystack_.page_offset_ = process_->getRandomPageOffset();
-  setupStack();
-  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
-
   // iterate and copy from ident to new virtual memory
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
   size_t vaddr_end = vpn * PAGE_SIZE;
@@ -371,11 +363,47 @@ int UserThread::execv(char* const argv[], size_t argc)
    *    6.5 repeat 6 with with i++ and offset += length of string until i = argc
    */ 
 
+  debug(X_USERTHREAD, "about to set up stuff for argument copying\n");
+  size_t new_argc = argc;
+  size_t ppn = PageManager::instance()->allocPPN();
+  char** ident_start = (char**)ArchMemory::getIdentAddressOfPPN(ppn);
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
+  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
+
+  size_t new_argv = vpn * PAGE_SIZE;
+  debug(X_USERTHREAD, "execv(): before for-loop\n");
+  size_t str_offset = argc * sizeof(char*);
+  size_t vaddr_i = new_argv;
+  for(size_t i = 0; i < argc; i++)
+  {
+    debug(X_USERTHREAD, "execv(): %ld from %ld args copied\n", i, argc);
+    // + 1 for null termination
+    if(!argv[i])
+      break;
+    size_t str_len = strlen(argv[i] + 1);
+    if(str_offset + str_len >= PAGE_SIZE)
+      return -1;
+
+    debug(X_USERTHREAD, "execv(): element %ld at %lx: set to (vaddr_i = %lx) + (str_offset = %lx)\n", i, (size_t)(ident_start + i), vaddr_i, str_offset);
+    *(ident_start + i) = (char*)(vaddr_i + str_offset);
+    
+    debug(X_USERTHREAD, "memcpy(vaddr_i = %lx, argv[i] = %s, str_len = %ld)\n", vaddr_i, argv[i], str_len);
+    memcpy((void*)(ident_start + str_offset), argv[i], str_len);
+  }
+
+  debug(X_USERTHREAD, "execv(): after for-loop.\n");
+  name_ = process_->getName();
+  loader_ = process_->getLoader();
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  mystack_.page_offset_ = process_->getRandomPageOffset();
+  setupStack();
+  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
+
   // passing new virtual memory to userspace 
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = argc; 
-  user_registers_->rsi = argc; // NOT ARGC but array with pointers. 
+  user_registers_->rdi = new_argc; 
+  user_registers_->rsi = new_argv; 
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
