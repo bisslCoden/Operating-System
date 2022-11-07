@@ -278,9 +278,9 @@ bool UserThread::setupStack()
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
-  debug(X_USERTHREAD, "argc = %ld\n", argc);
+  debug(X_USERTHREAD, "execv(): argc = %ld\n", argc);
   for(size_t i = 0; i < argc; i++)
-    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]? argv[i]: "NULL");
+    debug(X_USERTHREAD, "execv(): argv[%ld] = %s\n", i, argv[i]? argv[i]: "NULL");
   
   /* OUTDATED TRY.
   // vaddr... virtual address for old archmemory
@@ -353,7 +353,7 @@ int UserThread::execv(char* const argv[], size_t argc)
    *  1 create new page for the arguments
    *  2 getIdentAddress()
    *  3 argv will lie direcly below USER_BREAK
-   *  4 mapPage(ppn)
+   *  4 mapPage(ppn) with ARCHMEM FROM PROCESS
    *  5 set length of pointer array + create pointer array (char**)
    *  6 first iteration
    *    6.1 set length of string
@@ -363,32 +363,34 @@ int UserThread::execv(char* const argv[], size_t argc)
    *    6.5 repeat 6 with with i++ and offset += length of string until i = argc
    */ 
 
-  debug(X_USERTHREAD, "about to set up stuff for argument copying\n");
+  debug(X_USERTHREAD, "execv(): about to set up stuff for argument copying\n");
   size_t new_argc = argc;
   size_t ppn = PageManager::instance()->allocPPN();
   char** ident_start = (char**)ArchMemory::getIdentAddressOfPPN(ppn);
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
-  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
+  assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
+  debug(X_USERTHREAD, "execv(): ppn = %lx, ident_start = %lx, vpn = %lx\n", ppn, (size_t)ident_start, vpn);
 
   size_t new_argv = vpn * PAGE_SIZE;
-  debug(X_USERTHREAD, "execv(): before for-loop\n");
   size_t str_offset = argc * sizeof(char*);
-  size_t vaddr_i = new_argv;
+  debug(X_USERTHREAD, "execv(): before for-loop: new_argv = %ld, str_offset = %ld\n", new_argv, str_offset);
   for(size_t i = 0; i < argc; i++)
   {
     debug(X_USERTHREAD, "execv(): %ld from %ld args copied\n", i, argc);
     // + 1 for null termination
     if(!argv[i])
       break;
-    size_t str_len = strlen(argv[i] + 1);
+    size_t str_len = strlen(argv[i]) + 1;
     if(str_offset + str_len >= PAGE_SIZE)
       return -1;
 
-    debug(X_USERTHREAD, "execv(): element %ld at %lx: set to (vaddr_i = %lx) + (str_offset = %lx)\n", i, (size_t)(ident_start + i), vaddr_i, str_offset);
-    *(ident_start + i) = (char*)(vaddr_i + str_offset);
+    debug(X_USERTHREAD, "execv(): element %ld at %lx: set to (new_argv + str_offset) = %lx\n", i, (size_t)(ident_start + i), new_argv + str_offset);
+    *(ident_start + i) = (char*)(new_argv + str_offset);
     
-    debug(X_USERTHREAD, "memcpy(vaddr_i = %lx, argv[i] = %s, str_len = %ld)\n", vaddr_i, argv[i], str_len);
+    debug(X_USERTHREAD, "execv(): memcpy(ident_start + str_offset = %lx, argv[i] = %s, str_len = %ld)\n", (size_t)(ident_start + str_offset), argv[i], str_len);
     memcpy((void*)(ident_start + str_offset), argv[i], str_len);
+
+    str_offset += str_len;
   }
 
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
@@ -404,7 +406,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = new_argc; 
   user_registers_->rsi = new_argv; 
-  debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
 
