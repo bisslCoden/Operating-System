@@ -1,11 +1,11 @@
 #include "pthread.h"
-#include <stdio.h>
+#include "stdio.h"
 #include "assert.h"
 #include "sched.h"
 
-#define NUM_THREADS 140
+#define NUM_THREADS 100
 
-pthread_spinlock_t spinny;
+pthread_mutex_t mutex;
 pthread_t tids[NUM_THREADS]; 
 
 int counter = 0;
@@ -15,11 +15,11 @@ int never_false = 1;
 //
 int simple_routine()
 {
-  int spinret = 0;
-  printf("hi i ll try to get the spin!\n");
-  spinret = pthread_spin_lock(&spinny);
+  int mutret = 0;
+  printf("hi i ll try to get the mutex!\n");
+  mutret = pthread_mutex_lock(&mutex);
+  printf("lock returned %d.\n", mutret);
   assert(never_false == 1 && "never false aint 1? whaat?\n");
-  printf("spinret LOCK returned me %d!\n", spinret);
   never_false = 0;
   sched_yield();
   never_false = 1;
@@ -30,8 +30,8 @@ int simple_routine()
   //   if((counter + res) < 20000000)
   //       counter += res;
   // }
-  spinret = pthread_spin_unlock(&spinny);
-  printf("spinret UNLOCK returned me %d!\n", spinret);
+  mutret = pthread_mutex_unlock(&mutex);
+  printf("mutex UNLOCK returned me %d!\n", mutret);
 
 //  printf("unlocked it!\n");
   return 0;
@@ -41,8 +41,8 @@ int main()
 {
   int ret;
   int rets;
-  pthread_spin_init(&spinny, 0);
   printf("Hello!\n");
+  pthread_mutex_init(&mutex, NULL);
   for (size_t i = 0; i < NUM_THREADS; i++)
   {
     ret = pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL);

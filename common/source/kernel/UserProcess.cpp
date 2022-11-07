@@ -11,6 +11,9 @@
 #include "ArchThreads.h"
 #include "offsets.h"
 #include "VfsSyscall.h"
+#include "Scheduler.h"
+
+#define currentUserThread ((UserThread*)currentThread)
 
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
@@ -21,31 +24,27 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     name_(filename.c_str()),
     threads_lock_("UserProcess::threads_lock_"),
     returnvalue_lock_("UserProcess::retvallock"),
-    offsetlist_lock_("UserProcess::offsets")
+    offsetlist_lock_("UserProcess::offsets"),
+    kill_lock_("UserProcess::kill_lock_"),
+    KILLED_(false)
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
-  if (fd_ >= 0)
-    loader_ = new Loader(fd_);
-
-  if (!loader_ || !loader_->loadExecutableAndInitProcess())
-  {
-    debug(USERPROCESS, "Error: loading %s failed!\n", name_.c_str());
+  if(!setupLoader(fd_))
     return;
-  }
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setProcessState(RUNNING_AND_RUNNABLE);
   setDuaration(0);
   setChildStatus(0);
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 }
 
 // User Process Constructor for fork
-UserProcess::UserProcess(UserProcess *parent, size_t pid) :
-  pid_(pid),
+UserProcess::UserProcess(UserProcess *parent) :
+  pid_(ProcessRegistry::instance()->createID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
   fs_info_(parent->fs_info_),
   //loader_(new Loader(fd_)),
@@ -54,39 +53,30 @@ UserProcess::UserProcess(UserProcess *parent, size_t pid) :
   name_(parent->name_),
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock"),
-  offsetlist_lock_("UserProcess::offsets")
+  offsetlist_lock_("UserProcess::offsets"),
+  kill_lock_("UserProcess::kill_lock_"),
+  KILLED_(false)
 {
-  debug(X_USERPROCESS, "Entering UserProcess fork constructor\n");
+  debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
   {
     debug(USERPROCESS, "Failed to obtain working directory!\n");
     return;
   }
 
-  if (fd_ >= 0)
-    loader_ = new Loader(fd_); 
-
-  if(!loader_ || !loader_->arch_memory_.page_map_level_4_)
-  {
-    debug(USERPROCESS, "Failed to create Loader!\n");
+  if (!setupLoader(fd_))
     return;
-  }
-
-  if(!loader_->loadExecutableAndInitProcess())
-  {
-    debug(USERPROCESS, "Failed to init Process\n");
-    return;
-  }
+  debug(USERPROCESS, "UserProcess fork constructor sucessfully setupLoader()\n");
 
   debug(USERPROCESS, "Start copying virtual memory!\n");
   threads_lock_.acquire();
-  ((UserThread*)currentThread)->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
+  currentUserThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
   threads_lock_.release();
 
   //local fd
 
   debug(USERPROCESS, "Creating new Thread for Fork\n");
-  auto thread = new UserThread(this,(UserThread*) currentThread);
+  auto thread = new UserThread(this, (UserThread*) currentThread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
@@ -172,6 +162,13 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   }
 
   // sets Thread::last_ if it's last thread
+  debug(X_USERPROCESS, "%ld threads left in my process\n", threads_.size());
+  // for (size_t i = 0; i < threads_.size(); i++)
+  // {
+  //   debug(X_USERPROCESS, "  %ld  ", threads_[i]->getTID());
+  // }
+  // debug(X_USERPROCESS, "\n");
+
   if(threads_.size() == 1)
     thread->setLast();
 
@@ -181,7 +178,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
-size_t UserProcess::getRandomPageOffset(){
+size_t UserProcess::getRandomPageOffset()
+{
   size_t firstbits;
   size_t lastbits;
   size_t page_offset = 0;
@@ -194,7 +192,7 @@ size_t UserProcess::getRandomPageOffset(){
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
     offsetlist_lock_.acquire();
-  } while (checkInList(page_offset));
+  } while (checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
@@ -202,7 +200,7 @@ size_t UserProcess::getRandomPageOffset(){
   return page_offset;
 }
 
-bool UserProcess::checkInList(size_t NR)
+bool UserProcess::checkInOffsetList(size_t NR)
 {
   for (auto val : offsets_)
   {
@@ -212,14 +210,12 @@ bool UserProcess::checkInList(size_t NR)
   return false;
 }
 
-//caution! aquire lock before!!!
 Thread* UserProcess::findInThreadList(size_t tid)
 {
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
 }
-
 
 size_t UserProcess::getNrOfThreads()
 {
@@ -229,10 +225,10 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper)
+size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate)
 {
   // pthread
-  UserThread* thread = new UserThread(wrapper, UserProcess::getRandomPageOffset());
+  UserThread* thread = new UserThread(wrapper, getRandomPageOffset());
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
@@ -240,6 +236,9 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
     Fifth Argument: R8
     Sixth Argument: R9
   */
+  if (joinstate == PTHREAD_CREATE_JOINABLE);
+  else
+    thread->setJoinState(joinstate);
   thread->user_registers_->rdi = start_routine;
   thread->user_registers_->rsi = args;
   if(thread)
@@ -248,9 +247,12 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
   return 0;
 }
 
-void UserProcess::exit(size_t exit_code)
+void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
+  kill_lock_.acquire();
+  KILLED_ = true;
+
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
   
@@ -260,9 +262,7 @@ void UserProcess::exit(size_t exit_code)
     else
     {
       if (!thread.second->checkFlagLock(currentThread))
-      {
         thread.second->lockFlagMutex();
-      }
       
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
@@ -272,18 +272,20 @@ void UserProcess::exit(size_t exit_code)
     }
   }
   threads_lock_.release();
+  kill_lock_.release();
   debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
-  Syscall::pthread_exit((void*) exit_code);
+  // callingThread->lockFlagMutex();
+  // callingThread->setCancelState(PTHREAD_CANCEL_ENABLE);
+  // callingThread->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
+  // callingThread->sendCancelRequest();
+  // callingThread->unlockFlagMutex();
+  if(kill_currentThread)  
+    Syscall::pthread_exit((void*) exit_code);
 
 }
 
-void UserProcess::killThread(UserThread* thread)
+bool UserProcess::getRetVal(size_t tid, void** value)
 {
-  debug(USERPROCESS, "PID: [%ld] killThread() called for tid [%ld]\n", pid_, thread->getTID());
-  thread->kill();
-}
-
-bool UserProcess::getRetVal(size_t tid, void** value){
   returnvalue_lock_.acquire();
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -294,26 +296,89 @@ bool UserProcess::getRetVal(size_t tid, void** value){
   }
   returnvalue_lock_.release();
   return false;
+}
+
+int UserProcess::execv(const char* path)
+{
+  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
+  ssize_t old_fd = fd_;
+  Loader* old_loader = loader_;
+  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+  if(!setupLoader(new_fd))
+  {
+    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
+  }
+  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  name_ = path;
+
+  // exec 
+  debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
+  removeOldProcessInformation();
+  currentUserThread->execv();
   
-
+  VfsSyscall::close(old_fd); 
+  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
+  return 0;
 }
 
-void UserProcess::setWaitStatus(bool arg)
-{ 
-  wait_status_ = arg; 
+int UserProcess::execv(const char* path, char *const argv[], size_t argc)
+{
+  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
+  ssize_t old_fd = fd_;
+  Loader* old_loader = loader_;
+  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+  if(!setupLoader(new_fd))
+  {
+    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
+  }
+  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  name_ = path;
+
+  // exec 
+  debug(X_USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path, (size_t)argv);
+  removeOldProcessInformation();
+  currentUserThread->execv(argv, argc);
+  
+  VfsSyscall::close(old_fd); 
+  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
+  return 0;
 }
 
-void UserProcess::setChildStatus(bool arg)
-{ 
-  child_ = arg; 
+bool UserProcess::setupLoader(ssize_t fd)
+{
+  if(fd < 0)
+    return false;
+
+  fd_ = fd;
+  Loader* new_loader = new Loader(fd_);
+  if(!new_loader || !new_loader->loadExecutableAndInitProcess())
+    return false;
+
+  loader_ = new_loader;
+  return true;
 }
 
-void UserProcess::setProcessState(ProcessState state)
-{ 
-  state_ = state; 
-}
+void UserProcess::removeOldProcessInformation()
+{
+  debug(X_USERPROCESS, "removingOldProcessInformation() entered\n");
+  exit(13579, false);
+  while(getNrOfThreads() > 1)
+    Scheduler::instance()->yield();
 
-void UserProcess::setDuaration(size_t duaration)
-{ 
-  duaration_ = duaration; 
+  returnvalue_lock_.acquire();
+  returnvalues_.clear();
+  returnvalue_lock_.release();
+
+  offsetlist_lock_.acquire();
+  offsets_.clear();
+  offsetlist_lock_.release();
+  debug(X_USERPROCESS, "removingOldProcessInformation() finished\n");
 }

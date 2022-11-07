@@ -8,7 +8,7 @@ int main(int argc, char** argv)
 {
   printf("Call to Fork w 3!\n");
   int pid = 0;
-  for(int i = 0; i < 6; i++)
+  for(int i = 0; i < 1; i++)
     pid = fork();
   if (!pid)
   {
@@ -23,7 +23,20 @@ int main(int argc, char** argv)
     printf("Error while forking!");
   }
 
-  /*printf("Call to Fork w 5!\n");
+  // if (!pid)
+  // {
+  //   printf("[%d] I am the Child!
+  // else if (pid > 0)
+  // {
+  //   printf("[%d] I am the Parent!\n", pid);
+  //   assert (pid != 0);  // hello
+  // }else
+  // {n", pid);
+  // }
+  //   printf("Error while forking!");
+  // }
+
+   /*printf("Call to Fork w 5!\n");
   for(int i = 0; i < 5; i++)
     pid = fork();
   if (!pid)
@@ -55,5 +68,7 @@ int main(int argc, char** argv)
     printf("Error while forking!");
   }
   printf("Call to Fork finished!\n");*/
+
+  printf("main() returning\n");
   return 0;
 }

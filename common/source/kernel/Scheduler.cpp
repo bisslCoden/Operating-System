@@ -44,7 +44,7 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-
+  //debug(SCHEDULER, "schedule called!\n");
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
@@ -73,6 +73,7 @@ uint32 Scheduler::schedule()
     ret = 0;
   }
 
+
   if (currentThread->switch_to_userspace_)
   {
      UserThread* current = (UserThread*) currentThread;
@@ -87,8 +88,8 @@ uint32 Scheduler::schedule()
           currentThreadRegisters = currentThread->kernel_registers_;
           ret = 0;
           currentThreadRegisters->rdi = (uint64_t) PTHREAD_CANCELED;
-          ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
           currentThread->switch_to_userspace_ = 0;
+          ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
         }
         else
           current->getflags()->kcancelreq.clear();
@@ -99,7 +100,6 @@ uint32 Scheduler::schedule()
     else 
       current->getflags()->knotcancelable.clear();
   }
-  
 
   return ret;
 }
@@ -126,9 +126,11 @@ void Scheduler::sleep()
 
 void Scheduler::wake(Thread* thread_to_wake)
 {
+
   // wait until the thread is sleeping
   while(thread_to_wake->getState() != Sleeping)
     yield();
+
   thread_to_wake->setState(Running);
 }
 
@@ -216,8 +218,11 @@ bool Scheduler::isCurrentlyCleaningUp()
 
 uint32 Scheduler::getTicks()
 {
+  frequency = (frequency + getRDTSC()) / 2;
   return ticks_;
 }
+
+
 
 size_t Scheduler::getRDTSC()
 {

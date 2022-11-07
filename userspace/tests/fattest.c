@@ -1,10 +1,11 @@
 #include "pthread.h"
 #include <stdio.h>
 
-#define SIMPLE1 1
-#define SIMPLE2 1
-#define SIMPLE3 1
-#define FORK 1
+// everything on 2 or we run out of memory
+#define SIMPLE1 2
+#define SIMPLE2 2
+#define SIMPLE3 2
+#define FORKS 2
 
 void simple_routine()
 {
@@ -22,7 +23,7 @@ void simple_routine()
     printf("[1 child: cancel async] ");
   pthread_exit((void*)9);
 }
-
+//hui
 void simple_routine2()
 {
   int old;
@@ -53,19 +54,28 @@ int main()
   int retvals[SIMPLE1 + SIMPLE2 + SIMPLE3];
   int ret = 0;
   pid_t pid = fork();
+  size_t fork_i = FORKS;
 
   // creates
+  fork_i--;
+  if(fork_i > 0) fork();
   for(size_t i = 0; i < SIMPLE1; i++){
     ret = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
   }
+  fork_i--;
+  if(fork_i > 0) fork();
   for(size_t i = SIMPLE1; i < (SIMPLE1 + SIMPLE2); i++)
   {
     ret = pthread_create(&tids[i], NULL, (void*)&simple_routine2, NULL);
   }
+  fork_i--;
+  if(fork_i > 0) fork();
   for(size_t i = SIMPLE1 + SIMPLE2; i < (SIMPLE1 + SIMPLE2 + SIMPLE3); i++)
   {
     ret = pthread_create(&tids[i], NULL, (void*)&simple_routine3, NULL);
   }
+  fork_i--;
+  if(fork_i > 0) fork();
   ret = pthread_create(&tids[10], NULL, (void*)&simple_routine3, NULL);
 
   // join/cancels

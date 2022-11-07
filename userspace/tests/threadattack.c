@@ -4,7 +4,7 @@
 #include "assert.h"
 
 
-#define NUM_THREADS1 150
+#define NUM_THREADS1 100
 #define NUM_THREADS2 100
 
 pthread_t tids[NUM_THREADS1 + NUM_THREADS2];
@@ -66,8 +66,8 @@ int main()
     assert((ret = pthread_create(&tids[i], NULL, (void* (*)(void*))&simple_routine2, (void*) &paramsnow)) == 0 && "couldnt create anymore threads daaamn!\n");
   }
   sched_yield();
-  int busy = 0;
-  int long_ = 0;
+ // int busy = 0;
+  //int long_ = 0;
 //   while (long_ < 4000000000000)
 //   {
 //     busy += long_;

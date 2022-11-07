@@ -57,6 +57,17 @@ class ProcessRegistry : public Thread
     void createProcess(const char* path);
 
     /**
+     * @brief handles argument checking for execv and calls UserProcess::(path, argv, argc)
+     * 
+     * @param path the path to the programm (c string)
+     * @param argv the args as handeled by calling convention
+     * @return int return value, -1 on fail, shouldn't return on success
+     */
+    int execvProcess(const char* path, char *const argv[]);
+    // this is the version without args
+    int execvProcess(const char* path);
+
+    /**
      * creates an unique ID for every process OR thread ID
      *
      * @return size_t the ID
@@ -71,7 +82,6 @@ class ProcessRegistry : public Thread
     ustl::map<size_t, UserProcess*> getProcessList();
 
   private:
-
     char const **progs_;
     uint32 progs_running_;
     Mutex counter_lock_;

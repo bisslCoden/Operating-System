@@ -6,7 +6,7 @@
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
-
+#include "offsets.h"
 
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
@@ -108,15 +108,13 @@ size_t ProcessRegistry::createID()
 
 size_t ProcessRegistry::processFork()
 {
-  size_t pid = createID();
-
-  debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
-  auto parent = ((UserThread*)currentThread)->getParentProcess();
+  debug(PROCESS_REG, "processFork() called starting process creation\n");
+  auto parent = ((UserThread*)currentThread)->getProcess();
   //debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent,pid);
+  auto process = new UserProcess(parent);
 
   debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID()==0)
+  if (!process || process->getPID() == 0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
     delete process;
@@ -124,11 +122,11 @@ size_t ProcessRegistry::processFork()
   }
 
   list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
   list_of_processes_lock_.release();
-  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
   
-  return pid;
+  debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
+  return process->getPID();
 }
 
 ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
@@ -139,13 +137,21 @@ ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
 
 void ProcessRegistry::createProcess(const char* path)
 {
-  debug(PROCESS_REG, "create process %s\n", path);
-  FileSystemInfo test = *working_dir_;
-  debug(PROCESS_REG, "was able to deref that\n");
-  UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
-  assert(process && "Process creation failed miserably o_O");
+  debug(PROCESS_REG, "createProcess(path = %s)\n", path);
+  FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
+  if(!fs_info)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
+    return;
+  }
+  UserProcess* process = new UserProcess(path, fs_info);
+  if(!process || process->getPID() == 0)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
+    return;
+  }
 
-  debug(PROCESS_REG, "created process successfully!\n");
+  debug(X_PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
@@ -164,45 +170,37 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     auto search_child = list.find(arg1);
     list_of_processes_lock_.release();
-    if (search_child != list.end())
-    {
-      list_of_processes_lock_.acquire();
-      parent_process->setWaitStatus(1);
-      size_t process_state = search_child->second->getProcessState();
-      return_pid = search_child->second->getPID();
-      list_of_processes_lock_.release();
-      while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() 
-      && search_child->second->getProcessState() == 2) 
-      {
-        Scheduler::instance()->yield();
-        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
-        {
-          list_of_processes_lock_.acquire();
-          parent_process->setWaitStatus(0);
-          list_of_processes_lock_.release();
-        }
-      }
-    }
-    else
+    if (search_child == list.end())
     {
       debug(WAITPID, "Not found, process %ld\n", arg1);
-      //list_of_processes_lock_.release();
       return -1;
+    }
+    list_of_processes_lock_.acquire();
+    parent_process->setWaitStatus(1);
+    size_t process_state = search_child->second->getProcessState();
+    return_pid = search_child->second->getPID();
+    list_of_processes_lock_.release();
+    while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    {
+      Scheduler::instance()->yield();
+      if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+      {
+        list_of_processes_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        list_of_processes_lock_.release();
+      }
     }
   }
   else if((long int) arg1 == -1) // any child process.
   {
     debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
     list_of_processes_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list;
-    list = ProcessRegistry::getProcessList();
-    ustl::map<size_t, UserProcess*>::iterator i;
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     UserProcess* child = parent_process;
     list_of_processes_lock_.release();
-    for (i = list.begin(); i != list.end(); ++i) 
+    for (ustl::map<size_t, UserProcess*>::iterator i = list.begin(); i != list.end(); ++i) 
     {
-      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) 
-      && (child->getWaitStatus() == 0))
+      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) && (child->getWaitStatus() == 0))
       {
         list_of_processes_lock_.acquire();
         child = i->second;
@@ -210,18 +208,23 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
         break;
       }
     }
+    if(child->getPID() == parent_process->getPID()){
+      debug(WAITPID, "No child process\n");
+      return -1;
+    }
     list_of_processes_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = child->getProcessState();
     return_pid = child->getPID();
     list_of_processes_lock_.release();
-    debug(WAITPID, "before while \n");
+    //maybe the child wait status can be changed to 1 with more waitpids
     while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
     {
       debug(WAITPID, "in while  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
-       arg1, parent_process->getProcessState(), child->getProcessState(),
-       parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
-       parent_process->getWaitStatus(), child->getWaitStatus());
+      arg1, parent_process->getProcessState(), child->getProcessState(),
+      parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
+      parent_process->getWaitStatus(), child->getWaitStatus());
+
       Scheduler::instance()->yield();
       if(process_state != child->getProcessState() || child->getProcessState() == 0)
       {
@@ -230,9 +233,8 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
         list_of_processes_lock_.release();
       }
     }
-   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
+    debug(WAITPID, "after while \n");
   }
-
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
@@ -248,64 +250,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
     return -1;
   } 
-    /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
-       points.  This integer can be inspected with the following macros (which take the integer itself
-       as an argument, not a pointer to it, as is done in wait() and waitpid()!):
-
-       WIFEXITED(wstatus)
-              returns true if the child terminated normally, that is, by calling exit(3) or  _exit(2),
-              or by returning from main().
-
-       WEXITSTATUS(wstatus)
-              returns  the exit status of the child.  This consists of the least significant 8 bits of
-              the status argument that the child specified in a call to exit(3) or _exit(2) or as  the
-              argument for a return statement in main().  This macro should be employed only if WIFEX‐
-              ITED returned true.
-
-       WIFSIGNALED(wstatus)
-              returns true if the child process was terminated by a signal.
-
-       WTERMSIG(wstatus)
-              returns the number of the signal that caused the child process to terminate.  This macro
-              should be employed only if WIFSIGNALED returned true.
-
-       WCOREDUMP(wstatus)
-              returns  true if the child produced a core dump (see core(5)).  This macro should be em‐
-              ployed only if WIFSIGNALED returned true.
-
-              This macro is not specified in POSIX.1-2001 and is not available on some UNIX  implemen‐
-              tations (e.g., AIX, SunOS).  Therefore, enclose its use inside #ifdef WCOREDUMP ... #en‐
-              dif.
-
-       WIFSTOPPED(wstatus)
-              returns true if the child process was stopped by delivery of a signal; this is  possible
-              only  if  the  call  was  done  using  WUNTRACED  or when the child is being traced (see
-              ptrace(2)).
-
-       WSTOPSIG(wstatus)
-              returns the number of the signal which caused the child to stop.  This macro  should  be
-              employed only if WIFSTOPPED returned true.
-
-       WIFCONTINUED(wstatus)
-              (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
-              CONT.
-*/
   if(arg2 != 0)
   {
     debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
   }
-  /*The value of options is an OR of zero or more of the following constants:
-
-       WNOHANG
-              return immediately if no child has exited.
-
-       WUNTRACED
-              also  return  if  a child has stopped (but not traced via ptrace(2)).  Status for traced
-              children which have stopped is provided even if this option is not specified.
-
-       WCONTINUED (since Linux 2.6.10)
-              also return if a stopped child has been resumed by delivery of SIGCONT.
-*/
   if(arg3 > 0) 
   {
     debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
@@ -313,5 +261,42 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   return return_pid;
 }
 
-// 49.6%
-// 53.4%
+int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+{
+  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
+  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
+  bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
+  if(!pathptr_ok || !argvptr_ok)
+    return -1;
+  bool is_first_path = false;
+  bool found_null = false;
+  if(!strcmp(path, argv[0]))
+    is_first_path = true;
+  size_t argc = 1;
+  for(; !found_null; argc++)
+    if(argv[argc] == NULL && argc > 1)
+      found_null = true;
+  if(!is_first_path || !found_null)
+    return -1;
+
+  // UserProcess::execv()
+  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
+  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  return currentProcess->execv(path, argv, argc);
+}
+
+int ProcessRegistry::execvProcess(const char* path)
+{
+  debug(X_PROCESS_REG, "execvProcess() WITHOUT ARGS!!!\n");
+  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
+  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
+  if(!pathptr_ok)
+    return -1;
+
+  // UserProcess::execv()
+  debug(PROCESS_REG, "execvProcess(path = %s\n", path);
+  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
+  return currentProcess->execv(path);
+}

@@ -6,6 +6,7 @@
 #include "CleanupThread.h"
 #include "UserThread.h"
 #include "Syscall.h"
+#include "ArchMemory.h"
 
 class Thread;
 class Mutex;
@@ -31,6 +32,7 @@ class Scheduler
     uint32 getThreadCount();
 
     size_t getRDTSC();
+    size_t getFrequency() {return frequency;}
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
