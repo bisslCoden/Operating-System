@@ -282,73 +282,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   for(size_t i = 0; i < argc; i++)
     debug(X_USERTHREAD, "execv(): argv[%ld] = %s\n", i, argv[i]? argv[i]: "NULL");
   
-  /* OUTDATED TRY.
-  // vaddr... virtual address for old archmemory
-  size_t vpn = USER_BREAK / PAGE_SIZE - 1; 
-  size_t vaddr_end = vpn * PAGE_SIZE;
-  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
-  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
-  // ident... identMapping of freshly allocated PPN
-  size_t ppn = PageManager::instance()->allocPPN();
-  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
-  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
-  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", vpn, ident_start, ident_end);
-  // map vpn to ppn (this is still the old loader_->arch_memory_)
-  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "UserThread::execv() mapPage() failed");
-  // iterate and copy from old archmem to ident
-  debug(X_USERTHREAD, "mapped vpn and ppn. copying from old archmem to ident:\n");
-  size_t vaddr_i = vaddr_start;
-  size_t ident_i = ident_start;
-  for(size_t i = 0; (i < argc) && (ident_i != ident_end); i++)
-  {
-    // copy pointer to char ptr to ident address
-    *((size_t*)ident_i) = vaddr_i;
-    memcpy((void*)ident_i, (void*)argv[i], strlen(argv[i]));
-    // 
-    ident_i += sizeof(size_t);
-    vaddr_i += sizeof(char)*strlen(argv[i]) + 1;
-    ident_i += sizeof(char)*strlen(argv[i]) + 1;
-  }
-  */
-
-  /* OUTDATED TRY
-  // identMapping to access freshly allocated PPN
-  size_t ppn = PageManager::instance()->allocPPN();
-  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
-  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
-  size_t ident_i = ident_start;
-  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", ppn, ident_start, ident_end);
-
-  // copy char* to ident address until argv[i] is NULL
-  for(size_t i = 0; i < argc - 1; i++)
-  {
-    strcpy((char*)ident_i, argv[i]);
-    // increase ident_i by srtlen + 1 byte for null termination
-    ident_i += strlen(argv[i]) + sizeof(char);
-  }
-  ident_i = ident_start;
-  debug(X_USERTHREAD, "finished copy char* to ident address\n");
-
-  // iterate and copy from ident to new virtual memory
-  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
-  size_t vaddr_end = vpn * PAGE_SIZE;
-  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
-  size_t vaddr_i = vaddr_start;
-  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
-  size_t ppn_new = PageManager::instance()->allocPPN();
-  assert(loader_->arch_memory_.mapPage(vpn, ppn_new, 1));
-  debug(X_USERTHREAD, "ppn_new = %lx\n", ppn_new);
-  debug(X_USERTHREAD, "entering for-loop\n");
-  for(size_t i = 0; i < argc; i++)
-  {
-    strcpy((char*)vaddr_i, (char*)ident_i);
-    // increase ident_i by srtlen + 1 byte for null termination
-    ident_i += strlen(argv[i]) + sizeof(char);
-    vaddr_i += strlen(argv[i]) + sizeof(char);
-  }
-  debug(X_USERTHREAD, "left for-loop\n");
-  */
-
   /** CURRENT PLAN:
    *  1 create new page for the arguments
    *  2 getIdentAddress()
@@ -364,34 +297,35 @@ int UserThread::execv(char* const argv[], size_t argc)
    */ 
 
   debug(X_USERTHREAD, "execv(): about to set up stuff for argument copying\n");
-  size_t new_argc = argc;
+  // don't count NULL! otherwise pagefault at 0x0
+  size_t new_argc = argc - 1;
   size_t ppn = PageManager::instance()->allocPPN();
   char** ident_start = (char**)ArchMemory::getIdentAddressOfPPN(ppn);
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
   assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
   debug(X_USERTHREAD, "execv(): ppn = %lx, ident_start = %lx, vpn = %lx\n", ppn, (size_t)ident_start, vpn);
-
+  
   size_t new_argv = vpn * PAGE_SIZE;
   size_t str_offset = argc * sizeof(char*);
-  debug(X_USERTHREAD, "execv(): before for-loop: new_argv = %ld, str_offset = %ld\n", new_argv, str_offset);
-  for(size_t i = 0; i < argc; i++)
+  debug(X_USERTHREAD, "execv(): before for-loop: new_argv = %ld, str_offset = %ld\n\n", new_argv, str_offset);
+  for(size_t i = 0; argv[i]; i++)
   {
-    debug(X_USERTHREAD, "execv(): %ld from %ld args copied\n", i, argc);
+    debug(X_USERTHREAD, "execv(): loop start: %ld from %ld args copied\n", i, argc);
     // + 1 for null termination
-    if(!argv[i])
-      break;
     size_t str_len = strlen(argv[i]) + 1;
     if(str_offset + str_len >= PAGE_SIZE)
       return -1;
 
-    debug(X_USERTHREAD, "execv(): element %ld at %lx: set to (new_argv + str_offset) = %lx\n", i, (size_t)(ident_start + i), new_argv + str_offset);
+    debug(X_USERTHREAD, "execv(): element %ld at %lx: points to string at (new_argv + str_offset) = %lx\n", i, (size_t)(ident_start + i), new_argv + str_offset);
     *(ident_start + i) = (char*)(new_argv + str_offset);
     
     debug(X_USERTHREAD, "execv(): memcpy(ident_start + str_offset = %lx, argv[i] = %s, str_len = %ld)\n", (size_t)(ident_start + str_offset), argv[i], str_len);
     memcpy((void*)(ident_start + str_offset), argv[i], str_len);
 
     str_offset += str_len;
+    debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, argc);
   }
+  debug(X_USERTHREAD, "execv(): found NULL\n");
 
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
   name_ = process_->getName();
