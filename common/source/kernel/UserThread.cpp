@@ -302,7 +302,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   size_t ppn = PageManager::instance()->allocPPN();
   char** ident_start = (char**)ArchMemory::getIdentAddressOfPPN(ppn);
   size_t vpn = USER_BREAK / PAGE_SIZE - 1;
-  assert(getProcess()->getLoader()->arch_memory_.mapPage(vpn, ppn, 1));
   debug(X_USERTHREAD, "execv(): ppn = %lx, ident_start = %lx, vpn = %lx\n", ppn, (size_t)ident_start, vpn);
   
   size_t new_argv = vpn * PAGE_SIZE;
@@ -337,6 +336,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
 
   // passing new virtual memory to userspace 
+  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = new_argc; 
   user_registers_->rsi = new_argv; 
