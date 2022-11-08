@@ -599,7 +599,7 @@ int Syscall::get_pid()
   // frequency is needed, with that we multiply clock_per_sec
 unsigned int Syscall::sleep(unsigned int seconds)
 {
-  debug(SLEEP, "Sleep system call started\n");
+  /*debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   uint64_t time_to_wake = (seconds * 185) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
@@ -615,7 +615,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
      //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
      //Scheduler::instance()->getFrequency());
     Scheduler::instance()->yield();
-  }
+  }*/
   return 0;
 }
 
