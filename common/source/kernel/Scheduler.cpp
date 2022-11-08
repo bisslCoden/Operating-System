@@ -32,6 +32,8 @@ Scheduler::Scheduler()
   ticks_ = 0;
   frequency = 0;
   rdtsc_value = 0;
+  rdtsc_value_old = 0;
+  rdtsc_diff_per_tick = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
@@ -218,10 +220,8 @@ bool Scheduler::isCurrentlyCleaningUp()
 
 uint32 Scheduler::getTicks()
 {
-  frequency = (frequency + getRDTSC()) / 2;
   return ticks_;
 }
-
 
 
 size_t Scheduler::getRDTSC()
@@ -229,7 +229,6 @@ size_t Scheduler::getRDTSC()
   size_t firstbits;
   size_t lastbits; 
   asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
-  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   size_t return_ = firstbits << 32 | lastbits;
   return return_;
 }
@@ -237,6 +236,9 @@ size_t Scheduler::getRDTSC()
 void Scheduler::incTicks()
 {
   ticks_++;
+  rdtsc_value_old = rdtsc_value;
+  rdtsc_value = getRDTSC();
+  rdtsc_diff_per_tick = rdtsc_value_old - rdtsc_value;
 }
 
 

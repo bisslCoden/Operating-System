@@ -33,6 +33,7 @@ class Scheduler
 
     size_t getRDTSC();
     size_t getFrequency() {return frequency;}
+    size_t getRDTSCdiff() {return rdtsc_diff_per_tick;}
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
@@ -76,6 +77,8 @@ class Scheduler
 
     size_t frequency;
     size_t rdtsc_value;
+    size_t rdtsc_value_old;
+    size_t rdtsc_diff_per_tick;
 
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;

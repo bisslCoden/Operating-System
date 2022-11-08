@@ -600,13 +600,20 @@ int Syscall::get_pid()
 unsigned int Syscall::sleep(unsigned int seconds)
 {
   debug(SLEEP, "Sleep system call started\n");
-  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * Scheduler::instance()->getFrequency());
+  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC) * 20;
   debug(SLEEP, "rdtsc_now: %ld\n", rdtsc_now);
-  uint64_t time_to_wake = rdtsc_now + seconds;
-  debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
-  while(time_to_wake > Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000))
+  uint64_t time_to_wake = seconds * Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC) * 20;
+  debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+  //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
+  while(time_to_wake > Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC) * 20)
   {
-    debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
+    debug(SLEEP, "rdtsc_now: %ld\n",  Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC) * 20);
+    
+    debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+    
+    //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
+     //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
+     //Scheduler::instance()->getFrequency());
     Scheduler::instance()->yield();
   }
   return (unsigned int) time_to_wake;
