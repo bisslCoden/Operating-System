@@ -616,7 +616,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
      //Scheduler::instance()->getFrequency());
     Scheduler::instance()->yield();
   }
-  return (unsigned int) time_to_wake;
+  return 0;
 }
 
 // rdtsc now - rdtsc at program start
