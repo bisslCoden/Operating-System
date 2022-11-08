@@ -9,7 +9,7 @@
 #define NUM_THREADS2 10
 #define NUM_THREADS3 8
 #define MAX_RES 5000
-#define MATSIZE 2000
+#define ARRSIZE 16000
 
 pthread_t tids[NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3];
 int returnvalues [NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3];
@@ -56,7 +56,7 @@ size_t simple_routine2(args2* params)
   printf("entering simple_routine2\n");
   int old;
   pthread_t mychild = 0;
-  //int mat[MATSIZE][MATSIZE];
+  int bigarr[ARRSIZE];
   pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &old);
   
   sem_wait(&semy);
@@ -66,13 +66,10 @@ size_t simple_routine2(args2* params)
   
   pthread_mutex_lock(&never_false_lock);
   never_false = 0;
-  // for (int i = 0; i < MATSIZE; i++)
-  // {
-  //   for (int j = 0; j < MATSIZE; j++)
-  //   {
-  //     mat[i][j] = ((params->a) * (params->b + i)) % MATSIZE;
-  //   }
-  // }
+  for (int j = 0; j < ARRSIZE; j++)
+  {
+    bigarr[j] = ((params->a) * (params->b + j)) % ARRSIZE;
+  }
   pthread_mutex_lock(&threads3_lock);
   printf("after matfill\n");
   if (*params->xy > 0)
@@ -88,18 +85,16 @@ size_t simple_routine2(args2* params)
   pthread_mutex_unlock(&threads3_lock);
   
   pthread_mutex_lock(&result_lock);
-  
-  // for (int i = 0; i < MATSIZE; i++)
-  // {
-  //   for (int j = 0; j < MATSIZE; j++)
-  //   {
-  //     if(mat[i][j] < (MATSIZE / 10))
-  //     {
-  //       if(result + mat[i][j] < MAX_RES)
-  //         result += mat[i][j];
-  //     }
-  //   }
-  // }
+
+  for (int j = 0; j < ARRSIZE; j++)
+  {
+    if(bigarr[j] < (ARRSIZE / 1000))
+    {
+      if(result + bigarr[j] < MAX_RES)
+        result += bigarr[j];
+    }
+  }
+
 
   pthread_mutex_unlock(&result_lock);
   never_false = 1;
