@@ -238,7 +238,7 @@ void Scheduler::incTicks()
   ticks_++;
   rdtsc_value_old = rdtsc_value;
   rdtsc_value = getRDTSC();
-  rdtsc_diff_per_tick = rdtsc_value_old - rdtsc_value;
+  rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
 }
 
 
