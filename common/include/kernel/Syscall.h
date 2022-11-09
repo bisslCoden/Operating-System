@@ -6,7 +6,7 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
-#define callingThread ((UserThread*) currentThread)
+#define EXECV_MAX_PATH_LEN 1234
 
 
 class Syscall
@@ -26,7 +26,19 @@ class Syscall
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
   static int fork();
+
+  /**
+   * (1) checks if path is okay
+   * (2) if (argv != NULL) execvProces(path, argv);
+   * else execvProcess(path);
+   * 
+   * @param path the path to the binary. must end with '\0'
+   * @param argv the array of c-strings.
+   * @return on success this should not return. on fail -1
+   */
   static int execv(const char * path, char *const argv[]);
+  // checks path for exec.
+  static bool isExecPathValid(const char* path);
 
   // pthreads
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);

@@ -9,7 +9,7 @@ char const *user_progs[] = {
                             // "/usr/mutest.sweb",
                             // "/usr/mudead2.sweb",
                             // "/usr/threadattack.sweb",
-                            "usr/execprinter2.sweb",
+                            // "usr/execprinter2.sweb",
                             0
                            };
 

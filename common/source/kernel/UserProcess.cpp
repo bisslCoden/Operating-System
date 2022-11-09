@@ -13,8 +13,6 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
-#define currentUserThread ((UserThread*)currentThread)
-
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
@@ -26,7 +24,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     returnvalue_lock_("UserProcess::retvallock"),
     offsetlist_lock_("UserProcess::offsets"),
     kill_lock_("UserProcess::kill_lock_"),
-    KILLED_(false)
+    KILLED_(false),
+    waiting_exec_lock_("UserProcess::waiting_exec_lock_")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -53,8 +52,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   returnvalue_lock_("UserProcess::retvallock"), 
   offsetlist_lock_("UserProcess::offsets"),
   kill_lock_("UserProcess::kill_lock_"),
-  KILLED_(false)
-  
+  KILLED_(false),
+  waiting_exec_lock_("UserProcess::waiting_exec_lock_")
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
   if(!working_dir_)
@@ -165,6 +164,17 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   //   debug(X_USERPROCESS, "  %ld  ", threads_[i]->getTID());
   // }
   // debug(X_USERPROCESS, "\n");
+  waiting_exec_lock_.acquire();
+  if (threads_.size() == 2 && waiting_exec_ != 0)
+  {
+    waiting_exec_lock_.release();
+    waiting_exec_->lockJoin();
+    waiting_exec_->signalJoin();
+    waiting_exec_->unlockJoin();
+  }
+  else 
+    waiting_exec_lock_.release();
+
 
   // about to remove the last thread.. better set a flag that leads to process deletion aswell..
   if(threads_.size() == 1)
@@ -368,10 +378,30 @@ void UserProcess::removeOldProcessInformation()
 {
   debug(X_USERPROCESS, "removingOldProcessInformation() entered\n");
   exit(13579, false);
+  threads_lock_.acquire();
+  if (threads_.size() < 2)
+  {
+    threads_lock_.release();
+    goto done;
+  }
+  threads_lock_.release();
 
-  while(getNrOfThreads() > 1)
-    Scheduler::instance()->yield();
+  waiting_exec_lock_.acquire();
+  if (waiting_exec_ == 0)
+  {
+    waiting_exec_ = currentUserThread;
+    waiting_exec_lock_.release();
+    currentUserThread->lockJoin();
+    currentUserThread->waitJoin(true);
+    currentUserThread->unlockJoin();
+  }
+  else
+  {
+    waiting_exec_lock_.release();
+    assert(false && "exec called 2 times in one process is not possiblee!!!\n");
+  }
 
+done:
   returnvalue_lock_.acquire();
   returnvalues_.clear();
   returnvalue_lock_.release();

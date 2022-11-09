@@ -5,6 +5,8 @@
 #include "Thread.h"
 #include "UserProcess.h"
 
+#define EXECV_MAX_ARG_LEN 1234
+
 class ProcessRegistry : public Thread
 {
   public:
@@ -50,14 +52,27 @@ class ProcessRegistry : public Thread
     void createProcess(const char* path);
 
     /**
-     * @brief handles argument checking for execv and calls UserProcess::(path, argv, argc)
+     * @brief handles argument checking for execv when ARGV != NULL
+     * will call UserProcess::execv(path, argv[])
      * 
-     * @param path the path to the programm (c string)
+     * @param path the path to the programm 
      * @param argv the args as handeled by calling convention
      * @return int return value, -1 on fail, shouldn't return on success
      */
     int execvProcess(const char* path, char *const argv[]);
-    // this is the version without args
+    /**
+     * @brief checks exec args.
+     * @return int that holds argc, -1 on error
+     */
+    int areExecArgsValid(const char* path, char* const argv[]);
+
+    /**
+     * @brief handles argument checking for execv when ARGV == NULL
+     * will call UserProcess::execv(path)
+     * 
+     * @param path the path to the programm (already checked in Syscall)
+     * @return int return value, -1 on fail, shouldn't return on success
+     */
     int execvProcess(const char* path);
 
     /**

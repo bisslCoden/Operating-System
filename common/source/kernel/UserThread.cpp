@@ -109,9 +109,9 @@ bool UserThread::schedulable(){
 
 // pthread_create
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
-  Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
+  Thread(currentUserThread->working_dir_, currentUserThread->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(((UserThread*)currentThread)->process_), flag_mutex_{"thread::flag_mutex_"},
+  process_(currentUserThread->process_), flag_mutex_{"thread::flag_mutex_"},
    condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
@@ -279,27 +279,8 @@ bool UserThread::setupStack()
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
-  debug(X_USERTHREAD, "execv(): dear god, allmighty\n"
-                      "execv(): please recognise my praying\n"  
-                      "execv(): just let this code work\n");
-
-  debug(X_USERTHREAD, "execv(): argc = %ld\n", argc);
-  for(size_t i = 0; i < argc; i++)
-    debug(X_USERTHREAD, "execv(): argv[%ld] = %s\n", i, argv[i]? argv[i]: "NULL");
-  
-  /** CURRENT PLAN:
-   *  1 create new page for the arguments
-   *  2 getIdentAddress()
-   *  3 argv will lie direcly below USER_BREAK
-   *  4 mapPage(ppn) with ARCHMEM FROM PROCESS
-   *  5 set length of pointer array + create pointer array (char**)
-   *  6 first iteration
-   *    6.1 set length of string
-   *    6.2 check if length of pointer + length of string is below PAGE_SIZE
-   *    6.3 copy the address AFTER the pointer array (pointer array addr + length of pointer array) into first element of pointer array
-   *    6.4 copy string from argv to first address after pointer array
-   *    6.5 repeat 6 with with i++ and offset += length of string until i = argc
-   */ 
+  name_ = process_->getName();
+  debug(X_USERTHREAD, "execv(): %s\n", name_.c_str());
 
 
   //MEMLEAK
@@ -311,67 +292,29 @@ int UserThread::execv(char* const argv[], size_t argc)
     memcpy(here[i], argv[i], strlen(argv[i]));
     here[i][strlen(argv[i])] = '\0';
   }
-  for (size_t i = 0; i < new_argc; i++)
-  {
-    debug(X_USERTHREAD, "here: %s\n", here[i]);
-  }
-  
-  
-  
-  name_ = process_->getName();
+  debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[]\n");
+    
+  // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-
-
-  //debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
-
-  // passing new virtual memory to userspace 
- 
+  debug(X_USERTHREAD, "execv(): set new archmemory\n");
   
-  debug(X_USERTHREAD, "execv(): about to set up stuff for argument copying\n");
-  // don't count NULL! otherwise pagefault at 0x0
+  // setup copy
   size_t ppn = PageManager::instance()->allocPPN();
-  // char* ident_start[] will hold the pointers to the char strings. the page will also hold the strings
-  // the page in the virtual memory via which the user will be able to access the pointers and the strings that they point to
   size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE;
-  // mag earlier
   assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
-  //char** ident_start = (char**)ArchMemory::getIdentAddressOfPPN(ppn);
-  //debug(X_USERTHREAD, "execv(): ppn = %lx, ident_start = %lx, vpn = %lx\n", ppn, (size_t)ident_start, vpn);
-  
-  // the start of the page aka the tstart of the pointer array.
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;
-  
-  const char* string = "pups:D";
-  memcpy((void*)argv_arr, (void*) string, strlen(string));
-  debug(X_USERTHREAD, "%s is what i found at mapped_start [%p]\n", (char*) argv_arr, (char*) argv_arr);
-  
-  // the offset for the strings. first set directly behind the char* ident_start[] pointers. will be increased by str_len per for-loop-iterations
   size_t str_offset = argc * sizeof(char*);
-  debug(X_USERTHREAD, "execv(): before for-loop: new_argv = %p, str_offset = %ld\n\n", argv_arr, str_offset);
+  // copy from here[] into fresh ppn
   for(size_t i = 0; i < new_argc; i++)
   {
-    debug(X_USERTHREAD, "execv(): loop start: %ld from %ld args copied\n", i, new_argc);
-    // + 1 for null termination
     size_t str_len = strlen(here[i]) + 1;
-    // if str_offset + str_len gets larger than a PAGE_SIZE, we overshoot the page obviously
     if(str_offset + str_len >= PAGE_SIZE)
       return -1;
     
-    // copy string from userspace location to string array after pointer array. also copies null-termination
-  //  debug(X_USERTHREAD, "execv(): memcpy(ident_start + str_offset = %lx, argv[i] = %s, str_len = %ld)\n", (size_t)(ident_start + str_offset), argv[i], str_len);
-    debug(X_USERTHREAD, "before memcp: will copy to location %p\n", (void*)(new_argv + str_offset));
     memcpy((void*)(new_argv + str_offset), (void*) here[i], str_len);
-    //*((char*)(new_argv + str_offset + str_len)) = '\0';
-
-    // copy the address of the current string location to char* ident_start[i]
-   // debug(X_USERTHREAD, "execv(): element %ld at %lx: points to string at (new_argv + str_offset) = %lx\n", i, (size_t)(ident_start + i), new_argv + str_offset);
     *(argv_arr + i) = (char*)(new_argv + str_offset);
-    // check if copied successfully
-
-    debug(X_USERTHREAD, "execv(): found string %s at %p\n", argv_arr[i], argv_arr[i]);
-    // increase string offset by str_len
     str_offset += str_len;
     debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, new_argc);
   }
@@ -382,14 +325,15 @@ int UserThread::execv(char* const argv[], size_t argc)
   {
     debug(X_USERTHREAD, "just to check %ld: %s\n", i, argv_arr[i]);
   }
+  debug(X_USERTHREAD, "execv(): copied from here[] to new location\n");
 
+  // setup stack and set registers
   mystack_.page_offset_ = process_->getRandomPageOffset();
   setupStack();
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = new_argc; 
-  user_registers_->rsi = (size_t)argv_arr; 
-  
+  user_registers_->rsi = new_argv; 
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
