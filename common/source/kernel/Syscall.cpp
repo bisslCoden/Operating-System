@@ -620,7 +620,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
 }
 
 // 71.6 % 
-//
+// 75.4 %
 
 
 // rdtsc now - rdtsc at program start
