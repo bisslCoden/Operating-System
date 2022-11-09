@@ -301,6 +301,8 @@ int UserThread::execv(char* const argv[], size_t argc)
    *    6.5 repeat 6 with with i++ and offset += length of string until i = argc
    */ 
 
+
+  //MEMLEAK
   size_t new_argc = argc - 1;
   char* here[argc];
   for (size_t i = 0; i < new_argc; i++)
@@ -373,6 +375,7 @@ int UserThread::execv(char* const argv[], size_t argc)
     str_offset += str_len;
     debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, new_argc);
   }
+
 
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
   for (size_t i = 0; i < argc; i++)
