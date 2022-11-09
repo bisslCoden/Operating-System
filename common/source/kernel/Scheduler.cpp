@@ -240,13 +240,13 @@ void Scheduler::incTicks()
   rdtsc_value_old = rdtsc_value;
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
-  if(ticks_ > 10)
+  if(ticks_ > 20)
   {
     rdtsc_diff_sum += rdtsc_diff_per_tick;
-    diff_avg = rdtsc_diff_sum / (ticks_ - 10);
+    diff_avg = rdtsc_diff_sum / (ticks_ - 20);
   }
- // debug(SLEEP,"frequency is %ld, tick is %ld\n", frequency, ticks_);
-  //debug(SLEEP,"diff is      %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
+  //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);
+  //debug(SLEEP,"diff is     %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
 }
 
 
