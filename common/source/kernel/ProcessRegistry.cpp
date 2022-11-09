@@ -108,7 +108,7 @@ size_t ProcessRegistry::createID()
 size_t ProcessRegistry::processFork()
 {
   debug(PROCESS_REG, "processFork() called starting process creation\n");
-  auto parent = ((UserThread*)currentThread)->getProcess();
+  auto parent = currentUserThread->getProcess();
   //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent);
 
@@ -176,7 +176,7 @@ int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 
   // UserProcess::execv()
   debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
-  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  UserProcess* currentProcess = currentUserThread->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path, argv, argc);
 }
@@ -184,7 +184,7 @@ int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 int ProcessRegistry::execvProcess(const char* path)
 {
   debug(X_PROCESS_REG, "execv said: argv == NULL -> WITHOUT ARGS!!! path = %s\n", path);
-  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  UserProcess* currentProcess = currentUserThread->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
 }

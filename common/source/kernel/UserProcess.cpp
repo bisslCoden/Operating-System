@@ -13,8 +13,6 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
-#define currentUserThread ((UserThread*)currentThread)
-
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 

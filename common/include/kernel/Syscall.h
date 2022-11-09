@@ -6,7 +6,6 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
-#define callingThread ((UserThread*) currentThread)
 #define EXECV_MAX_PATH_LEN 1234
 
 

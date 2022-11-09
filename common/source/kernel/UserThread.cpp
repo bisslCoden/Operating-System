@@ -109,9 +109,9 @@ bool UserThread::schedulable(){
 
 // pthread_create
 UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
-  Thread(((UserThread*)currentThread)->working_dir_, ((UserThread*)currentThread)->name_, 
+  Thread(currentUserThread->working_dir_, currentUserThread->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(((UserThread*)currentThread)->process_), flag_mutex_{"thread::flag_mutex_"},
+  process_(currentUserThread->process_), flag_mutex_{"thread::flag_mutex_"},
    condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
