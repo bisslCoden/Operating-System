@@ -168,18 +168,15 @@ int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 {
-  // here we already know argv != NULL
+  // here we already know that path is okay and argv != NULL
   if((size_t)argv >= USER_BREAK)
     return -1;
 
-  // first arg must be path
+  // first char* may not be NULL, but string must be path
+  if(!argv[0])
+    return -1;
   char* must_be_path = argv[0];
-  if(must_be_path)
-  {
-    if(strcmp(path, must_be_path) != 0)
-      return -1;
-  }
-  else
+  if(strcmp(path, must_be_path) != 0)
     return -1;
 
   int argc = 0;
