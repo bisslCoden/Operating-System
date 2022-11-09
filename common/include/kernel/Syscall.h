@@ -38,7 +38,7 @@ class Syscall
    */
   static int execv(const char * path, char *const argv[]);
   // checks path for exec.
-  static bool isPathValid(const char* path);
+  static bool isExecPathValid(const char* path);
 
   // pthreads
   static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);

@@ -559,12 +559,12 @@ int Syscall::fork()
 int Syscall::execv(const char * path, char *const argv[])
 {
   debug(SYSCALL, "Syscall::execv()\n");
-  if(!isPathValid(path))
+  if(!isExecPathValid(path))
     return -1;
 
   // call execv with/without args
   int ret = 0;
-  if(argv)
+  if(argv) // if(argv) for arguments, if(false) fork woking exec D:
     ret = ProcessRegistry::instance()->execvProcess(path, argv);
   else
     ret = ProcessRegistry::instance()->execvProcess(path);
@@ -573,20 +573,21 @@ int Syscall::execv(const char * path, char *const argv[])
   return ret;
 }
 
-bool Syscall::isPathValid(const char* path)
+bool Syscall::isExecPathValid(const char* path)
 {
+  // path ptr valid?
   if(!(path && (size_t)path < USER_BREAK))
     return false;
 
   for(size_t i = 0; likely(path[i]); i++)
   {
-    // chars may not extend to USER_BREAK
+    // pointer to char invalid
     if((size_t)(path + i) >= USER_BREAK) 
       return false;
-    // string 2 long 4 me
+    // char too long
     if(i > EXECV_MAX_PATH_LEN)
       return false;
   }
-
+  debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
   return true;
 }

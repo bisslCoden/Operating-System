@@ -5,6 +5,8 @@
 #include "Thread.h"
 #include "UserProcess.h"
 
+#define EXECV_MAX_ARG_LEN 1234
+
 class ProcessRegistry : public Thread
 {
   public:
@@ -58,6 +60,11 @@ class ProcessRegistry : public Thread
      * @return int return value, -1 on fail, shouldn't return on success
      */
     int execvProcess(const char* path, char *const argv[]);
+    /**
+     * @brief checks exec args.
+     * @return int that holds argc, -1 on error
+     */
+    int areExecArgsValid(const char* path, char* const argv[]);
 
     /**
      * @brief handles argument checking for execv when ARGV == NULL
