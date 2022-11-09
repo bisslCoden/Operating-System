@@ -182,5 +182,9 @@ class UserProcess
 
     Mutex kill_lock_;
     bool KILLED_ = false;
+
+    // tells us which thread is waiting for other threads to be killed before exec-ing
+    UserThread* waiting_exec_ = 0;
+    Mutex waiting_exec_lock_;
 };
 

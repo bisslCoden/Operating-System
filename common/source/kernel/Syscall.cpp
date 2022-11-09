@@ -8,8 +8,6 @@
 #include "ProcessRegistry.h"
 #include "File.h"
 
-#define callingThread ((UserThread*) currentThread)
-
 typedef struct threadattribute
 {
     int initialized_;
@@ -563,14 +561,36 @@ int Syscall::fork()
 
 int Syscall::execv(const char * path, char *const argv[])
 {
-  debug(SYSCALL, "Syscall::execv(path = %s, argv = %lx)\n", path, (size_t)argv);
-  int ret = -234;
-  // set to false for testsystem points ( ͡° ͜ʖ ͡°)
-  bool with_args = true;
-  if(with_args)
+  debug(SYSCALL, "Syscall::execv()\n");
+  if(!isPathValid(path))
+    return -1;
+
+  // call execv with/without args
+  int ret = 0;
+  if(argv)
     ret = ProcessRegistry::instance()->execvProcess(path, argv);
   else
     ret = ProcessRegistry::instance()->execvProcess(path);
+
   debug(SYSCALL, "execProcess returned %d\n", ret);
   return ret;
+}
+
+bool Syscall::isPathValid(const char* path)
+{
+  if(!(path && (size_t)path < USER_BREAK))
+    return false;
+
+  for(size_t i = 0; likely(path[i]); i++)
+  {
+    // chars may not extend to USER_BREAK
+    if((size_t)(path + i) >= USER_BREAK) 
+      return false;
+
+    // string 2 long 4 me
+    if(i > EXECV_MAX_PATH_LEN)
+      return false;
+  }
+
+  return true;
 }
