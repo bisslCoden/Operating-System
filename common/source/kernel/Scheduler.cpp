@@ -34,6 +34,7 @@ Scheduler::Scheduler()
   rdtsc_value = 0;
   rdtsc_value_old = 0;
   rdtsc_diff_per_tick = 0;
+  rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
@@ -239,7 +240,13 @@ void Scheduler::incTicks()
   rdtsc_value_old = rdtsc_value;
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
-  //frequency = frequency #
+  if(ticks_ > 10)
+  {
+    rdtsc_diff_sum += rdtsc_diff_per_tick;
+    frequency = rdtsc_diff_sum / (ticks_ - 10);
+  }
+ // debug(SLEEP,"frequency is %ld, tick is %ld\n", frequency, ticks_);
+  //debug(SLEEP,"diff is      %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
 }
 
 

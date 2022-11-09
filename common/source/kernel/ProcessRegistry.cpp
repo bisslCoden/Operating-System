@@ -173,7 +173,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     if (search_child == list.end())
     {
       debug(WAITPID, "Not found, process %ld\n", arg1);
-      return -1;
+      return -1; //exit value returned
     }
     list_of_processes_lock_.acquire();
     parent_process->setWaitStatus(1);

@@ -79,6 +79,7 @@ class Scheduler
     size_t rdtsc_value;
     size_t rdtsc_value_old;
     size_t rdtsc_diff_per_tick;
+    size_t rdtsc_diff_sum;
 
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;
