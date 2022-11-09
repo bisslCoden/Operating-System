@@ -30,7 +30,7 @@ Scheduler::Scheduler()
 {
   block_scheduling_ = 0;
   ticks_ = 0;
-  frequency = 0;
+  diff_avg = 0;
   rdtsc_value = 0;
   rdtsc_value_old = 0;
   rdtsc_diff_per_tick = 0;
@@ -243,7 +243,7 @@ void Scheduler::incTicks()
   if(ticks_ > 10)
   {
     rdtsc_diff_sum += rdtsc_diff_per_tick;
-    frequency = rdtsc_diff_sum / (ticks_ - 10);
+    diff_avg = rdtsc_diff_sum / (ticks_ - 10);
   }
  // debug(SLEEP,"frequency is %ld, tick is %ld\n", frequency, ticks_);
   //debug(SLEEP,"diff is      %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);

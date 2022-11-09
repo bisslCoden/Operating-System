@@ -32,7 +32,7 @@ class Scheduler
     uint32 getThreadCount();
 
     size_t getRDTSC();
-    size_t getFrequency() {return frequency;}
+    size_t getDiffAvg() {return diff_avg;}
     size_t getRDTSCdiff() {return rdtsc_diff_per_tick;}
 
     /**
@@ -75,7 +75,7 @@ class Scheduler
 
     size_t ticks_;
 
-    size_t frequency;
+    size_t diff_avg;
     size_t rdtsc_value;
     size_t rdtsc_value_old;
     size_t rdtsc_diff_per_tick;
