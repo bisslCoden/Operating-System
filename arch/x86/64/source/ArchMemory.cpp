@@ -142,26 +142,9 @@ ArchMemory::~ArchMemory()
               PageTableEntry* pt = (PageTableEntry*) getIdentAddressOfPPN(pd[pdi].pt.page_ppn);
               for (uint64 pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
               {
-                if (pt[pti].present)
+                if (pt[pti].present && pt[pti].cow == 0)
                 {
-                  cow_cnt_lock_.acquire();
-                  if  (cow_counter_.find(pt[pti].page_ppn) == cow_counter_.end())
-                  {
-                    pt[pti].present = 0;
                     PageManager::instance()->freePPN(pt[pti].page_ppn);
-                  }else
-                  {
-                    if(cow_counter_.at(pt[pti].page_ppn) == 1)
-                    {
-                      pt[pti].present = 0;
-                      cow_counter_.erase(pt[pti].page_ppn);
-                      PageManager::instance()->freePPN(pt[pti].page_ppn);
-                    } else
-                    {
-                      cow_counter_.at(pt[pti].page_ppn)--;
-                    }
-                  }
-                  cow_cnt_lock_.release();
                 }
               }
               pd[pdi].pt.present = 0;

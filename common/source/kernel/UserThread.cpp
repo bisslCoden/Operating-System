@@ -99,7 +99,7 @@ bool UserThread::schedulable(){
     }
     else
     {
-      assert(false && "Sleep flag was neither 1 nor 0?\n");
+      //assert(false && "Sleep flag was neither 1 nor 0?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
