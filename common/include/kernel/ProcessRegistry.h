@@ -59,7 +59,7 @@ class ProcessRegistry : public Thread
      * @param argv the args as handeled by calling convention
      * @return int return value, -1 on fail, shouldn't return on success
      */
-    int execvProcess(const char* path, char *const argv[]);
+    int execv(const char* path, char *const argv[]);
     /**
      * @brief checks exec args.
      * @return int that holds argc, -1 on error
@@ -73,7 +73,7 @@ class ProcessRegistry : public Thread
      * @param path the path to the programm (already checked in Syscall)
      * @return int return value, -1 on fail, shouldn't return on success
      */
-    int execvProcess(const char* path);
+    int execv(const char* path);
 
     /**
      * creates an unique ID for every process OR thread ID

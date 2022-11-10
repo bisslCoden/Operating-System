@@ -152,7 +152,7 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+int ProcessRegistry::execv(const char* path, char *const argv[])
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
   // check if path is okay (no NULL-ptr & terminated with '\0')
@@ -175,10 +175,7 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 
   // first char* may null. call exec without process
   if(!argv[0])
-  {
-    debug(X_EXECV, "argv[0] = 0. calling execvProcess(path)\n");
-    execvProcess(path);
-  }
+    execv(path);
 
   int argc = 0;
   while(argv[argc])
@@ -194,9 +191,9 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
   return argc;
 }
 
-int ProcessRegistry::execvProcess(const char* path)
+int ProcessRegistry::execv(const char* path)
 {
-  debug(X_PROCESS_REG, "execv said: no args! path = %s\n", path);
+  debug(X_PROCESS_REG, "execv() said: no args! path = %s\n", path);
   UserProcess* currentProcess = currentUserThread->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
