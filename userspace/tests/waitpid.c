@@ -8,10 +8,10 @@
 
 int main(int argc, char** argv)
 {
-  for(int i = 0; i < 3; i++)
-  {
     printf("Call to wait_pid!\n");
     int pid = fork();
+    pid = fork();
+    pid = fork();
     pid = fork();
     pid = fork();
     
@@ -30,7 +30,6 @@ int main(int argc, char** argv)
       {
        printf("Waited for child with pid: %d\n", p_id);    
       }
-    }
     printf("Finished the task, my pid: %d\n", getpid());
   }
   

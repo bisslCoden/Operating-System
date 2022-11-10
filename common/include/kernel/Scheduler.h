@@ -32,6 +32,8 @@ class Scheduler
     uint32 getThreadCount();
 
     size_t getRDTSC();
+    size_t getDiffAvg() {return diff_avg;}
+    size_t getRDTSCdiff() {return rdtsc_diff_per_tick;}
 
     /**
      * NEVER EVER EVER CALL THIS METHOD OUTSIDE OF AN INTERRUPT CONTEXT
@@ -73,8 +75,11 @@ class Scheduler
 
     size_t ticks_;
 
-    size_t frequency;
+    size_t diff_avg;
     size_t rdtsc_value;
+    size_t rdtsc_value_old;
+    size_t rdtsc_diff_per_tick;
+    size_t rdtsc_diff_sum;
 
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;

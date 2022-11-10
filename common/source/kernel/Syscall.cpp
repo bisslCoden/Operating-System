@@ -630,17 +630,28 @@ int Syscall::get_pid()
 unsigned int Syscall::sleep(unsigned int seconds)
 {
   debug(SLEEP, "Sleep system call started\n");
-  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000);
-  debug(SLEEP, "rdtsc_now: %ld\n", rdtsc_now);
-  uint64_t time_to_wake = rdtsc_now + seconds;
-  debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
-  while(time_to_wake > Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000))
+  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
+  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
+  debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
+  debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+  //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
+  while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
   {
-    debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
+    debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
+    
+    debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+    
+    //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
+     //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
+     //Scheduler::instance()->getFrequency());
     Scheduler::instance()->yield();
   }
-  return (unsigned int) time_to_wake;
+  return 0;
 }
+
+// 71.6 % 
+// 75.4 %
+
 
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
@@ -650,8 +661,8 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 size_t Syscall::clock()
 {
-  //UserThread* thread = (UserThread*) currentThread;
-  return Scheduler::instance()->getRDTSC();
+  UserThread* thread = (UserThread*) currentThread;
+  return thread->getParentProcess()->getDuaration();
 }
 
 // commented out bc testing
