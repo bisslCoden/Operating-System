@@ -88,10 +88,9 @@ after:
     case sc_fork:
       return_value = fork();
       break;
-<<<<<<< HEAD
     case sc_execv:
       return_value = execv((const char *)arg1, (char* const*)arg2);
-=======
+      break;
     case sc_waitpid:
       return_value = wait_pid((size_t) arg1, (size_t*) arg2, arg3);
       break;
@@ -103,7 +102,6 @@ after:
       break;
     case sc_clock:
       return_value = clock();
->>>>>>> dev_dominik
       break;
     case sc_trace:
       trace();

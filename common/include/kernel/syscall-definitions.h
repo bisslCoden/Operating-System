@@ -30,7 +30,6 @@
 #define sc_pthread_detach 407
 #define sc_pthread_self 408
 
-#define sc_fork 501
 #define sc_execv 502
 #define sc_sleep 603
 #define sc_clock 604

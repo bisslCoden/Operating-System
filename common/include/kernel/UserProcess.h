@@ -36,7 +36,7 @@ class UserProcess
      * @param parent parent process that shall be forked
      *
      */
-    UserProcess(UserProcess* parent);
+    UserProcess(UserProcess* parent, size_t pid);
 
      /**
      * CopyConstructor
@@ -227,7 +227,6 @@ class UserProcess
 
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
-    Mutex offsetlist_lock_;
 
     Mutex kill_lock_;
     bool KILLED_ = false;
