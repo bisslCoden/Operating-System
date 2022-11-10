@@ -280,7 +280,7 @@ bool UserThread::setupStack()
 int UserThread::execv(char* const argv[], size_t argc)
 {
   name_ = process_->getName();
-  debug(X_USERTHREAD, "execv(): %s\n", name_.c_str());
+  debug(X_USERTHREAD, "execv(): %s. argc = %ld\n", name_.c_str(), argc);
 
   //MEMLEAK
   char* here[argc];

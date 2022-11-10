@@ -377,7 +377,6 @@ void ArchMemory::copyVirtualMem(ArchMemory &destination)
         }
       }
     }
-
   }
   arch_memory_lock_.release();
 }

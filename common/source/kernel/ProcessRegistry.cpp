@@ -168,16 +168,17 @@ int ProcessRegistry::execvProcess(const char* path, char *const argv[])
 
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 {
+  debug(X_PROCESS_REG, "areExecArgsValid()?\n");
   // here we already know that path is okay and argv != NULL
   if((size_t)argv >= USER_BREAK)
     return -1;
 
-  // first char* may not be NULL, but string must be path
+  // first char* may null. call exec without process
   if(!argv[0])
-    return -1;
-  char* must_be_path = argv[0];
-  if(strcmp(path, must_be_path) != 0)
-    return -1;
+  {
+    debug(X_EXECV, "argv[0] = 0. calling execvProcess(path)\n");
+    execvProcess(path);
+  }
 
   int argc = 0;
   while(argv[argc])
@@ -189,12 +190,13 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
   }
 
   // everything seemed okay..
+  debug(X_PROCESS_REG, "areExecArgsValid(): everything seems fine\n");
   return argc;
 }
 
 int ProcessRegistry::execvProcess(const char* path)
 {
-  debug(X_PROCESS_REG, "execv said: argv == NULL -> WITHOUT ARGS!!! path = %s\n", path);
+  debug(X_PROCESS_REG, "execv said: no args! path = %s\n", path);
   UserProcess* currentProcess = currentUserThread->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);

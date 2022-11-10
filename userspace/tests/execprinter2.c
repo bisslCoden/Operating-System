@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
     printf("ahelo\n");
  
   // hardcoded args :( - MAX_ARGS
-  char* const path = "/usr/printer.sweb";
+  char* const path = "/usr/printuntilnull.sweb";
 	char* const arg1 = "Eier";
 	char* const arg2 = "Mehl";
 	char* const arg3 = "Butter";
