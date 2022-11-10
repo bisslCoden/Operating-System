@@ -17,6 +17,7 @@ INTERRRUPTABLE_SLEEP,
 STOPPED
 };
 
+#define NO_EXEC_CALL 123454321
 
 class UserThread;
 class Syscall;

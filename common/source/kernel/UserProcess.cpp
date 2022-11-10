@@ -82,7 +82,7 @@ UserProcess::UserProcess(UserProcess *parent) :
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
-    //delete thread;
+    delete thread;
     return;
   }
   setProcessState(RUNNING_AND_RUNNABLE);
@@ -148,7 +148,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
 
   returnvalues_.insert(ustl::make_pair(tid, value));
   debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
-  
+
   returnvalue_lock_.release();
   return true;
 }
@@ -200,7 +200,7 @@ size_t UserProcess::getRandomPageOffset()
   size_t firstbits;
   size_t lastbits;
   size_t page_offset = 0;
-  size_t rand; 
+  size_t rand;
   offsetlist_lock_.acquire();
   do
   {
@@ -213,7 +213,7 @@ size_t UserProcess::getRandomPageOffset()
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
   //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
-  
+
   return page_offset;
 }
 
@@ -272,7 +272,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
-  
+
   for(auto thread : threads_) // first = tid, second = *Thread
   {
     if(thread.first == currentThread->getTID());
@@ -280,7 +280,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     {
       if (!thread.second->checkFlagLock(currentThread))
         thread.second->lockFlagMutex();
-      
+
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
       thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
@@ -296,7 +296,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
   // callingThread->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
   // callingThread->sendCancelRequest();
   // callingThread->unlockFlagMutex();
-  if(kill_currentThread)  
+  if(kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
 
 }
@@ -331,12 +331,12 @@ int UserProcess::execv(const char* path)
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   name_ = path;
 
-  // exec 
+  // exec
   debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
   removeOldProcessInformation();
   currentUserThread->execv();
-  
-  VfsSyscall::close(old_fd); 
+
+  VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
   debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
   return 0;
@@ -358,12 +358,12 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   name_ = path;
 
-  // exec 
+  // exec
   debug(X_USERPROCESS, "execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path, (size_t)argv);
   removeOldProcessInformation();
   currentUserThread->execv(argv, argc);
-  
-  VfsSyscall::close(old_fd); 
+
+  VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
   debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
   return 0;

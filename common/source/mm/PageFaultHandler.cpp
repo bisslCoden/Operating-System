@@ -13,7 +13,7 @@ extern "C" void arch_contextSwitch();
 const size_t PageFaultHandler::null_reference_check_border_ = PAGE_SIZE;
 
 inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
-                                                    bool present, bool switch_to_us)
+                                                    bool present, bool switch_to_us, bool writing)
 {
   debug(X_PAGEFAULT, "Entered checkPageFaultIsValid(). CurrentThread %p: with name %s \n", currentThread, currentThread->getName());
   if(currentThread->isUserThread())
@@ -40,7 +40,7 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
    // debug(PAGEFAULT, "Pagefault on a guardpage!\n");
     kprintf("STACKOVERFLOW DETECTED!\n");
   }
-  else if(present)
+  else if(present && !writing)
   {
     debug(PAGEFAULT, "You got a pagefault even though the address is mapped.\n");
   }
@@ -70,12 +70,13 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   ArchThreads::printThreadRegisters(currentThread, false);
 
-  if (checkPageFaultIsValid(address, user, present, switch_to_us))
+  if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    if  (present && writing)
+    if (present && writing)
     {
       debug(PAGEFAULT, "Copy on Write will execute now\n");
       currentThread->loader_->arch_memory_.copyOnWrite(address);
+      return;
     }
     else if (switch_to_us && address < currentUserThread->getStackInfo().userstack_start_ && 
     address > currentUserThread->getStackInfo().userstack_end_)

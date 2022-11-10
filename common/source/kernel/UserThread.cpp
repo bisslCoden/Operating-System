@@ -14,10 +14,10 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) : 
+UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) :
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  process_(process_), 
-  flag_mutex_{"thread::flag_mutex_"}, 
+  process_(process_),
+  flag_mutex_{"thread::flag_mutex_"},
   condition_mutex_{"Thread::cond_mutex_"},
   join_cond_{ &condition_mutex_, "Thread::join_cond" } // UserThread's members
 {
@@ -61,7 +61,7 @@ UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl:
 }
 
 bool UserThread::schedulable(){
-  
+
   if (getState() == Running)
   {
     //testsystem
@@ -81,7 +81,7 @@ bool UserThread::schedulable(){
         else
           getflags()->kasynchronous.clear();
       }
-      else 
+      else
         getflags()->knotcancelable.clear();
     
     
@@ -125,7 +125,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    (void*) mystack_.userstack_start_, getKernelStackStartPointer());
 
-  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n", 
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
@@ -157,7 +157,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 // fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
+  process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_,
   "Thread::join_cond"}
 {
   debug(X_USERTHREAD, "Entering fork constructor for new thread...\n");
@@ -166,7 +166,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   //cant we somehow just write a new setupstack... this makes me uncomfortable as we have 3 different constructors where we
   // play around with stacks
 
-  StackInfo parent_stack = parent_thread->getStackInfo(); 
+  StackInfo parent_stack = parent_thread->getStackInfo();
   mystack_ = parent_stack;
 
   //Nedzma said its the users fault :D
@@ -201,7 +201,7 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-  
+
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
@@ -211,7 +211,7 @@ UserThread::~UserThread()
 }
 
 
-void UserThread::setCancelState(int state){ 
+void UserThread::setCancelState(int state){
   myflags_.cancelable = state;
   if(state == PTHREAD_CANCEL_DISABLE)
     myflags_.knotcancelable.test_and_set();
@@ -219,18 +219,18 @@ void UserThread::setCancelState(int state){
     myflags_.knotcancelable.clear();
   return;
 }
-void UserThread::setCancelType(int type) { 
-  myflags_.deferred = type; 
+void UserThread::setCancelType(int type) {
+  myflags_.deferred = type;
   if (type == PTHREAD_CANCEL_ASYNCHRONOUS)
     myflags_.kasynchronous.test_and_set();
   else
     myflags_.kasynchronous.clear();
-  return; 
+  return;
 }
-void UserThread::sendCancelRequest(){ 
+void UserThread::sendCancelRequest(){
   myflags_.cancelreq = true;
   myflags_.kcancelreq.test_and_set();
-  return; 
+  return;
   }
 
 void UserThread::getNewStackPage(size_t adress){
@@ -290,6 +290,40 @@ bool UserThread::setupStack()
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
+  debug(X_USERTHREAD, "argc = %ld\n", argc);
+  for(size_t i = 0; i < argc; i++)
+    debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
+
+  /*
+  // vaddr... virtual address for old archmemory
+  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
+  size_t vaddr_end = vpn * PAGE_SIZE;
+  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
+  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
+  // ident... identMapping of freshly allocated PPN
+  size_t ppn = PageManager::instance()->allocPPN();
+  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
+  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
+  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", vpn, ident_start, ident_end);
+  // map vpn to ppn (this is still the old loader_->arch_memory_)
+  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "UserThread::execv() mapPage() failed");
+  // iterate and copy from old archmem to ident
+  debug(X_USERTHREAD, "mapped vpn and ppn. copying from old archmem to ident:\n");
+  size_t vaddr_i = vaddr_start;
+  size_t ident_i = ident_start;
+  for(size_t i = 0; (i < argc) && (ident_i != ident_end); i++)
+  {
+    // copy pointer to char ptr to ident address
+    *((size_t*)ident_i) = vaddr_i;
+    memcpy((void*)ident_i, (void*)argv[i], strlen(argv[i]));
+    //
+    ident_i += sizeof(size_t);
+    vaddr_i += sizeof(char)*strlen(argv[i]) + 1;
+    ident_i += sizeof(char)*strlen(argv[i]) + 1;
+  }
+  */
+
+  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
   name_ = process_->getName();
   debug(X_USERTHREAD, "execv(): %s\n", name_.c_str());
 
@@ -356,7 +390,7 @@ int UserThread::execv(char* const argv[], size_t argc)
 
 int UserThread::execv()
 {
-  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory 
+  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
   name_ = process_->getName();
   loader_ = process_->getLoader();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
@@ -367,9 +401,11 @@ int UserThread::execv()
   setupStack();
   debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
 
-  // passing new virtual memory to userspace 
+  // passing new virtual memory to userspace
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
+  // user_registers_->rdi = (size_t)argv;
+  // user_registers_->rsi = argc;
   debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }

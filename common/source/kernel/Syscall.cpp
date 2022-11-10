@@ -618,20 +618,40 @@ int Syscall::get_pid()
   return callingthread->getParentProcess()->getPID();
 }
 
+// wake up when getRDTSC == rdtsc_now + (cpu cycles) seconds
+  // while(getRDTSC != rdtsc_to_wake)
+  // yield
+  //
+  // ms = mili second 1s/1000 
+  // 54 ms = 0.054 s happens a tick
+  // CLOCKS_PER_SECOND = 1000000
+
+  // frequency is needed, with that we multiply clock_per_sec
 unsigned int Syscall::sleep(unsigned int seconds)
 {
   debug(SLEEP, "Sleep system call started\n");
-  int y = 0; 
-  for(unsigned int i = 0; i < seconds * 100; i++)
-    for(unsigned int j = 0; j < seconds * 1000; j++)
-        y = j + i;
-  return y;
+  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000);
+  debug(SLEEP, "rdtsc_now: %ld\n", rdtsc_now);
+  uint64_t time_to_wake = rdtsc_now + seconds;
+  debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
+  while(time_to_wake > Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000))
+  {
+    debug(SLEEP, "time_to_wake: %ld, and the getRDTSC: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC*2000));
+    Scheduler::instance()->yield();
+  }
+  return (unsigned int) time_to_wake;
 }
 
+// rdtsc now - rdtsc at program start
+// but thread can sleep or yield, so then it doesn't count
+// we need to increment the ticks variable for every thread of the process
+// then use the number of ticks to get the seconds
+// we know how many clocks(cycles i think) happen per second
+// we get the number of cycles
 size_t Syscall::clock()
 {
   //UserThread* thread = (UserThread*) currentThread;
-  return Scheduler::instance()->getTicks();
+  return Scheduler::instance()->getRDTSC();
 }
 
 // commented out bc testing

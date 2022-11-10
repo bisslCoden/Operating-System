@@ -19,7 +19,7 @@ private:
    * @param present true if the fault happened on a already mapped page
    * @param switch_to_us the switch to userspace flag of the current thread
    */
-  static inline bool checkPageFaultIsValid(size_t address, bool user, bool present, bool switch_to_us);
+  static inline bool checkPageFaultIsValid(size_t address, bool user, bool present, bool switch_to_us, bool writing);
 
   /**
    * Print out the pagefault information. Check if the pagefault is valid, or the thread state is corrupt.
