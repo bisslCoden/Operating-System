@@ -7,7 +7,7 @@
 int main(int argc, char** argv)
 {
   printf("Call to Fork w 3!\n");
-  int pid = 0;
+  int pid = 1;
   for(int i = 0; i < 1; i++)
     pid = fork();
   if (!pid)
@@ -22,6 +22,7 @@ int main(int argc, char** argv)
   {
     printf("Error while forking!\n");
   }
+  printf("just again the pid: %d\n", pid);
 
   // if (!pid)
   // {
