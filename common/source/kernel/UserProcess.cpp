@@ -13,8 +13,6 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
-#define currentUserThread ((UserThread*)currentThread)
-
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
@@ -179,6 +177,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
     waiting_exec_lock_.release();
   
 
+
+  // about to remove the last thread.. better set a flag that leads to process deletion aswell..
   if(threads_.size() == 1)
     thread->setLast();
 

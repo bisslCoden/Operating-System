@@ -6,6 +6,8 @@
 #include "UserProcess.h"
 #include "uatomic.h"
 
+#define currentUserThread ((UserThread*) currentThread)
+
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
 #define SLEEPING_KS 0x46334234
