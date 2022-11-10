@@ -402,7 +402,6 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
         }
       }
     }
-
   }
   arch_memory_lock_.release();
 }

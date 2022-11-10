@@ -168,20 +168,26 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-
+int ProcessRegistry::execv(const char* path, char *const argv[])
+{
+  debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
+  // check if path is okay (no NULL-ptr & terminated with '\0')
+  int argc = areExecArgsValid(path, argv);
+  if(argc == -1)
+    return argc;
+  return 0;
+}
 
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 {
+  debug(X_PROCESS_REG, "areExecArgsValid()?\n");
   // here we already know that path is okay and argv != NULL
   if((size_t)argv >= USER_BREAK)
     return -1;
 
-  // first char* may not be NULL, but string must be path
+  // first char* may null. call exec without process
   if(!argv[0])
-    return -1;
-  char* must_be_path = argv[0];
-  if(strcmp(path, must_be_path) != 0)
-    return -1;
+    execv(path);
 
   int argc = 0;
   while(argv[argc])
@@ -193,46 +199,14 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
   }
 
   // everything seemed okay..
+  debug(X_PROCESS_REG, "areExecArgsValid(): everything seems fine\n");
   return argc;
 }
 
-
-int ProcessRegistry::execvProcess(const char* path, char *const argv[])
+int ProcessRegistry::execv(const char* path)
 {
-  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
-  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
-  bool argvptr_ok = ((size_t)argv < USER_BREAK) && (argv != NULL);
-  if(!pathptr_ok || !argvptr_ok)
-    return -1;
-  bool is_first_path = false;
-  bool found_null = false;
-  if(!strcmp(path, argv[0]))
-    is_first_path = true;
-  size_t argc = 1;
-  for(; !found_null; argc++)
-    if(argv[argc] == NULL && argc > 1)
-      found_null = true;
-  if(!is_first_path || !found_null)
-    return -1;
-
-  // UserProcess::execv()
-  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %ld\n", path, (size_t)argv, argc);
-  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
-  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
-  return currentProcess->execv(path, argv, argc);
-}
-
-int ProcessRegistry::execvProcess(const char* path)
-{
-  debug(X_PROCESS_REG, "execvProcess() WITHOUT ARGS!!!\n");
-  // checking parameter ptr + calling convention: first element must be path, last element must be NULL
-  bool pathptr_ok = ((size_t)path < USER_BREAK) && (path != NULL);
-  if(!pathptr_ok)
-    return -1;
-
-  // UserProcess::execv()
-  debug(PROCESS_REG, "execvProcess(path = %s\n", path);
-  UserProcess* currentProcess = ((UserThread*)currentThread)->getProcess();
+  debug(X_PROCESS_REG, "execv() said: no args! path = %s\n", path);
+  UserProcess* currentProcess = currentUserThread->getProcess();
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
 }

@@ -566,21 +566,22 @@ int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
-  return ProcessRegistry::instance()->processFork();
+  // return ProcessRegistry::instance()->processFork();
+  return -1;
 }
 
 int Syscall::execv(const char * path, char *const argv[])
 {
-  debug(SYSCALL, "Syscall::execv()\n");
+  debug(SYSCALL, "execv() checking path.\n");
   if(!isExecPathValid(path))
     return -1;
 
   // call execv with/without args
   int ret = 0;
-  if(true) // if(argv) for arguments, if(false) fork woking exec D:
-    ret = ProcessRegistry::instance()->execvProcess(path, argv);
+  if(argv) // if(argv) for arguments, if(false) fork woking exec D:
+    ret = ProcessRegistry::instance()->execv(path, argv);
   else
-    ret = ProcessRegistry::instance()->execvProcess(path);
+    ret = ProcessRegistry::instance()->execv(path);
 
   debug(SYSCALL, "execProcess returned %d\n", ret);
   return ret;
