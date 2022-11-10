@@ -564,7 +564,7 @@ int Syscall::execv(const char * path, char *const argv[])
 
   // call execv with/without args
   int ret = 0;
-  if(false) // if(argv) for arguments, if(false) fork woking exec D:
+  if(argv) // if(argv) for arguments, if(false) fork woking exec D:
     ret = ProcessRegistry::instance()->execvProcess(path, argv);
   else
     ret = ProcessRegistry::instance()->execvProcess(path);

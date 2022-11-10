@@ -282,17 +282,16 @@ int UserThread::execv(char* const argv[], size_t argc)
   name_ = process_->getName();
   debug(X_USERTHREAD, "execv(): %s\n", name_.c_str());
 
-
   //MEMLEAK
-  size_t new_argc = argc - 1;
   char* here[argc];
-  for (size_t i = 0; i < new_argc; i++)
+  for (size_t i = 0; i < argc; i++)
   {
     here[i] = new char[strlen(argv[i]) + 1];
     memcpy(here[i], argv[i], strlen(argv[i]));
     here[i][strlen(argv[i])] = '\0';
+    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to here[%ld] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(here + i));
   }
-  debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[]\n");
+  debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
     
   // set new archmemory to thread
   loader_ = process_->getLoader();
@@ -306,24 +305,27 @@ int UserThread::execv(char* const argv[], size_t argc)
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;
   size_t str_offset = argc * sizeof(char*);
-  // copy from here[] into fresh ppn
-  for(size_t i = 0; i < new_argc; i++)
+  // copy from here[] into fresh archmem
+  for(size_t i = 0; i < argc; i++)
   {
     size_t str_len = strlen(here[i]) + 1;
     if(str_offset + str_len >= PAGE_SIZE)
       return -1;
     
     memcpy((void*)(new_argv + str_offset), (void*) here[i], str_len);
-    *(argv_arr + i) = (char*)(new_argv + str_offset);
+    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from here[%ld] to (argv_arr + str_offset) = %lx\n", here[i], (size_t)(here + i), (size_t)(new_argv + str_offset));
+    
+    argv_arr[i] = (char*)(new_argv + str_offset);
+    debug(X_USERTHREAD, "execv(): memcpy() memcpy(argv_arr[%lx] = (%lx)\n", (size_t)argv_arr[i], new_argv + str_offset);
+
     str_offset += str_len;
-    debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, new_argc);
   }
-
-
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
+
+
   for (size_t i = 0; i < argc; i++)
   {
-    debug(X_USERTHREAD, "just to check %ld: %s\n", i, argv_arr[i]);
+    debug(X_USERTHREAD, "execv(): argv_arr[%ld]: %s\n", i, argv_arr[i]);
   }
   debug(X_USERTHREAD, "execv(): copied from here[] to new location\n");
 
@@ -332,7 +334,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   setupStack();
   user_registers_->rsp = (size_t)getUserstackStart();
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = new_argc; 
+  user_registers_->rdi = argc; 
   user_registers_->rsi = new_argv; 
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
