@@ -22,7 +22,13 @@ void* wrapper(void* (*start_routine)(void*), void* args)
   return 0;
 }
 
-
+/**
+ * @brief the userspace way to get to the sleepflag... used by mutex and CV to set thread sleeping AND as a unique identifier
+ * for a thread to detect deadlocks
+ * 
+ * @param inputadress the adress of some stackvariable of a thread which is used to find its sleepflag
+ * @return the flag location of the thread
+ */
 size_t findStackStackStart(size_t inputadress){
   size_t outputadress = inputadress >> 12;
   outputadress = outputadress << 12;
@@ -30,6 +36,13 @@ size_t findStackStackStart(size_t inputadress){
   return outputadress;
 }
 
+/**
+ * @brief also used for deadlock detection: checks if a thread is waiting on a lock
+ * 
+ * @param identifier the threads unique identifier as computed by the function above 
+ * @param mutex the Mutex for which it should be checked wether the thread waits on it
+ * @return 0 if the thread isnt waiting on the lock and 1 if it is
+ */
 int isWaitingHere(size_t identifier, pthread_mutex_t* mutex){
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   if (mutex->firstsleeper_ == 0)
@@ -54,8 +67,14 @@ int isWaitingHere(size_t identifier, pthread_mutex_t* mutex){
   return 0;
 }
 
-
-
+/**
+ * @brief detects if a thread which is waiting on  a lock waits on one of the other locks. This should be VERY unlikely, as the 
+ * thread must have been woken up by a different source than us...
+ * 
+ * @param waiter_identifier unique identifier as computed above
+ * @param lock_wanted the lock which the thread wants to wait on
+ * @return 0 if the thread is not waitin, otherwise it asserts anyways :D
+ */
 int detectThreadWaiting(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
   pthread_spin_lock(&mutexlist_lock);
   for (pthread_mutex_t* iter = firstmutex; iter->next_mutex_ != 0; iter = iter->next_mutex_)
@@ -73,7 +92,14 @@ int detectThreadWaiting(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
 }
   
 
-
+/**
+ * @brief Circular deadlock detection: checks for a circular dependency: If the thread waiting on this lock also has a lock on which the thread
+ * currently holding the lock wants to wait
+ * 
+ * @param waiter_identifier unique identifier as computed above
+ * @param lock_wanted the lock which the thread wants to wait on
+ * @return 0 if there was no circular deadlock and assert() if there was one!
+ */
 int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wanted){
   pthread_spin_lock(&lock_wanted->held_by_lock_);
   size_t held_by_cur = lock_wanted->held_by_;
@@ -89,8 +115,7 @@ int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wante
     size_t held_by = iter->held_by_;
     if (held_by == waiter_identifier && isWaitingHere(held_by_cur, iter))
     {
-      printf("CIRCULAR deadlock found!\n");
-      __syscall(sc_exit, 999, 0x0, 0x0, 0x0, 0x0);
+      assert(0 && "CIRCULAR deadlock found!\n");
     }
     pthread_spin_unlock(&iter->held_by_lock_);           
 
@@ -116,6 +141,13 @@ size_t atomic_exchange_1(size_t* lock){
 }
 
 
+/**
+ * @brief checks if an adress is valid or not, Caution: this one also detects NULL pointers and marks them as invalid... sometimes they are okay 
+ * though... furthermore detects kernel adresses
+ * 
+ * @param adress the adress to be checkede
+ * @return -1 if adress is invalid 0 if its okay
+ */
 int checkAdress(void* adress){
   if (adress < (void*) 0x1000 || (unsigned long long) adress > 0x0000800000000000ULL)
   {
@@ -126,7 +158,14 @@ int checkAdress(void* adress){
     return 0;
 }
 
-//lock beforeee
+
+/**
+ * @brief Adds a thread to the waiterslist of a mutex... lock the List before using this (sleeperslist_)
+ * 
+ * @param mutex the mutex tho which's list the thread shall be added
+ * @param localvaradress adress of the size_t* next varibale pointing to the next thread on the waiters list. NOT the unique identifier!!
+ * @return 0 if the thread could be added sucessfully -1 if it already was on the list
+ */
 int addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
 {
   if(mutex->firstsleeper_ == 0)
@@ -150,6 +189,14 @@ int addToWaitersList(pthread_mutex_t* mutex, size_t** localvaradress)
   return 0;
 }
 
+
+/**
+ * @brief literally the same function as above for condition variables... Unfortunately C has no inheritance!
+ * 
+ * @param cond the condition var
+ * @param lock_wanted the next var
+ * @return 0 if sucess -1 if alreafy on list
+ */
 int addToCVWaitersList(pthread_cond_t* cond, size_t** localvaradress)
 {
   if(cond->firstsleeper_ == 0)
@@ -195,8 +242,10 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_
 }
 
 
-
-
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_attr_init(pthread_attr_t *attr){
   if(checkAdress((void*) attr) != 0)
     return -1;
@@ -209,6 +258,11 @@ int pthread_attr_init(pthread_attr_t *attr){
   attr->initialized_ = 1;
   return 0;
 }
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_attr_destroy(pthread_attr_t *attr){
   if(checkAdress((void*) attr) != 0)
     return -1;
@@ -219,10 +273,19 @@ int pthread_attr_destroy(pthread_attr_t *attr){
   
 };
 
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 pthread_t pthread_self(void){
   return (pthread_t) __syscall(sc_pthread_self, 0x0, 0x0, 0x0, 0x0, 0x0);
 }
 
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate){
   
   if(checkAdress((void*) attr) != 0)
@@ -234,6 +297,11 @@ int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate){
   return 0;
 }
 
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate){
   
   if(checkAdress((void*) attr) != 0 || checkAdress((void*) detachstate)!= 0)
@@ -288,9 +356,18 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 
 
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_setcancelstate(int state, int *oldstate){
   return __syscall(sc_pthread_setcancelstate, (size_t) state, (size_t) oldstate, 0x0, 0x0, 0x0);
 }
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
 int pthread_setcanceltype(int type, int *oldtype){
   return __syscall(sc_pthread_setcanceltype, (size_t) type, (size_t) oldtype, 0x0, 0x0, 0x0);
 }
@@ -349,11 +426,6 @@ int pthread_mutex_destroy(pthread_mutex_t *mutex)
   return 0;
 }
 
-//userstack:
-//0x672bfffffff0
-//flagadress:
-//0x672c00000000
-
 /**
  * function stub
  * posix compatible signature - do not change the signature!
@@ -406,8 +478,6 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
   return 0;
 }
 
-//0x685bfffffff0
-//0x685c00000000
 /**
  * function stub
  * posix compatible signature - do not change the signature!
@@ -598,7 +668,13 @@ int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
  */
 int pthread_spin_destroy(pthread_spinlock_t *lock)
 {
-  return -1;
+  if (checkAdress((void*)lock) != 0)
+    return -1;
+  if (lock->initialized_ != 1)
+    return -1;
+
+  lock->initialized_ = 0;
+  return 0;
 }
 
 /**
@@ -626,9 +702,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
     return -1;
   
   if (lock->initialized_ != 1)
-  {
-    __syscall(sc_exit, (size_t) -1, 0x0, 0x0, 0x0, 0x0);
-  }
+    return -1;
   
   while (!atomic_exchange_0(&lock->mylock_))
   {
@@ -644,7 +718,18 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
  */
 int pthread_spin_trylock(pthread_spinlock_t *lock)
 {
+  if(checkAdress((void*) lock) != 0)
+    return -1;
+  
+  if (lock->initialized_ != 1)
   return -1;
+  
+  if (!atomic_exchange_0(&lock->mylock_))
+  {
+    //not suuper safe but okay for now
+    return -1;
+  }
+  return 0;
 }
 
 /**

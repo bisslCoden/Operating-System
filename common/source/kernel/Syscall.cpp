@@ -553,7 +553,8 @@ int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
-  return ProcessRegistry::instance()->processFork();
+  // return ProcessRegistry::instance()->processFork();
+  return -1;
 }
 
 int Syscall::execv(const char * path, char *const argv[])

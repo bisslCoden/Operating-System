@@ -150,6 +150,7 @@ class UserProcess
     // the process ID
     size_t const pid_;
 
+
     // the process' fd. see "FileDescriptor.h"
     ssize_t fd_;
 
@@ -182,6 +183,7 @@ class UserProcess
 
     Mutex kill_lock_;
     bool KILLED_ = false;
+
 
     // tells us which thread is waiting for other threads to be killed before exec-ing
     UserThread* waiting_exec_ = 0;
