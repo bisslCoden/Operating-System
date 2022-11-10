@@ -72,16 +72,16 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
-    if (switch_to_us && address < currentUserThread->getStackInfo().userstack_start_ && 
+    if  (present && writing)
+    {
+      debug(PAGEFAULT, "Copy on Write will execute now\n");
+      currentThread->loader_->arch_memory_.copyOnWrite(address);
+    }
+    else if (switch_to_us && address < currentUserThread->getStackInfo().userstack_start_ && 
     address > currentUserThread->getStackInfo().userstack_end_)
     {
       debug(PAGEFAULT, "seems like our currentthread just wants a new Page!\n");
       currentUserThread->getNewStackPage(address);
-    }
-    else if  (present && writing)
-    {
-      debug(PAGEFAULT, "Copy on Write will execute now\n");
-      currentThread->loader_->arch_memory_.copyOnWrite(address);
     }
     else
     {

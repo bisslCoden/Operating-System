@@ -110,6 +110,15 @@ size_t ProcessRegistry::processFork()
 {
   debug(PROCESS_REG, "processFork() called starting process creation\n");
   auto parent = currentUserThread->getProcess();
+  
+  parent->lockKill();
+  if (parent->checkKill())
+  {
+    parent->unlockKill();
+    return -1;
+  }
+  parent->unlockKill();
+
   //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent);
 

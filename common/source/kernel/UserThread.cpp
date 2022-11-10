@@ -160,6 +160,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, 
   "Thread::join_cond"}
 {
+  debug(X_USERTHREAD, "Entering fork constructor for new thread...\n");
   loader_ = child->getLoader();
 
   //cant we somehow just write a new setupstack... this makes me uncomfortable as we have 3 different constructors where we
@@ -168,12 +169,12 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   StackInfo parent_stack = parent_thread->getStackInfo(); 
   mystack_ = parent_stack;
 
-
-  ArchMemoryMapping map = loader_->arch_memory_.resolveMapping(mystack_.userstack_start_ / PAGE_SIZE);
-  size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
-  location += PAGE_SIZE - sizeof(size_t);
-  mystack_.UserMutex = (size_t*) location;
-  *mystack_.UserMutex = AWAKE_KS;
+  //Nedzma said its the users fault :D
+  // ArchMemoryMapping map = loader_->arch_memory_.resolveMapping(mystack_.userstack_start_ / PAGE_SIZE);
+  // size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
+  // location += PAGE_SIZE - sizeof(size_t);
+  // mystack_.UserMutex = (size_t*) location;
+  // *mystack_.UserMutex = *parent_thread->getStackInfo().UserMutex;
 
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
@@ -191,19 +192,9 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
-  process_->lockKill();
-  if (process_->checkKill())
-  {
-    switch_to_userspace_ = 0;
-    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
-    process_->unlockKill();
-  }
-  else
-  {
-    process_->unlockKill();
-    switch_to_userspace_ = 1;
-  }
   //ArchThreads::printThreadRegisters(this);
+  debug(X_USERTHREAD, "Fork constructor successful for new thread...\n");
+
 }
 
 UserThread::~UserThread()

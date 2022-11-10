@@ -44,7 +44,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
 
 // User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent) :
-  pid_(ProcessRegistry::instance()->getTID()),
+  pid_(ProcessRegistry::instance()->createID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
   fs_info_(parent->fs_info_),
   //loader_(new Loader(fd_)),
@@ -77,7 +77,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   threads_lock_.release();
 
   debug(USERPROCESS, "Creating new Thread for Fork\n");
-  auto thread = new UserThread(this, (UserThread*) currentThread);
+  UserThread* parent_thread = currentUserThread;
+  auto thread = new UserThread(this, parent_thread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
@@ -89,6 +90,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   setChildStatus(1);
   addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
+  
+  //?
   Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
 }
