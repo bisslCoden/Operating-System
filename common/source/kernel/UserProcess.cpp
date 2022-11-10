@@ -43,8 +43,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
 }
 
 // User Process Constructor for fork
-UserProcess::UserProcess(UserProcess *parent, size_t pid) :
-  pid_(pid),
+UserProcess::UserProcess(UserProcess *parent) :
+  pid_(ProcessRegistry::instance()->getTID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
   fs_info_(parent->fs_info_),
   //loader_(new Loader(fd_)),

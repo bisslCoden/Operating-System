@@ -36,7 +36,7 @@ class UserProcess
      * @param parent parent process that shall be forked
      *
      */
-    UserProcess(UserProcess* parent, size_t pid);
+    UserProcess(UserProcess* parent);
 
      /**
      * CopyConstructor
