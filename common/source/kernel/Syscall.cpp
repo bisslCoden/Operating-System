@@ -544,7 +544,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
-  *stackaddr = (size_t*)callingThread->getStackInfo().userstack_start_;
+  *stackaddr = (size_t*)currentUserThread->getStackInfo().userstack_start_;
   *stacksize = STACK_SIZE_IN_PAGES * PAGE_SIZE;
   return 0;
 }
@@ -564,7 +564,7 @@ int Syscall::execv(const char * path, char *const argv[])
 
   // call execv with/without args
   int ret = 0;
-  if(false) // if(argv) for arguments, if(false) fork woking exec D:
+  if(true) // if(argv) for arguments, if(false) fork woking exec D:
     ret = ProcessRegistry::instance()->execvProcess(path, argv);
   else
     ret = ProcessRegistry::instance()->execvProcess(path);

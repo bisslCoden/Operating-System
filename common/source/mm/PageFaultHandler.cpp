@@ -34,8 +34,8 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   {
     debug(PAGEFAULT, "You are accessing a kernel address in user-mode.\n");
   }
-  else if (switch_to_us && address > END_OF_STACKS && (address > callingThread->getStackInfo().userstack_start_ 
-  || address < callingThread->getStackInfo().userstack_end_))
+  else if (switch_to_us && address > END_OF_STACKS && (address > currentUserThread->getStackInfo().userstack_start_ 
+  || address < currentUserThread->getStackInfo().userstack_end_))
   {
    // debug(PAGEFAULT, "Pagefault on a guardpage!\n");
     kprintf("STACKOVERFLOW DETECTED!\n");
@@ -72,11 +72,11 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
-    if (switch_to_us && address < callingThread->getStackInfo().userstack_start_ && 
-    address > callingThread->getStackInfo().userstack_end_)
+    if (switch_to_us && address < currentUserThread->getStackInfo().userstack_start_ && 
+    address > currentUserThread->getStackInfo().userstack_end_)
     {
       debug(PAGEFAULT, "seems like our currentthread just wants a new Page!\n");
-      callingThread->getNewStackPage(address);
+      currentUserThread->getNewStackPage(address);
     }
     else if  (present && writing)
     {

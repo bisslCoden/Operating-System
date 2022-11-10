@@ -339,6 +339,11 @@ int UserThread::execv(char* const argv[], size_t argc)
     debug(X_USERTHREAD, "execv(): loop end %ld from %ld args copied\n\n", i + 1, new_argc);
   }
 
+  for (size_t i = 0; i < new_argc; i++)
+  {
+    delete[] here[i];
+  }
+  
 
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
   for (size_t i = 0; i < argc; i++)
