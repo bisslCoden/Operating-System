@@ -759,4 +759,3 @@ int pthread_spin_unlock(pthread_spinlock_t *lock)
     return -1;
   return 0;
 }
-

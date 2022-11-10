@@ -219,10 +219,26 @@ uint32 Scheduler::getTicks()
   return ticks_;
 }
 
+size_t Scheduler::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}
+
 void Scheduler::incTicks()
 {
-  ++ticks_;
+  ticks_++;
 }
+
+
+uint32 Scheduler::getThreadCount() {
+  return threads_.size();
+}
+
 
 void Scheduler::printStackTraces()
 {

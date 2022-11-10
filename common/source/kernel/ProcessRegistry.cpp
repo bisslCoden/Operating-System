@@ -15,7 +15,8 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
+    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_"),
+    wait_pid_lock_("ProcessRegistry::wait_pid_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
   instance_ = this; // instance_ is static! -> Singleton-like behaviour
@@ -128,6 +129,12 @@ size_t ProcessRegistry::processFork()
   return process->getPID();
 }
 
+ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
+{
+  return list_of_processes_;
+}
+
+
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "createProcess(path = %s)\n", path);
@@ -199,3 +206,172 @@ int ProcessRegistry::execvProcess(const char* path)
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
 }
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
+{
+  /*If wstatus is not NULL, wait() and waitpid() store status information in the int  to  which  it
+       points.  This integer can be inspected with the following macros (which take the integer itself
+       as an argument, not a pointer to it, as is done in wait() and waitpid()!):
+
+       WIFEXITED(wstatus)
+              returns true if the child terminated normally, that is, by calling exit(3) or  _exit(2),
+              or by returning from main().
+
+       WEXITSTATUS(wstatus)
+              returns  the exit status of the child.  This consists of the least significant 8 bits of
+              the status argument that the child specified in a call to exit(3) or _exit(2) or as  the
+              argument for a return statement in main().  This macro should be employed only if WIFEX‐
+              ITED returned true.
+
+       WIFSIGNALED(wstatus)
+              returns true if the child process was terminated by a signal.
+
+       WTERMSIG(wstatus)
+              returns the number of the signal that caused the child process to terminate.  This macro
+              should be employed only if WIFSIGNALED returned true.
+
+       WCOREDUMP(wstatus)
+              returns  true if the child produced a core dump (see core(5)).  This macro should be em‐
+              ployed only if WIFSIGNALED returned true.
+
+              This macro is not specified in POSIX.1-2001 and is not available on some UNIX  implemen‐
+              tations (e.g., AIX, SunOS).  Therefore, enclose its use inside #ifdef WCOREDUMP ... #en‐
+              dif.
+
+       WIFSTOPPED(wstatus)
+              returns true if the child process was stopped by delivery of a signal; this is  possible
+              only  if  the  call  was  done  using  WUNTRACED  or when the child is being traced (see
+              ptrace(2)).
+
+       WSTOPSIG(wstatus)
+              returns the number of the signal which caused the child to stop.  This macro  should  be
+              employed only if WIFSTOPPED returned true.
+
+       WIFCONTINUED(wstatus)
+              (since  Linux  2.6.10) returns true if the child process was resumed by delivery of SIG‐
+              CONT.
+*/
+  debug(DBEK, "arg2 : %ln\n", arg2);
+  if(arg2 != 0)
+  {
+    debug(DBEK, "arg2 different 0, process %ld\n", arg1);
+  }
+  /*The value of options is an OR of zero or more of the following constants:
+
+       WNOHANG
+              return immediately if no child has exited.
+
+       WUNTRACED
+              also  return  if  a child has stopped (but not traced via ptrace(2)).  Status for traced
+              children which have stopped is provided even if this option is not specified.
+
+       WCONTINUED (since Linux 2.6.10)
+              also return if a stopped child has been resumed by delivery of SIGCONT.
+*/
+  if(arg3 > 0) 
+  {
+    debug(DBEK, "arg3 bigger 0, process %ld\n", arg1);
+  }
+  debug(DBEK, "id: %ld\n", parent_process->getPID());
+  int return_pid = 0;
+  if((long int) arg1 > 0) // any specifed process
+  {
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
+    debug(DBEK, "arg1 greater 0, process %ld\n", arg1);
+    auto search_child = list.find(arg1);
+    list_of_processes_lock_.release();
+    if (search_child != list.end())
+    {
+      list_of_processes_lock_.acquire();
+      parent_process->setWaitStatus(1);
+      size_t process_state = search_child->second->getProcessState();
+      return_pid = search_child->second->getPID();
+      list_of_processes_lock_.release();
+      while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() 
+      && search_child->second->getProcessState() == 2) 
+      {
+        Scheduler::instance()->yield();
+        if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+        {
+          list_of_processes_lock_.acquire();
+          parent_process->setWaitStatus(0);
+          list_of_processes_lock_.release();
+        }
+      }
+    }
+    else
+    {
+      debug(DBEK, "Not found, process %ld\n", arg1);
+      //list_of_processes_lock_.release();
+      return -1;
+    }
+    debug(DBEK, "PID of the return2: %ld\n", search_child->second->getPID());
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list;
+    list = ProcessRegistry::getProcessList();
+    debug(DBEK, "arg1 equals -1, process %ld\n", arg1);
+    ustl::map<size_t, UserProcess*>::iterator i;
+    UserProcess* child = parent_process;
+    list_of_processes_lock_.release();
+    for (i = list.begin(); i != list.end(); ++i) 
+    {
+      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) 
+      && (child->getWaitStatus() == 0))
+      {
+        list_of_processes_lock_.acquire();
+        child = i->second;
+        list_of_processes_lock_.release();
+        break;
+      }
+    }
+    list_of_processes_lock_.acquire();
+    parent_process->setWaitStatus(1);
+    size_t process_state = child->getProcessState();
+    return_pid = child->getPID();
+    list_of_processes_lock_.release();
+    while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
+    {
+      debug(DBEK, "in nw hile  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
+       arg1, parent_process->getProcessState(), child->getProcessState(),
+       parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
+       parent_process->getWaitStatus(), child->getWaitStatus());
+      Scheduler::instance()->yield();
+      if(process_state != child->getProcessState() || child->getProcessState() == 0)
+      {
+        list_of_processes_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        list_of_processes_lock_.release();
+      }
+    }
+   // auto search_parent = list.find(callingthread->getParentProcess()->getPID());
+  }
+
+  else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(DBEK, "arg1 smaller -1\n");
+    return -1;
+  }
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(DBEK, "arg1 equals 0\n");
+    return -1;
+  }
+  else //   something went wrong
+  {
+    debug(DBEK, "we have an error somewhere, process %ld\n", arg1);
+    //list_of_processes_lock_.release();
+    return -1;
+  } 
+  // for printing the elements of the map
+  //ustl::map<size_t, UserProcess*>::iterator i;
+  //for (i = list.begin(); i != list.end(); ++i) 
+   // debug(DBEK, "element %ld\n", i->first);
+  //list_of_processes_lock_.release();
+  return return_pid;
+}
+
+// 49.6%
+// 53.4%

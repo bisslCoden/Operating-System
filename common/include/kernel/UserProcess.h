@@ -8,6 +8,15 @@
 #include "Loader.h"
 
 #define NO_EXEC_CALL 123454321
+enum ProcessState
+{
+ZERO, //to check if the process exist or not with getProcessState()
+UNINTERRUPTABLE_SLEEP,
+RUNNING_AND_RUNNABLE,
+INTERRRUPTABLE_SLEEP,
+STOPPED
+};
+
 
 class UserThread;
 class Syscall;
@@ -28,6 +37,15 @@ class UserProcess
      *
      */
     UserProcess(UserProcess* parent);
+
+     /**
+     * CopyConstructor
+     * @param parent_process
+     *
+     */
+
+    UserProcess(const UserProcess& parent_process);
+
 
     ~UserProcess();
 
@@ -146,10 +164,33 @@ class UserProcess
     bool getRetVal(size_t tid, void** value);
     bool checkInOffsetList(size_t NR);
 
+    bool getWaitStatus(){ return wait_status_; }
+    
+    void setWaitStatus(bool arg);
+
+    bool getChildStatus(){ return child_; }
+    
+    void setChildStatus(bool arg);
+
+    ProcessState getProcessState() const {return state_; }
+
+    void setProcessState(ProcessState state);
+
+    size_t getDuaration(){ return duaration_; }
+    
+    void setDuaration(size_t duaration);
+
+
+
+  //set these to protected to children can access aswell
+  volatile ProcessState state_;
+
   private:
     // the process ID
     size_t const pid_;
 
+    // the parent  process ID
+    //size_t const ppid_;
 
     // the process' fd. see "FileDescriptor.h"
     ssize_t fd_;
@@ -177,7 +218,14 @@ class UserProcess
     ustl::map<size_t, void*> returnvalues_;
     Mutex returnvalue_lock_;
 
-    // the offsets of the thread's stack
+    // for wait_pid
+    bool wait_status_;
+    bool child_;
+
+    // for clock
+    size_t duaration_;
+
+    Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
     Mutex offsetlist_lock_;
 

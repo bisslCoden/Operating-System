@@ -7,6 +7,7 @@
 #include "UserProcess.h"
 #include "ProcessRegistry.h"
 #include "File.h"
+#include "../../../userspace/libc/include/time.h"
 
 typedef struct threadattribute
 {
@@ -87,8 +88,22 @@ after:
     case sc_fork:
       return_value = fork();
       break;
+<<<<<<< HEAD
     case sc_execv:
       return_value = execv((const char *)arg1, (char* const*)arg2);
+=======
+    case sc_waitpid:
+      return_value = wait_pid((size_t) arg1, (size_t*) arg2, arg3);
+      break;
+    case sc_getpid:
+      return_value = get_pid();
+      break;
+    case sc_sleep:
+      return_value = sleep(arg1);
+      break;
+    case sc_clock:
+      return_value = clock();
+>>>>>>> dev_dominik
       break;
     case sc_trace:
       trace();
@@ -591,3 +606,107 @@ bool Syscall::isExecPathValid(const char* path)
   debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
   return true;
 }
+size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  debug(SYSCALL, "Calling Syscall waitpid!\n");
+  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3, callingthread->getParentProcess());
+}
+
+int Syscall::get_pid()
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  debug(SYSCALL, "Calling Syscall getpid!\n");
+  return callingthread->getParentProcess()->getPID();
+}
+
+unsigned int Syscall::sleep(unsigned int seconds)
+{
+  debug(SLEEP, "Sleep system call started\n");
+  int y = 0; 
+  for(unsigned int i = 0; i < seconds * 100; i++)
+    for(unsigned int j = 0; j < seconds * 1000; j++)
+        y = j + i;
+  return y;
+}
+
+size_t Syscall::clock()
+{
+  //UserThread* thread = (UserThread*) currentThread;
+  return Scheduler::instance()->getTicks();
+}
+
+// commented out bc testing
+// The clock() function returns an approximation of processor time used by the program
+/*size_t Syscall::clock()
+{
+  UserThread* thread = (UserThread*) currentThread;
+  return getRDTSC() - thread->getParentProcess()->getDuaration();
+
+  //else
+  //  return (clock_t) -1;
+
+  //uint32 new_ticks = Scheduler::instance()->getTicks(); 
+  //size_t reuturn_d_ticks = return_ / new_ticks;
+  //size_t return_final = reuturn_d_ticks/1000000;
+  //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
+}*/
+
+/*size_t Syscall::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}*/
+
+
+/*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  int number = 10;
+  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(DBEK, "arg1 smaller -1\n");
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(DBEK, "arg1 equals -1\n");
+  } 
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(DBEK, "arg1 equals 0\n");
+  }
+  else if((long int) arg1 > 0) // any specifed process
+  {
+    debug(DBEK, "arg1 greater 0\n");
+  }  
+  else //   something went wrong
+  {
+    debug(DBEK, "we have an error somewhere\n");
+  } 
+  if(arg2 != 0)
+  {
+    debug(DBEK, "arg2 different 0\n");
+  }
+  if(arg3 > 0) 
+  {
+    debug(DBEK, "arg3 bigger 0\n");
+  }
+  ustl::map<size_t, UserProcess*> list;
+  list = ProcessRegistry::getProcessList();
+  auto search = list.find(arg1);
+  if (search != list.end())
+  {
+    debug(DBEK, "Found\n");
+  }
+  else
+  {
+    debug(DBEK, "Not found\n");
+  }
+  //debug(DBEK, "%ld\n\n\n\n\n", search->first);
+  return number;
+}*/
+
+

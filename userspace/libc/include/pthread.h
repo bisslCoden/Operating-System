@@ -3,6 +3,8 @@
 #include "types.h"
 #include "assert.h"
 #include "stdio.h"
+#include "sys/syscall.h"
+#include "../../../common/include/kernel/syscall-definitions.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -144,5 +146,3 @@ extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 #ifdef __cplusplus
 }
 #endif
-
-
