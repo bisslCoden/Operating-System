@@ -12,6 +12,7 @@
 #define STACK_SIZE_IN_PAGES 16ULL
 #define SLEEPING_KS 0x46334234
 #define AWAKE_KS 0x54321432
+#define NO_LOCK_KS 0x92246879
 
 class UserProcess;
 

@@ -186,6 +186,10 @@ class UserProcess
     size_t getDuaration(){ return duaration_; }
     
     void setDuaration(size_t duaration);
+    
+    void lockArchMem(){archmem_lock_.acquire();}
+    void unlockArchMem(){archmem_lock_.release();}
+    
 
 
 
@@ -242,5 +246,6 @@ class UserProcess
     // tells us which thread is waiting for other threads to be killed before exec-ing
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
+    Mutex archmem_lock_;
 };
 

@@ -26,7 +26,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     kill_lock_("UserProcess::kill_lock_"),
     KILLED_(false),
     waiting_exec_(0),
-    waiting_exec_lock_("UserProcess::waiting_exec_lock_")
+    waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
+    archmem_lock_("UserProcess::archmem_lock_")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -57,7 +58,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   kill_lock_("UserProcess::kill_lock_"),
   KILLED_(false),
   waiting_exec_(0),
-  waiting_exec_lock_("UserProcess::waiting_exec_lock_")
+  waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
+  archmem_lock_("UserProcess::archmem_lock_")
 
 {
   debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);

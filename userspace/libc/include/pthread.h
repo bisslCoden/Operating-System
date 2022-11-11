@@ -15,6 +15,8 @@ typedef size_t pthread_t;
 
 #define SLEEPING_US 0x46334234
 #define AWAKE_US 0x54321432
+#define NO_LOCK_US 0x92246879
+
 
 enum cancelstate {
     PTHREAD_CANCEL_ENABLE,
@@ -58,7 +60,6 @@ typedef struct UserMutex{
     pthread_mutexattr_t my_attr_;
     size_t lock_;
     size_t held_by_;
-    pthread_spinlock_t held_by_lock_;
     struct UserMutex* next_mutex_;
 }pthread_mutex_t;
 
@@ -106,7 +107,7 @@ extern int pthread_spin_unlock(pthread_spinlock_t *lock);
 extern int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
 extern int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate);
 
-extern int checkAdress(void* adress);
+extern int checkAdress(void* adress, int null_ok);
 
 extern pthread_t pthread_self(void);
 

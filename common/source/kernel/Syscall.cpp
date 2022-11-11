@@ -31,19 +31,18 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
   }
   //UserProcess::getRandomPageOffset();
   //call exit with phthread cancelled if the thread can be cancelled
-  UserThread* caller = currentUserThread;
   if (syscall_number == sc_pthread_exit)
   {
     goto after;
   }
 
-  caller->lockFlagMutex();
-  if (caller->getflags()->cancelreq && (caller->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
+  currentUserThread->lockFlagMutex();
+  if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
   {
-    caller->unlockFlagMutex();
+    currentUserThread->unlockFlagMutex();
     Syscall::pthread_exit(PTHREAD_CANCELED);
   }
-  caller->unlockFlagMutex();
+  currentUserThread->unlockFlagMutex();
  
 
 after:
@@ -127,6 +126,15 @@ after:
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
+
+  currentUserThread->lockFlagMutex();
+  if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
+  {
+    currentUserThread->unlockFlagMutex();
+    Syscall::pthread_exit(PTHREAD_CANCELED);
+  }
+  currentUserThread->unlockFlagMutex();
+
   return return_value;
 }
 
@@ -350,49 +358,38 @@ void Syscall::pthread_exit(void* value)
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
 {
-  if(!checkAdressValid((void*) oldstate))
-    exit(999);
-  if((state != 1) && (state != 0))
+  int old;
+  if((state != PTHREAD_CANCEL_ENABLE) && (state != PTHREAD_CANCEL_DISABLE))
   {
     debug(X_USERTHREAD, "got a wrong arg as cancelstate!\n");
     return -1;
   }
   currentUserThread->lockFlagMutex();
-  *oldstate = currentUserThread->getflags()->cancelable;
   currentUserThread->setCancelState(state);
-  //debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", currentUserThread->getTID(), state);
+  old = currentUserThread->getflags()->cancelable;
   currentUserThread->unlockFlagMutex();
+  //debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", currentUserThread->getTID(), state);
+  if (oldstate >= (int*) 0x1000 && checkAdressValid(oldstate))
+    *oldstate = old;
 
-
-  // if(state == PTHREAD_CANCEL_ENABLE && currentUserThread->getflags()->cancelreq)
-  // {
-  //   currentUserThread->unlockFlagMutex();
-  //   pthread_exit(PTHREAD_CANCELED);
-  // }
   return 0;
 };
 
 int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
-  if(!checkAdressValid((void*) oldtype))
-    exit(999);
-   if((type != 1) && (type != 0))
+  int old;
+   if((type != PTHREAD_CANCEL_ASYNCHRONOUS) && (type != PTHREAD_CANCEL_DEFERRED))
   {
     debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
     return -1;
   }
   currentUserThread->lockFlagMutex();
-  *oldtype = currentUserThread->getflags()->cancelable;
+  old = currentUserThread->getflags()->deferred;
   currentUserThread->setCancelType(type);
   currentUserThread->unlockFlagMutex();
-  //debug(X_USERTHREAD, "[%ld]: just changed my type from %d to: %d!\n" ,currentUserThread->getTID(), *oldtype, type);
-  //debug(X_USERTHREAD, "[%ld]: now my flags are: state: %d type: %d\n", currentUserThread->getTID(),
-  //currentUserThread->getflags()->cancelable, currentUserThread->getflags()->deferred);
-  // if(type == PTHREAD_CANCEL_ASYNCHRONOUS && currentUserThread->getflags()->cancelreq
-  // && currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE)
-  // {
-  //   currentUserThread->unlockFlagMutex();
-  //   pthread_exit(PTHREAD_CANCELED);
-  // }
+
+  if (oldtype >= (int*) 0x1000 && checkAdressValid(oldtype))
+    *oldtype = old;
+
   return 0;
 }
 
@@ -494,8 +491,10 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     currentUserThread->getProcess()->unLockThreadMutex();
   }
 
-  *value_ptr = retval;
   debug(X_USERTHREAD, "[%ld]MANAGED to join [%ld]\n", currentUserThread->getTID(), thread);
+  if (checkAdressValid(value_ptr) && (void*)value_ptr > (void*) 0x1000)
+    *value_ptr = retval;
+  
   return 0;
 }
 

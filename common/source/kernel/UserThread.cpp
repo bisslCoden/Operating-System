@@ -124,6 +124,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   // set up user registers and adressspace
   setupStack();
+
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    (void*) mystack_.userstack_start_, getKernelStackStartPointer());
 
@@ -241,6 +242,7 @@ void UserThread::sendCancelRequest(){
 
 void UserThread::getNewStackPage(size_t adress){
   my_pages_lock_.acquire();
+  process_->lockArchMem();
   size_t new_page = PageManager::instance()->allocPPN();
   if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
   {
@@ -249,17 +251,20 @@ void UserThread::getNewStackPage(size_t adress){
     assert(false);
   }
   my_pages_.push_back(adress / PAGE_SIZE);
+  process_->unlockArchMem();
   my_pages_lock_.release();
   return;
 }
 
 void UserThread::freeMyPages(){
   my_pages_lock_.acquire();
+  process_->lockArchMem();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     //might delete the assert later
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
+  process_->unlockArchMem();
   my_pages_lock_.release();
 }
 
@@ -282,6 +287,8 @@ bool UserThread::setupStack()
   size_t ppn_for_stack = PageManager::instance()->allocPPN();
   // check stack vpn and ppn + mapPage()
   assert(vpn_for_stack && ppn_for_stack);
+
+  process_->lockArchMem();
   if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
@@ -290,16 +297,20 @@ bool UserThread::setupStack()
     return false;
   }
   debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
+  process_->unlockArchMem();
 
   my_pages_lock_.acquire();
   my_pages_.push_back(vpn_for_stack);
   my_pages_lock_.release();
 
-  mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
+  mystack_.userstack_start_ = stack_start_ptr - 2 * sizeof(size_t);
   size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn_for_stack);
   location += PAGE_SIZE - sizeof(size_t);
   mystack_.UserMutex = (size_t*) location;
   *mystack_.UserMutex = AWAKE_KS;
+
+  size_t* userlock_wait = (size_t*)(location - sizeof(size_t));
+  *userlock_wait = NO_LOCK_KS;
   mystack_.guardpage_front_nr_ = frontguard;
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
@@ -371,7 +382,10 @@ int UserThread::execv(char* const argv[], size_t argc)
   // setup copy
   size_t ppn = PageManager::instance()->allocPPN();
   size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE;
+  process_->lockArchMem();
   assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
+  process_->unlockArchMem();
+
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;
   size_t str_offset = argc * sizeof(char*);
