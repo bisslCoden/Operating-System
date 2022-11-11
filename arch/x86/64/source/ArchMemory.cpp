@@ -121,7 +121,7 @@ bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_
 ArchMemory::~ArchMemory()
 {
   assert(currentThread->kernel_registers_->cr3 != page_map_level_4_ * PAGE_SIZE && "thread deletes its own arch memory");
-
+  arch_memory_lock_.acquire();
   PageMapLevel4Entry* pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   for (uint64 pml4i = 0; pml4i < PAGE_MAP_LEVEL_4_ENTRIES / 2; pml4i++) // free only lower half
   {
@@ -160,6 +160,7 @@ ArchMemory::~ArchMemory()
     }
   }
   PageManager::instance()->freePPN(page_map_level_4_);
+  arch_memory_lock_.release();
 }
 
 pointer ArchMemory::checkAddressValid(uint64 vaddress_to_check)
