@@ -115,6 +115,8 @@ class UserThread : public Thread
     // no-args here
     int execv();
 
+    //lock retval before!
+    bool detectCircularJoin(UserThread* to_be_joined);
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
@@ -124,12 +126,13 @@ class UserThread : public Thread
     int getJoinState(){return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
+    void freeMyPages();
 
-    void lockJoin(){condition_mutex_.acquire();}
-    void setJoiner(int32 tid){join_waiter_ = tid;}
-    void unlockJoin(){condition_mutex_.release();}
-    void waitJoin(bool reacquire){join_cond_.wait(reacquire);}
+    //acquie retvallock before!
+    void setJoiner(UserThread* thread){join_waiter_ = thread;}
+    void waitJoin(){join_cond_.wait();}
     void signalJoin(){join_cond_.signal();}
+    
     bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
 
     size_t getPageOffset(){return mystack_.page_offset_;}
@@ -143,6 +146,8 @@ class UserThread : public Thread
 
     bool schedulable() override;
 
+    void signalExec(){exec_wait_.signal();}
+    void waitExec(){exec_wait_.wait();}
 
     void lockFlagMutex(){ flag_mutex_.acquire();}
     void unlockFlagMutex(){ flag_mutex_.release();}
@@ -153,7 +158,7 @@ class UserThread : public Thread
     void setLast(){last_ = true;}    
     // getters
     Threadflags*  getflags()          { return &myflags_;}     //lock before!
-    int32         getJoiner()         { return join_waiter_;}  //lock before!
+    UserThread*   getJoiner()         { return join_waiter_;}  //lock before!
     void*         getUserstackStart() { return (void*)mystack_.userstack_start_; }
     UserProcess*  getProcess()        { return process_; }
     bool          isLast()            { return last_; }        // tells if thread is the last thread of its process (important: on thread destuction, the process is destroyed if set!)
@@ -161,9 +166,8 @@ class UserThread : public Thread
     // the process that contains this thread
     UserProcess* process_;
 
-    int32 join_waiter_ = -1;
+    UserThread* join_waiter_ = 0;
     Mutex flag_mutex_;
-    Mutex condition_mutex_;
     Condition join_cond_;
 
     /**
@@ -182,8 +186,12 @@ class UserThread : public Thread
         size_t page_offset_
      */
     StackInfo mystack_;
+    bool last_ = false; 
+
+    ustl::vector<size_t> my_pages_;
+    Mutex my_pages_lock_;
+    Condition exec_wait_;
     
     // only true if removeFromThreadList() detects last thread to delete process
-    bool last_ = false; 
 };
 

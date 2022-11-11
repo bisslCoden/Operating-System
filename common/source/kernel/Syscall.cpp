@@ -305,33 +305,41 @@ void Syscall::pthread_exit(void* value)
   
   if (currentUserThread->getProcess()->findInThreadList(my_tid) != 0x00)
   {
-    currentUserThread->lockJoin();
-    if (currentUserThread->getJoiner() != -1)
+    if (!currentUserThread->getProcess()->checkRetVal(currentThread))
+    {
+      currentUserThread->getProcess()->lockRetVal();
+    }
+    
+    if (currentUserThread->getJoiner() != 0)
     {
       UserThread* to_be_signaled;
-      if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()))!= 0x00)
+      if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
       {
-        to_be_signaled->lockJoin();
         to_be_signaled->signalJoin();
-        to_be_signaled->unlockJoin();
       }
       else
       {
-        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process?\n");
+        //this will happen if a forked thread calls it
+        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process... I must be a forked thread!\n");
       }
     }
-    currentUserThread->unlockJoin();
     currentUserThread->lockFlagMutex();
     if (currentUserThread->getflags()->joinable == PTHREAD_CREATE_DETACHED)
+    {
       currentUserThread->unlockFlagMutex();
+      currentUserThread->getProcess()->unlockRetVal();
+    }
     else
-     {  
-        currentUserThread->unlockFlagMutex();
-        currentUserThread->getParentProcess()->addToRetvalList(currentUserThread->getTID(), value);
-     } 
+    {  
+      currentUserThread->unlockFlagMutex();
+      currentUserThread->getParentProcess()->addToRetvalList(currentUserThread->getTID(), value);
+    } 
     
     currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
     currentUserThread->getParentProcess()->unLockThreadMutex();
+
+    //experimentaaal: free my pages on my own!
+    currentUserThread->freeMyPages();
     currentThread->kill();
   }
   else
@@ -341,7 +349,6 @@ void Syscall::pthread_exit(void* value)
   }
   debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", currentUserThread->getTID());
   return;
-
 }
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
@@ -408,6 +415,15 @@ int Syscall::pthread_detach(size_t thread){
   UserThread* to_be_detached = 0x00;
   if ((to_be_detached = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread)) != 0x00)
   {
+    currentUserThread->getProcess()->lockRetVal();
+    if (to_be_detached->getJoiner() != 0)
+    {
+      currentUserThread->getProcess()->unlockRetVal();
+      currentUserThread->getParentProcess()->unLockThreadMutex();
+      return -1;
+    }
+    currentUserThread->getProcess()->unlockRetVal();
+
     to_be_detached->lockFlagMutex();
     to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
     to_be_detached->unlockFlagMutex();
@@ -425,25 +441,20 @@ int Syscall::pthread_detach(size_t thread){
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
-  if(!checkAdressValid((void*) value_ptr))
-    exit(999);
-  void* retval;
 
+  void* retval;
   //catch edgecases
   if(thread == currentUserThread->getTID())
     return -1;
-  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before threadlock\n", currentUserThread->getTID(), thread);
-  currentUserThread->getProcess()->lockThreadMutex();
-  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; afeter threadlock\n", currentUserThread->getTID(), thread);
 
-  
+  currentUserThread->getProcess()->lockThreadMutex();
   debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before join and retval\n", currentUserThread->getTID(), thread);
 
   if (currentUserThread->getProcess()->findInThreadList(thread) != 0x00)
   {
     UserThread* join_victim = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread);
-    join_victim->lockFlagMutex();
     
+    join_victim->lockFlagMutex();
     if (join_victim->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
       join_victim->unlockFlagMutex();
@@ -452,28 +463,27 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     }
     join_victim->unlockFlagMutex();
     
-    join_victim->lockJoin();
-    currentUserThread->lockJoin();
-    if (join_victim->getJoiner() != -1 || currentUserThread->getJoiner() == (int32) thread)
+    currentUserThread->getProcess()->lockRetVal();
+    if (join_victim->getJoiner() != 0 || join_victim->getJoiner() == currentUserThread || currentUserThread->detectCircularJoin(join_victim))
     {
-      debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each other with thread [%ld]!\n",
+      debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each "
+      "other with thread [%ld] OR there is a Circular Deadjoin :D!\n",
        thread, currentUserThread->getTID());
-      join_victim->unlockJoin();
-      currentUserThread->unlockJoin();
+      currentUserThread->getProcess()->unlockRetVal();
       currentUserThread->getProcess()->unLockThreadMutex();
       return -1;
     }
-    join_victim->setJoiner((int32) currentUserThread->getTID());
-    join_victim->unlockJoin();
+    
+    join_victim->setJoiner(currentUserThread);
     currentUserThread->getProcess()->unLockThreadMutex();
 
-    debug(X_USERTHREAD, "thread [%ld] now trying to wait\n", currentUserThread->getTID());
-    currentUserThread->waitJoin(true);
-    debug(X_USERTHREAD, "thread [%ld] got OUT of wait\n", currentUserThread->getTID());
+    //releases retvallock!
+    currentUserThread->waitJoin();
     
-    if (!currentUserThread->getProcess()->getRetVal(thread, &retval))
-      debug(X_USERTHREAD, "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
-    currentUserThread->unlockJoin();
+    //getretval unlocks retvallock :D
+    debug(X_USERTHREAD, "woke up to look for [%ld]s retval\n", thread);
+    assert(currentUserThread->getProcess()->getRetVal(thread, &retval) && 
+    "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
   }
   else if (!currentUserThread->getProcess()->getRetVal(thread, &retval))
   {

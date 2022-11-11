@@ -136,7 +136,8 @@ bool UserProcess::addToThreadList(UserThread* thread)
 
 //this function locks internally!
 bool UserProcess::addToRetvalList(size_t tid, void* value){
-  returnvalue_lock_.acquire();
+  if(!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
 
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -175,10 +176,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   waiting_exec_lock_.acquire();
   if (threads_.size() == 2 && waiting_exec_ != 0)
   {
+    waiting_exec_->signalExec();
     waiting_exec_lock_.release();
-    waiting_exec_->lockJoin();
-    waiting_exec_->signalJoin();
-    waiting_exec_->unlockJoin();
   }
   else 
     waiting_exec_lock_.release();
@@ -298,10 +297,12 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
 
 }
-
+//unlocks the retvallock
 bool UserProcess::getRetVal(size_t tid, void** value)
 {
-  returnvalue_lock_.acquire();
+  if(!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
+
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     *value = returnvalues_[tid];
@@ -397,23 +398,22 @@ void UserProcess::removeOldProcessInformation()
   if (waiting_exec_ == 0)
   {
     waiting_exec_ = currentUserThread;
-    waiting_exec_lock_.release();
-    currentUserThread->lockJoin();
-    currentUserThread->waitJoin(true);
-    currentUserThread->unlockJoin();
+    currentUserThread->waitExec();
   }
   else
   {
-    waiting_exec_lock_.release();
     assert(false && "exec called 2 times in one process is not possiblee!!!\n");
   }
+  waiting_exec_lock_.release();
 
 done:
-  returnvalue_lock_.acquire();
+  if (!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
   returnvalues_.clear();
   returnvalue_lock_.release();
 
-  offsetlist_lock_.acquire();
+  if (!offsetlist_lock_.isHeldBy(currentUserThread))
+    offsetlist_lock_.acquire();
   offsets_.clear();
   offsetlist_lock_.release();
   debug(X_USERPROCESS, "removingOldProcessInformation() finished\n");

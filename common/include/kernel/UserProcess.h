@@ -116,6 +116,7 @@ class UserProcess
      */
     size_t getNrOfThreads();
 
+
    /**
      * @brief returns a random offset generated with rdtsc. This should only be used to set
      * UserThread::mystack_.page_offset_!!
@@ -144,6 +145,11 @@ class UserProcess
     void lockKill(){kill_lock_.acquire();}
     void unlockKill(){kill_lock_.release();}
     bool checkKill(){ return KILLED_;}
+
+    void lockRetVal(){ returnvalue_lock_.acquire();}
+    void unlockRetVal(){ returnvalue_lock_.release();}
+    bool checkRetVal(Thread* thread){ return returnvalue_lock_.isHeldBy(thread);}
+
 
 
     void lockThreadMutex(){threads_lock_.acquire();}
@@ -187,6 +193,7 @@ class UserProcess
   volatile ProcessState state_;
 
   private:
+    friend class UserThread;
     // the process ID
     size_t const pid_;
 

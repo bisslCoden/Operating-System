@@ -14,12 +14,12 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) :
+UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) :
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
-  process_(process_),
+  process_(process),
   flag_mutex_{"thread::flag_mutex_"},
-  condition_mutex_{"Thread::cond_mutex_"},
-  join_cond_{ &condition_mutex_, "Thread::join_cond" } // UserThread's members
+  join_cond_{ &process_->returnvalue_lock_, "Thread::join_cond" } , my_pages_lock_{"thread::my_pages_lock_"},
+  exec_wait_{&process->waiting_exec_lock_, "Thread::exec_wait_"}// UserThread's members
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
@@ -112,7 +112,8 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   Thread(currentUserThread->working_dir_, currentUserThread->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
   process_(currentUserThread->process_), flag_mutex_{"thread::flag_mutex_"},
-   condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_, "Thread::join_cond"} // UserThread's members
+   join_cond_{&process_->returnvalue_lock_, "Thread::join_cond"},my_pages_lock_{"thread::my_pages_lock_"}
+   , exec_wait_{&process_->waiting_exec_lock_, "Thread::exec_wait_"}// UserThread's members
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = process_->getLoader();
@@ -157,8 +158,8 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 // fork
 UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(child),flag_mutex_{"thread::flag_mutex_"}, condition_mutex_{"Thread::cond_mutex_"},join_cond_{&condition_mutex_,
-  "Thread::join_cond"}
+  process_(child),flag_mutex_{"thread::flag_mutex_"}, join_cond_{&child->returnvalue_lock_,
+  "Thread::join_cond"}, my_pages_lock_{"thread::my_pages_lock_"}, exec_wait_{&child->waiting_exec_lock_, "Thread::exec_wait_"}
 {
   debug(X_USERTHREAD, "Entering fork constructor for new thread...\n");
   loader_ = child->getLoader();
@@ -169,6 +170,9 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   StackInfo parent_stack = parent_thread->getStackInfo();
   mystack_ = parent_stack;
 
+  my_pages_lock_.acquire();
+  my_pages_ = parent_thread->my_pages_;
+  my_pages_lock_.release();
   //Nedzma said its the users fault :D
   // ArchMemoryMapping map = loader_->arch_memory_.resolveMapping(mystack_.userstack_start_ / PAGE_SIZE);
   // size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
@@ -234,14 +238,29 @@ void UserThread::sendCancelRequest(){
   }
 
 void UserThread::getNewStackPage(size_t adress){
+  my_pages_lock_.acquire();
   size_t new_page = PageManager::instance()->allocPPN();
   if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
   {
+    //might need change in the future
     debug(USERTHREAD, "getnewpage(): RIP. asserting.\n");
     assert(false);
   }
+  my_pages_.push_back(adress / PAGE_SIZE);
+  my_pages_lock_.release();
   return;
 }
+
+void UserThread::freeMyPages(){
+  my_pages_lock_.acquire();
+  for (size_t i = 0; i < my_pages_.size(); i++)
+  {
+    //might delete the assert later
+    assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
+  }
+  my_pages_lock_.release();
+}
+
 
 
 bool UserThread::setupStack()
@@ -270,6 +289,9 @@ bool UserThread::setupStack()
   }
   debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
 
+  my_pages_lock_.acquire();
+  my_pages_.push_back(vpn_for_stack);
+  my_pages_lock_.release();
 
   mystack_.userstack_start_ = stack_start_ptr - sizeof(size_t);
   size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn_for_stack);
@@ -279,6 +301,7 @@ bool UserThread::setupStack()
   mystack_.guardpage_front_nr_ = frontguard;
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
+  
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %ld) and ends at %lx (VPN %ld) flag is at %lx"
   "and guardpages are at %ld and %ld\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
   mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
@@ -391,6 +414,35 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
+
+bool UserThread::detectCircularJoin(UserThread* to_be_joined){
+  if (join_waiter_ == 0)
+  {
+    return false;
+  }
+  else if (join_waiter_ == to_be_joined)
+  {
+    return true;
+  }
+  else
+  {
+    UserThread* iter = join_waiter_;
+    debug(X_USERTHREAD, "joincheck for [%ld] iter: %p\n", iter->getTID(), iter);
+    while (iter != 0)
+    {
+      if (iter == to_be_joined)
+        return true;
+      else
+      {
+        debug(X_USERTHREAD, "next on list is: %p\n", iter->join_waiter_);
+        iter = iter->join_waiter_;
+      }
+    }
+  }
+  return false;
+}
+
+
 
 int UserThread::execv()
 {
