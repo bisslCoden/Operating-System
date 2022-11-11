@@ -198,19 +198,18 @@ size_t UserProcess::getRandomPageOffset()
     asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
-    if(!page_offset)
-      continue;
     offsetlist_lock_.acquire();
-  } while (checkInOffsetList(page_offset));
+  } while (page_offset == NULL || checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
-  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  debug(X_USERPROCESS, "read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
   
   return page_offset;
 }
 
 bool UserProcess::checkInOffsetList(size_t NR)
 {
+
   for (auto val : offsets_)
   {
     if(val == NR)

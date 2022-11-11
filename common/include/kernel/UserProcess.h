@@ -41,14 +41,19 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
-     * @brief creates a thread that starts the binary of the program
+     * @brief kills all threads except for one + opens the file +
+     *  creates loader and sets to loader_. old loaders are deleted
      * 
      * @param path the path to the binary
      * @param argv the arguments 
      * @param argc the argument count
      */
     int execv(const char* path, char *const argv[], size_t argc);
-    // this is non-args version of execv
+    /**
+     * @brief creates a thread that starts the binary of the program
+     * 
+     * @param path the path to the binary
+     */
     int execv(const char* path);
 
     void removeOldProcessInformation();
