@@ -99,6 +99,7 @@ bool UserThread::schedulable(){
     }
     else
     {
+      debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
@@ -205,7 +206,8 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-
+  
+  freeMyPages();
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());

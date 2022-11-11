@@ -306,9 +306,7 @@ void Syscall::pthread_exit(void* value)
   if (currentUserThread->getProcess()->findInThreadList(my_tid) != 0x00)
   {
     if (!currentUserThread->getProcess()->checkRetVal(currentThread))
-    {
       currentUserThread->getProcess()->lockRetVal();
-    }
     
     if (currentUserThread->getJoiner() != 0)
     {
@@ -339,7 +337,6 @@ void Syscall::pthread_exit(void* value)
     currentUserThread->getParentProcess()->unLockThreadMutex();
 
     //experimentaaal: free my pages on my own!
-    currentUserThread->freeMyPages();
     currentThread->kill();
   }
   else
