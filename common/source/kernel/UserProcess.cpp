@@ -198,6 +198,8 @@ size_t UserProcess::getRandomPageOffset()
     asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
+    if(!page_offset)
+      continue;
     offsetlist_lock_.acquire();
   } while (checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
