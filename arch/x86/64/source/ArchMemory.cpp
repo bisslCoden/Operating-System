@@ -14,7 +14,7 @@ PageTableEntry kernel_page_table[8 * PAGE_TABLE_ENTRIES] __attribute__((aligned(
 
 
 ArchMemory::ArchMemory() :
-    arch_memory_lock_("Locks the arch memory"), cow_cnt_lock_("Locks the cow counter")
+    arch_memory_lock_("Locks the arch memory")
 {
   debug(X_ARCHMEM, "Archmemory constructor\n");
   page_map_level_4_ = PageManager::instance()->allocPPN();
@@ -144,25 +144,15 @@ ArchMemory::~ArchMemory()
               {
                 if (pt[pti].present)
                 {
-                  cow_cnt_lock_.acquire();
-                  if  (cow_counter_.find(pt[pti].page_ppn) == cow_counter_.end())
-                  {
+                  PageManager* pm = PageManager::instance();
+                  pm->lockCowCnt();
+                  if(pm->decreaseCowCnt(pt[pti].page_ppn))
+                  { 
                     pt[pti].present = 0;
-                    PageManager::instance()->freePPN(pt[pti].page_ppn);
-                  }else
-                  {
-                    if(cow_counter_.at(pt[pti].page_ppn) == 1)
-                    {
-                      pt[pti].present = 0;
-                      cow_counter_.erase(pt[pti].page_ppn);
-                      PageManager::instance()->freePPN(pt[pti].page_ppn);
-                    } else
-                    {
-                      cow_counter_.at(pt[pti].page_ppn)--;
-                    }
+                    pm->eraseCowCntEntry(pt[pti].page_ppn);
                   }
-                  cow_cnt_lock_.release();
-                }
+                  pm->unlockCowCnt();
+                }   
               }
               pd[pdi].pt.present = 0;
               PageManager::instance()->freePPN(pd[pdi].pt.page_ppn);
@@ -387,14 +377,9 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
                   pt[pti].writeable = 0;
                   pt[pti].cow = 1;
 
-                  cow_cnt_lock_.acquire();
-                  if(cow_counter_.find(pt[pti].page_ppn) == cow_counter_.end())
-                  {
-                      cow_counter_.insert(ustl::make_pair((size_t)pt[pti].page_ppn,1));
-                  }
-                  cow_counter_[pt[pti].page_ppn]++;
-
-                  cow_cnt_lock_.release();
+                  PageManager::instance()->lockCowCnt();
+                  PageManager::instance()->increaseCowCnt(pt[pti].page_ppn);
+                  PageManager::instance()->unlockCowCnt();
                 }
               }
             }
@@ -406,48 +391,3 @@ void ArchMemory::copyVirtualMem([[maybe_unused]]ArchMemory &destination)
   arch_memory_lock_.release();
 }
 
-void ArchMemory::copyOnWrite(size_t address)
-{
-  debug(A_MEMORY,"Entering copy on write function");
-  arch_memory_lock_.acquire();
-  size_t virtual_page = address/PAGE_SIZE;
-
-  ArchMemoryMapping m = resolveMapping(virtual_page);
-
-  size_t used_page = m.pt[m.pti].page_ppn;
-
-  assert((m.pt[m.pti].cow || m.pt[m.pti].writeable) && "COW 1 & WRITABLE 1 ?!?!?!!?");
-  cow_cnt_lock_.acquire();
-
-  if(cow_counter_.find(used_page) == cow_counter_.end())
-  {
-      debug(A_MEMORY,"Page %ld not in the cow_counter even tho flags are set!\n", used_page);
-      cow_cnt_lock_.release();
-      arch_memory_lock_.release();
-      return;
-  }
-  // this is the only case cow needs to be cow 1 and writable 0
-  if(cow_counter_.at(used_page) > 1)
-  {
-    if  (m.pt[m.pti].cow && !m.pt[m.pti].writeable)
-    {
-        m.pt[m.pti].page_ppn = PageManager::instance()->allocPPN();
-        void* page_curr = (void*)getIdentAddressOfPPN(used_page);
-        void* page_dest = (void*)getIdentAddressOfPPN(m.pt[m.pti].page_ppn);
-        memcpy(page_dest, page_curr, PAGE_SIZE);
-        debug(A_MEMORY,"Copied page in COW from %lx to %lx!\n", used_page,(size_t) m.pt[m.pti].page_ppn);
-        cow_counter_.at(used_page)--;
-        m.pt[m.pti].cow = 0;
-        m.pt[m.pti].writeable = 1;
-    }
-  }
-
-  if(cow_counter_.at(used_page) == 1)
-  {
-    m.pt[m.pti].cow = 0;
-    m.pt[m.pti].writeable = 1;
-    cow_counter_.erase(used_page);
-  }
-  cow_cnt_lock_.release();
-  arch_memory_lock_.release();
-}

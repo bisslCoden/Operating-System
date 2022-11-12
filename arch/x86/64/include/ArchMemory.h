@@ -123,11 +123,7 @@ public:
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
   void copyVirtualMem(ArchMemory &destination);
-  void copyOnWrite(size_t add);
-  ustl::map<size_t, size_t> cow_counter_;
   Mutex arch_memory_lock_;
-  Mutex cow_cnt_lock_;
-
 private:
 
 /** 
@@ -153,6 +149,5 @@ private:
 
   ArchMemory(ArchMemory const &src);
   ArchMemory &operator=(ArchMemory const &src);
-
 };
 

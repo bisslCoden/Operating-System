@@ -7,6 +7,7 @@
 #include "Loader.h"
 #include "Syscall.h"
 #include "ArchThreads.h"
+#include "PageManager.h"
 
 extern "C" void arch_contextSwitch();
 
@@ -66,10 +67,10 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
 
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    if (present && writing)
+    if (checkForCow(address))
     {
-      debug(PAGEFAULT, "Copy on Write will execute now\n");
-      currentThread->loader_->arch_memory_.copyOnWrite(address);
+      debug(PAGEFAULT, "Copy on Write found\n");
+      // ArchMemory::copyCowPage();
       return;
     }
     else if (switch_to_us && address > END_OF_STACKS)
@@ -129,4 +130,36 @@ void PageFaultHandler::enterPageFault(size_t address, bool user,
   currentThread->switch_to_userspace_ = saved_switch_to_userspace;
   if (currentThread->switch_to_userspace_)
     currentThreadRegisters = currentThread->user_registers_;
+}
+
+bool PageFaultHandler::checkForCow(size_t address)
+{
+  // setup archmem and checkAddressValid()
+  ArchMemory* current_archmem = &(currentUserThread->getProcess()->getLoader()->arch_memory_);
+  current_archmem->arch_memory_lock_.acquire();
+  if(!current_archmem->checkAddressValid(address))
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed.\n", address);
+    current_archmem->arch_memory_lock_.release();
+    return false;
+  }
+  size_t vpn = address/PAGE_SIZE;
+  ArchMemoryMapping m = current_archmem->resolveMapping(vpn);
+  
+  // if !present OR !(cow =1 AND writable = 0) -> no cow, that's another problem
+  if(!m.pt[m.pti].present || !(m.pt[m.pti].cow && !m.pt[m.pti].writeable))
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says (!present OR !(cow =1 AND writable = 0)) failed.\n");
+    current_archmem->arch_memory_lock_.release();
+    return false;
+  }
+
+  PageManager::instance()->lockCowCnt();
+  assert(PageManager::instance()->isInCowCnt(m.pt[m.pti].page_ppn));
+
+  
+
+  PageManager::instance()->unlockCowCnt();
+
+  current_archmem->arch_memory_lock_.release();
 }

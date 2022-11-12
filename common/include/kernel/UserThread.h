@@ -123,40 +123,40 @@ class UserThread : public Thread
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
      * 
      */
-    void setJoinState(int state){myflags_.joinable = state;}
-    int getJoinState(){return myflags_.joinable;}
+    void setJoinState(int state)      {myflags_.joinable = state;}
+    int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
     void freeMyPages();
 
     //acquie retvallock before!
     void setJoiner(UserThread* thread){join_waiter_ = thread;}
-    void waitJoin(){join_cond_.wait();}
-    void signalJoin(){join_cond_.signal();}
+    void waitJoin()                   {join_cond_.wait();}
+    void signalJoin()                 {join_cond_.signal();}
     
     bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
 
-    size_t getPageOffset(){return mystack_.page_offset_;}
+    size_t getPageOffset()            {return mystack_.page_offset_;}
 
 
-    StackInfo getStackInfo() { return mystack_; }
+    StackInfo getStackInfo()          { return mystack_; }
 
     // tells if thread is the last thread of its process
     // return process of thread
-    UserProcess* getParentProcess() { return process_; }
+    UserProcess* getParentProcess()   { return process_; }
 
     bool schedulable() override;
 
-    void signalExec(){exec_wait_.signal();}
-    void waitExec(){exec_wait_.wait();}
+    void signalExec()                 {exec_wait_.signal();}
+    void waitExec()                   {exec_wait_.wait();}
 
-    void lockFlagMutex(){ flag_mutex_.acquire();}
-    void unlockFlagMutex(){ flag_mutex_.release();}
+    void lockFlagMutex()              { flag_mutex_.acquire();}
+    void unlockFlagMutex()            { flag_mutex_.release();}
 
     void setCancelState(int state);
     void setCancelType(int type);
     void sendCancelRequest();
-    void setLast(){last_ = true;}    
+    void setLast()                    {last_ = true;}    
     // getters
     Threadflags*  getflags()          { return &myflags_;}     //lock before!
     UserThread*   getJoiner()         { return join_waiter_;}  //lock before!

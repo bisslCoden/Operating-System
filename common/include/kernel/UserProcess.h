@@ -147,11 +147,11 @@ class UserProcess
      */
     void exit(size_t exit_code, bool kill_currentThread = true);
 
-    void lockKill(){kill_lock_.acquire();}
-    void unlockKill(){kill_lock_.release();}
-    bool checkKill(){ return KILLED_;}
+    void lockKill()   {kill_lock_.acquire();}
+    void unlockKill() {kill_lock_.release();}
+    bool checkKill()  { return KILLED_;}
 
-    void lockRetVal(){ returnvalue_lock_.acquire();}
+    void lockRetVal() { returnvalue_lock_.acquire();}
     void unlockRetVal(){ returnvalue_lock_.release();}
     bool checkRetVal(Thread* thread){ return returnvalue_lock_.isHeldBy(thread);}
 

@@ -246,3 +246,51 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
   }
   lock_.release();
 }
+
+bool PageManager::decreaseCowCnt(size_t ppn)
+{
+  // if ppn in map
+  if(cow_cnt_.find(ppn) != cow_cnt_.end()) 
+  {
+    if(cow_cnt_.at(ppn) > 1)
+    {
+      // decrese counter and return false (present stays 1)
+      cow_cnt_.at(ppn)--;
+      return false;
+    } 
+    else
+    {
+      // erase counter and free ppn. return true to 
+      cow_cnt_.erase(ppn);
+      PageManager::instance()->freePPN(ppn);
+      return true;
+    }
+  }
+  else
+  {
+    PageManager::instance()->freePPN(ppn);
+    return true;
+  }
+  assert(false && "wtf?");
+}
+
+void PageManager::eraseCowCntEntry(size_t ppn)
+{
+  cow_cnt_.erase(ppn);
+  PageManager::instance()->freePPN(ppn);
+}
+
+void PageManager::increaseCowCnt(size_t ppn)
+{
+  if(cow_cnt_.find(ppn) == cow_cnt_.end())
+    cow_cnt_.insert(ustl::make_pair(ppn, 1));
+  cow_cnt_[ppn]++;
+}
+
+size_t PageManager::getNrOfCows(size_t ppn)
+{
+  if(cow_cnt_.find(ppn) == cow_cnt_.end())
+  {
+    
+  }
+}

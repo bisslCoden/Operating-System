@@ -4,9 +4,13 @@
 #include "paging-definitions.h"
 #include "SpinLock.h"
 #include "Bitmap.h"
+#include "ustl.h"
+#include "Mutex.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
+
+#define WAS_LAST 123
 
 class PageManager
 {
@@ -52,6 +56,13 @@ class PageManager
       page_usage_table_->bmprint();
     }
 
+    void    increaseCowCnt(size_t ppn);
+    bool    decreaseCowCnt(size_t ppn);
+    void    eraseCowCntEntry(size_t ppn);
+    size_t  getNrOfCows(size_t ppn);
+    bool    isInCowCnt(size_t ppn) { return cow_cnt_.find(ppn) != cow_cnt_.end(); };
+    void    lockCowCnt()           { cow_cnt_lock_.acquire(); }
+    void    unlockCowCnt()         { cow_cnt_lock_.release(); }
   private:
     /**
      * used internally to mark pages as reserved
@@ -72,4 +83,8 @@ class PageManager
     static PageManager* instance_;
 
     size_t HEAP_PAGES;
+
+    // the cow_cnt_ maps the ppn of a page to the number of processes that haven't copied yet
+    ustl::map<size_t, size_t> cow_cnt_;
+    Mutex cow_cnt_lock_ = "PageManager::cow_cnt_lock_";
 };
