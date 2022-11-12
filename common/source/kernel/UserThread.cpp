@@ -46,18 +46,13 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
-  process_->lockKill();
-  if (process_->checkKill())
-  {
+  switch_to_userspace_ = 1;
+}
+
+void UserThread::reDirectToDeath(){
     switch_to_userspace_ = 0;
     ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
-    process_->unlockKill();
-  }
-  else
-  {
-    process_->unlockKill();
-    switch_to_userspace_ = 1;
-  }
+    return;
 }
 
 bool UserThread::schedulable(){
@@ -143,18 +138,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   Scheduler::instance()->addNewThread((Thread*)this);
 
-  process_->lockKill();
-  if (process_->checkKill())
-  {
-    switch_to_userspace_ = 0;
-    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
-    process_->unlockKill();
-  }
-  else
-  {
-    process_->unlockKill();
-    switch_to_userspace_ = 1;
-  }
+  switch_to_userspace_ = 1;
 }
 
 // fork

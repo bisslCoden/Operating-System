@@ -277,30 +277,46 @@ void Syscall::trace()
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
-  if(!checkAdressValid((void*) thread))
-    exit(999);
   // add as much parameter checking as possible and return -1
 
-  if(currentThread->getType() != Thread::TYPE::USER_THREAD)
-    assert(false && "how tf did that happen?");
+  assert(currentThread->getType() != Thread::TYPE::USER_THREAD && "how tf did that happen?");
 
-  // calling thread creation and settind return value to user's pthread_t thread adress 
-  int joinstate = PTHREAD_CREATE_JOINABLE;
-  if(attr == 0);
-  else if (!checkAdressValid((void*) attr))
-    exit(999);
-  else
-    joinstate = ((pthread_attr_t*) attr)->detach_state_;
-  
-  
-  size_t tid = currentUserThread->getParentProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
-  debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", tid);
-  *(size_t*)thread = tid;
-
-  if(tid == 0)
+  currentUserThread->getProcess()->lockKill();
+  if(currentUserThread->getProcess()->checkKill())
+  {
+    currentUserThread->getProcess()->unlockKill();
     return -1;
+  };
+  currentUserThread->getProcess()->unlockKill();
 
-  return 0;
+  // could be dangerous but we have NO locks here...
+  
+  int joinstate = PTHREAD_CREATE_JOINABLE;
+  if(attr >= 0x1000)
+    if (((pthread_attr_t*) attr)->detach_state_ == PTHREAD_CREATE_DETACHED)
+      joinstate = PTHREAD_CREATE_DETACHED;
+    else if (((pthread_attr_t*) attr)->detach_state_ != PTHREAD_CREATE_JOINABLE)
+      return -1;
+  
+  
+  UserThread* newthread = currentUserThread->getParentProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
+  debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", newthread->getTID());
+
+  if(newthread != 0)
+  {
+    currentUserThread->getProcess()->lockKill();
+    if(currentUserThread->getProcess()->checkKill())
+    {
+      newthread->reDirectToDeath();
+      currentUserThread->getProcess()->unlockKill();
+      return -1;
+    };
+    currentUserThread->getProcess()->unlockKill();
+
+    *(size_t*)thread = newthread->getTID();
+    return 0;
+  }
+  return -1;
 }
 
 
@@ -561,6 +577,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 */
 }
 
+//this should never be called when holding any locks
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
   *stackaddr = (size_t*)currentUserThread->getStackInfo().userstack_start_;

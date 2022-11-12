@@ -282,7 +282,7 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate)
+UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate = PTHREAD_CREATE_JOINABLE)
 {
   // pthread
   UserThread* thread = new UserThread(wrapper, getRandomPageOffset());
@@ -293,21 +293,33 @@ size_t UserProcess::createNewThread(size_t start_routine, size_t args, size_t wr
     Fifth Argument: R8
     Sixth Argument: R9
   */
-  if (joinstate == PTHREAD_CREATE_JOINABLE);
+  if (thread)
+  {
+    if (joinstate != PTHREAD_CREATE_JOINABLE)
+      thread->setJoinState(joinstate);
+    
+    thread->user_registers_->rdi = start_routine;
+    thread->user_registers_->rsi = args;
+    
+    return thread;
+  }
   else
-    thread->setJoinState(joinstate);
-  thread->user_registers_->rdi = start_routine;
-  thread->user_registers_->rsi = args;
-  if(thread)
-    return thread->getTID();
+  {
+    debug(X_USERPROCESS, "something went wrong with threadcreation\n");
+    return 0;
+  }
   
-  return 0;
 }
 
 void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
   kill_lock_.acquire();
+  if (checkKill())
+  {
+    kill_lock_.release();
+    return;
+  }
   KILLED_ = true;
 
   if (!threads_lock_.isHeldBy(currentThread))

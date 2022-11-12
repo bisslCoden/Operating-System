@@ -157,6 +157,8 @@ class UserThread : public Thread
     void setCancelType(int type);
     void sendCancelRequest();
     void setLast(){last_ = true;}    
+
+    void reDirectToDeath();
     // getters
     Threadflags*  getflags()          { return &myflags_;}     //lock before!
     UserThread*   getJoiner()         { return join_waiter_;}  //lock before!
