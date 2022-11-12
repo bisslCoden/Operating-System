@@ -601,11 +601,11 @@ unsigned int Syscall::sleep(unsigned int seconds)
 {
   if(seconds == 0)
     return 0;
-  debug(SLEEP, "Sleep system call started\n");
+  //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
-  debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
-  debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getDiffAvg() + rdtsc_now;
+  //debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
+  //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
   while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
   {
@@ -635,7 +635,7 @@ size_t Syscall::clock()
 {
   UserThread* thread = (UserThread*) currentThread;
   //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
-  size_t duaration = Scheduler::instance()->getClockSum(thread->getParentProcess()->getPID());
+  size_t duaration = Scheduler::instance()->getClockSum();
   duaration += thread->getParentProcess()->getDuaration();
   return duaration;
 }

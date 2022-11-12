@@ -299,7 +299,7 @@ void Scheduler::printLockingInformation()
   unlockScheduling();
 }
 
-size_t Scheduler::getClockSum(size_t pid)
+size_t Scheduler::getClockSum()
 {
   size_t sum = 0;
   for (size_t c = 0; c < threads_.size(); ++c)
