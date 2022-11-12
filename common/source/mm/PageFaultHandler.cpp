@@ -34,12 +34,6 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   {
     debug(PAGEFAULT, "You are accessing a kernel address in user-mode.\n");
   }
-  else if (switch_to_us && address > END_OF_STACKS && (address > currentUserThread->getStackInfo().userstack_start_ 
-  || address < currentUserThread->getStackInfo().userstack_end_))
-  {
-   // debug(PAGEFAULT, "Pagefault on a guardpage!\n");
-    kprintf("STACKOVERFLOW DETECTED!\n");
-  }
   else if(present && !writing)
   {
     debug(PAGEFAULT, "You got a pagefault even though the address is mapped.\n");
@@ -78,11 +72,26 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       currentThread->loader_->arch_memory_.copyOnWrite(address);
       return;
     }
-    else if (switch_to_us && address < currentUserThread->getStackInfo().userstack_start_ && 
-    address > currentUserThread->getStackInfo().userstack_end_)
+    else if (switch_to_us && address > END_OF_STACKS)
     {
-      debug(PAGEFAULT, "seems like our currentthread just wants a new Page!\n");
-      currentUserThread->getNewStackPage(address);
+      debug(PAGEFAULT, "checking for stack-extension....\n");
+      UserThread* stack_owner = 0;
+      if((stack_owner = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
+      {
+        debug(PAGEFAULT, "seems like our currentthread just wants a new Page for someone!\n");
+        stack_owner->getNewStackPage(address);      
+      }
+      else
+      {
+        debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
+            // the page-fault seems to be faulty, print out the thread stack traces
+        ArchThreads::printThreadRegisters(currentThread, true);
+        currentThread->printBacktrace(true);
+        if (currentThread->loader_)
+          Syscall::exit(9999);
+        else
+          currentThread->kill();
+      }
     }
     else
     {

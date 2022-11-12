@@ -174,7 +174,11 @@ class UserProcess
      * @return false if the Thread was not in the list
      */
     bool getRetVal(size_t tid, void** value);
+    
     bool checkInOffsetList(size_t NR);
+    void removeFromOffsetList(size_t NR);
+
+    UserThread* checkStackAdress(size_t address);
 
     bool getWaitStatus(){ return wait_status_; }
     
