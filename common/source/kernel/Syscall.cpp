@@ -279,7 +279,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
   // add as much parameter checking as possible and return -1
 
-  assert(currentThread->getType() != Thread::TYPE::USER_THREAD && "how tf did that happen?");
+  assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
 
   currentUserThread->getProcess()->lockKill();
   if(currentUserThread->getProcess()->checkKill())
