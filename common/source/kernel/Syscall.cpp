@@ -607,9 +607,9 @@ unsigned int Syscall::sleep(unsigned int seconds)
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
   while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
   {
-    debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
+    //debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
     
-    debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+    //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
     
     //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
      //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
