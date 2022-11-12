@@ -178,7 +178,7 @@ class UserProcess
 
     size_t getDuaration(){ return duaration_; }
     
-    void setDuaration(size_t duaration) { duaration_ = duaration; };
+    void incDuaration(size_t duaration) { duaration_ += duaration; };
 
 
 
@@ -220,7 +220,7 @@ class UserProcess
     bool child_;
 
     // for clock
-    size_t duaration_;
+    size_t duaration_ = 0;
 
     // the offsets of the thread's stack
     ustl::vector<size_t> offsets_;

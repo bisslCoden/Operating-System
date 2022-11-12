@@ -67,6 +67,10 @@ class Thread
 
     void setTerminal(Terminal *my_term);
 
+    size_t getLastStart() {return last_start_; }
+
+    void setLastStart(size_t time) {last_start_ = time;}
+
     /**
      * getting the informations about the working Directory of this
      * Thread
@@ -146,6 +150,9 @@ class Thread
 
     ustl::string name_;
     bool Userthread = false;
+
+    //clock
+    size_t last_start_;
 
 };
 

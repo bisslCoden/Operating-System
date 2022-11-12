@@ -632,7 +632,10 @@ unsigned int Syscall::sleep(unsigned int seconds)
 size_t Syscall::clock()
 {
   UserThread* thread = (UserThread*) currentThread;
-  return thread->getParentProcess()->getDuaration();
+  //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
+  size_t duaration = Scheduler::instance()->getClockSum();
+  duaration += thread->getParentProcess()->getDuaration();
+  return duaration;
 }
 
 // commented out bc testing

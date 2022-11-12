@@ -117,6 +117,7 @@ void Scheduler::addNewThread(Thread *thread)
   lockScheduling();
   KernelMemoryManager::instance()->getKMMLock().release();
   threads_.push_back(thread);
+  thread->setLastStart(getRDTSC());
   unlockScheduling();
 }
 
@@ -296,4 +297,14 @@ void Scheduler::printLockingInformation()
   }
   debug(LOCK, "Scheduler::printLockingInformation finished\n");
   unlockScheduling();
+}
+
+size_t Scheduler::getClockSum()
+{
+  size_t sum = 0;
+  for (size_t c = 0; c < threads_.size(); ++c)
+  {
+    sum += getRDTSC() - threads_[c]->getLastStart();
+  }
+  return sum;
 }

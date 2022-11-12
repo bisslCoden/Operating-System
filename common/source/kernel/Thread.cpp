@@ -73,6 +73,7 @@ void Thread::kill()
   {
     ArchInterrupts::enableInterrupts();
     debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
+    ((UserThread*)currentThread)->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentThread->getLastStart()); 
     Scheduler::instance()->yield();
   }
 }
