@@ -343,7 +343,7 @@ void Syscall::pthread_exit(void* value)
     
     currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
     currentUserThread->getParentProcess()->unLockThreadMutex();
-
+    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo().page_offset_);
     //experimentaaal: free my pages on my own!
     currentThread->kill();
   }

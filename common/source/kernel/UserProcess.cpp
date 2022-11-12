@@ -194,6 +194,47 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   return true;
 }
 
+void UserProcess::removeFromOffsetList(size_t NR){
+  offsetlist_lock_.acquire();
+  size_t* my_offset = 0;
+  for (size_t i = 0; i < offsets_.size(); i++)
+  {
+    if (offsets_[i] == NR)
+    {
+      my_offset = &offsets_[i];
+      break;
+    }
+  }
+  if (my_offset != 0)
+  {
+    offsets_.erase(my_offset);
+  }
+  else
+  {
+    debug(X_USERPROCESS, "tried to erase offset %ld but DID NOT FIND IT WTF!!!\n", NR);
+  }
+  offsetlist_lock_.release();
+  return;
+}
+
+//locks threadlock internally!
+UserThread* UserProcess::checkStackAdress(size_t address){
+  threads_lock_.acquire();
+  ustl::map<size_t, UserThread*>::iterator it;
+  for (it = threads_.begin(); it != threads_.end(); it++)
+  {
+    if (address <= it->second->getStackInfo().userstack_start_ && address > it->second->getStackInfo().userstack_end_)
+    {
+      threads_lock_.release();
+      return it->second;
+    }
+  }
+  threads_lock_.release();
+  return 0;
+}
+
+
+
 size_t UserProcess::getRandomPageOffset()
 {
   size_t firstbits;
