@@ -30,6 +30,11 @@ Scheduler::Scheduler()
 {
   block_scheduling_ = 0;
   ticks_ = 0;
+  diff_avg = 0;
+  rdtsc_value = 0;
+  rdtsc_value_old = 0;
+  rdtsc_diff_per_tick = 0;
+  rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
@@ -219,10 +224,36 @@ uint32 Scheduler::getTicks()
   return ticks_;
 }
 
+
+size_t Scheduler::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}
+
 void Scheduler::incTicks()
 {
-  ++ticks_;
+  ticks_++;
+  rdtsc_value_old = rdtsc_value;
+  rdtsc_value = getRDTSC();
+  rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
+  if(ticks_ > 20)
+  {
+    rdtsc_diff_sum += rdtsc_diff_per_tick;
+    diff_avg = rdtsc_diff_sum / (ticks_ - 20);
+  }
+  //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);
+  //debug(SLEEP,"diff is     %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
 }
+
+
+uint32 Scheduler::getThreadCount() {
+  return threads_.size();
+}
+
 
 void Scheduler::printStackTraces()
 {

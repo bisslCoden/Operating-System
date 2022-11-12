@@ -7,7 +7,7 @@
  */
 int sem_wait(sem_t *sem)
 {
-  if(checkAdress((void*) sem) != 0)
+  if(checkAdress((void*) sem, 0) != 0)
     return -1;
   
   if (sem->initialized_ != 1)
@@ -53,7 +53,7 @@ int sem_trywait(sem_t *sem)
  */
 int sem_init(sem_t *sem, int pshared, unsigned value)
 {
-  if(checkAdress((void*) sem) != 0)
+  if(checkAdress((void*) sem, 0) != 0)
     return -1;
   if (sem->initialized_ == 1)
   {
@@ -74,7 +74,7 @@ int sem_init(sem_t *sem, int pshared, unsigned value)
  */
 int sem_destroy(sem_t *sem)
 {
-  if(checkAdress((void*) sem) != 0)
+  if(checkAdress((void*) sem, 0) != 0)
     return -1;
   if (sem->initialized_ != 1)
   {
@@ -90,7 +90,7 @@ int sem_destroy(sem_t *sem)
  */
 int sem_post(sem_t *sem)
 {
-  if(checkAdress((void*) sem) != 0)
+  if(checkAdress((void*) sem, 0) != 0)
     return -1;
   if (sem->initialized_ != 1)
   {

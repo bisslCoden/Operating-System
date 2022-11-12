@@ -7,6 +7,7 @@
 #include "UserProcess.h"
 #include "ProcessRegistry.h"
 #include "File.h"
+#include "../../../userspace/libc/include/time.h"
 
 typedef struct threadattribute
 {
@@ -30,19 +31,18 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
   }
   //UserProcess::getRandomPageOffset();
   //call exit with phthread cancelled if the thread can be cancelled
-  UserThread* caller = currentUserThread;
   if (syscall_number == sc_pthread_exit)
   {
     goto after;
   }
 
-  caller->lockFlagMutex();
-  if (caller->getflags()->cancelreq && (caller->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
+  currentUserThread->lockFlagMutex();
+  if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
   {
-    caller->unlockFlagMutex();
+    currentUserThread->unlockFlagMutex();
     Syscall::pthread_exit(PTHREAD_CANCELED);
   }
-  caller->unlockFlagMutex();
+  currentUserThread->unlockFlagMutex();
  
 
 after:
@@ -90,6 +90,18 @@ after:
     case sc_execv:
       return_value = execv((const char *)arg1, (char* const*)arg2);
       break;
+    case sc_waitpid:
+      return_value = wait_pid((size_t) arg1, (size_t*) arg2, arg3);
+      break;
+    case sc_getpid:
+      return_value = get_pid();
+      break;
+    case sc_sleep:
+      return_value = sleep(arg1);
+      break;
+    case sc_clock:
+      return_value = clock();
+      break;
     case sc_trace:
       trace();
       break;
@@ -114,6 +126,15 @@ after:
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
+
+  currentUserThread->lockFlagMutex();
+  if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
+  {
+    currentUserThread->unlockFlagMutex();
+    Syscall::pthread_exit(PTHREAD_CANCELED);
+  }
+  currentUserThread->unlockFlagMutex();
+
   return return_value;
 }
 
@@ -292,33 +313,38 @@ void Syscall::pthread_exit(void* value)
   
   if (currentUserThread->getProcess()->findInThreadList(my_tid) != 0x00)
   {
-    currentUserThread->lockJoin();
-    if (currentUserThread->getJoiner() != -1)
+    if (!currentUserThread->getProcess()->checkRetVal(currentThread))
+      currentUserThread->getProcess()->lockRetVal();
+    
+    if (currentUserThread->getJoiner() != 0)
     {
       UserThread* to_be_signaled;
-      if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()))!= 0x00)
+      if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
       {
-        to_be_signaled->lockJoin();
         to_be_signaled->signalJoin();
-        to_be_signaled->unlockJoin();
       }
       else
       {
-        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process?\n");
+        //this will happen if a forked thread calls it
+        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process... I must be a forked thread!\n");
       }
     }
-    currentUserThread->unlockJoin();
     currentUserThread->lockFlagMutex();
     if (currentUserThread->getflags()->joinable == PTHREAD_CREATE_DETACHED)
+    {
       currentUserThread->unlockFlagMutex();
+      currentUserThread->getProcess()->unlockRetVal();
+    }
     else
-     {  
-        currentUserThread->unlockFlagMutex();
-        currentUserThread->getParentProcess()->addToRetvalList(currentUserThread->getTID(), value);
-     } 
+    {  
+      currentUserThread->unlockFlagMutex();
+      currentUserThread->getParentProcess()->addToRetvalList(currentUserThread->getTID(), value);
+    } 
     
     currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
     currentUserThread->getParentProcess()->unLockThreadMutex();
+
+    //experimentaaal: free my pages on my own!
     currentThread->kill();
   }
   else
@@ -328,54 +354,42 @@ void Syscall::pthread_exit(void* value)
   }
   debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", currentUserThread->getTID());
   return;
-
 }
 
 int32 Syscall::pthread_setcancelstate(int32 state, int32 *oldstate)
 {
-  if(!checkAdressValid((void*) oldstate))
-    exit(999);
-  if((state != 1) && (state != 0))
+  int old;
+  if((state != PTHREAD_CANCEL_ENABLE) && (state != PTHREAD_CANCEL_DISABLE))
   {
     debug(X_USERTHREAD, "got a wrong arg as cancelstate!\n");
     return -1;
   }
   currentUserThread->lockFlagMutex();
-  *oldstate = currentUserThread->getflags()->cancelable;
   currentUserThread->setCancelState(state);
-  //debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", currentUserThread->getTID(), state);
+  old = currentUserThread->getflags()->cancelable;
   currentUserThread->unlockFlagMutex();
+  //debug(X_USERTHREAD, "[%ld]: just changed my state to: %d!\n", currentUserThread->getTID(), state);
+  if (oldstate >= (int*) 0x1000 && checkAdressValid(oldstate))
+    *oldstate = old;
 
-
-  // if(state == PTHREAD_CANCEL_ENABLE && currentUserThread->getflags()->cancelreq)
-  // {
-  //   currentUserThread->unlockFlagMutex();
-  //   pthread_exit(PTHREAD_CANCELED);
-  // }
   return 0;
 };
 
 int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
-  if(!checkAdressValid((void*) oldtype))
-    exit(999);
-   if((type != 1) && (type != 0))
+  int old;
+   if((type != PTHREAD_CANCEL_ASYNCHRONOUS) && (type != PTHREAD_CANCEL_DEFERRED))
   {
     debug(X_USERTHREAD, "got a wrong arg as canceltype!\n");
     return -1;
   }
   currentUserThread->lockFlagMutex();
-  *oldtype = currentUserThread->getflags()->cancelable;
+  old = currentUserThread->getflags()->deferred;
   currentUserThread->setCancelType(type);
   currentUserThread->unlockFlagMutex();
-  //debug(X_USERTHREAD, "[%ld]: just changed my type from %d to: %d!\n" ,currentUserThread->getTID(), *oldtype, type);
-  //debug(X_USERTHREAD, "[%ld]: now my flags are: state: %d type: %d\n", currentUserThread->getTID(),
-  //currentUserThread->getflags()->cancelable, currentUserThread->getflags()->deferred);
-  // if(type == PTHREAD_CANCEL_ASYNCHRONOUS && currentUserThread->getflags()->cancelreq
-  // && currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE)
-  // {
-  //   currentUserThread->unlockFlagMutex();
-  //   pthread_exit(PTHREAD_CANCELED);
-  // }
+
+  if (oldtype >= (int*) 0x1000 && checkAdressValid(oldtype))
+    *oldtype = old;
+
   return 0;
 }
 
@@ -395,6 +409,15 @@ int Syscall::pthread_detach(size_t thread){
   UserThread* to_be_detached = 0x00;
   if ((to_be_detached = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread)) != 0x00)
   {
+    currentUserThread->getProcess()->lockRetVal();
+    if (to_be_detached->getJoiner() != 0)
+    {
+      currentUserThread->getProcess()->unlockRetVal();
+      currentUserThread->getParentProcess()->unLockThreadMutex();
+      return -1;
+    }
+    currentUserThread->getProcess()->unlockRetVal();
+
     to_be_detached->lockFlagMutex();
     to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
     to_be_detached->unlockFlagMutex();
@@ -412,25 +435,20 @@ int Syscall::pthread_detach(size_t thread){
 
 size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 {
-  if(!checkAdressValid((void*) value_ptr))
-    exit(999);
-  void* retval;
 
+  void* retval;
   //catch edgecases
   if(thread == currentUserThread->getTID())
     return -1;
-  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before threadlock\n", currentUserThread->getTID(), thread);
-  currentUserThread->getProcess()->lockThreadMutex();
-  //debug(X_USERTHREAD, "[%ld]trying to join [%ld]; afeter threadlock\n", currentUserThread->getTID(), thread);
 
-  
+  currentUserThread->getProcess()->lockThreadMutex();
   debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before join and retval\n", currentUserThread->getTID(), thread);
 
   if (currentUserThread->getProcess()->findInThreadList(thread) != 0x00)
   {
     UserThread* join_victim = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread);
-    join_victim->lockFlagMutex();
     
+    join_victim->lockFlagMutex();
     if (join_victim->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
       join_victim->unlockFlagMutex();
@@ -439,28 +457,27 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     }
     join_victim->unlockFlagMutex();
     
-    join_victim->lockJoin();
-    currentUserThread->lockJoin();
-    if (join_victim->getJoiner() != -1 || currentUserThread->getJoiner() == (int32) thread)
+    currentUserThread->getProcess()->lockRetVal();
+    if (join_victim->getJoiner() != 0 || join_victim->getJoiner() == currentUserThread || currentUserThread->detectCircularJoin(join_victim))
     {
-      debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each other with thread [%ld]!\n",
+      debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each "
+      "other with thread [%ld] OR there is a Circular Deadjoin :D!\n",
        thread, currentUserThread->getTID());
-      join_victim->unlockJoin();
-      currentUserThread->unlockJoin();
+      currentUserThread->getProcess()->unlockRetVal();
       currentUserThread->getProcess()->unLockThreadMutex();
       return -1;
     }
-    join_victim->setJoiner((int32) currentUserThread->getTID());
-    join_victim->unlockJoin();
+    
+    join_victim->setJoiner(currentUserThread);
     currentUserThread->getProcess()->unLockThreadMutex();
 
-    debug(X_USERTHREAD, "thread [%ld] now trying to wait\n", currentUserThread->getTID());
-    currentUserThread->waitJoin(true);
-    debug(X_USERTHREAD, "thread [%ld] got OUT of wait\n", currentUserThread->getTID());
+    //releases retvallock!
+    currentUserThread->waitJoin();
     
-    if (!currentUserThread->getProcess()->getRetVal(thread, &retval))
-      debug(X_USERTHREAD, "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
-    currentUserThread->unlockJoin();
+    //getretval unlocks retvallock :D
+    debug(X_USERTHREAD, "woke up to look for [%ld]s retval\n", thread);
+    assert(currentUserThread->getProcess()->getRetVal(thread, &retval) && 
+    "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
   }
   else if (!currentUserThread->getProcess()->getRetVal(thread, &retval))
   {
@@ -474,8 +491,10 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     currentUserThread->getProcess()->unLockThreadMutex();
   }
 
-  *value_ptr = retval;
   debug(X_USERTHREAD, "[%ld]MANAGED to join [%ld]\n", currentUserThread->getTID(), thread);
+  if (checkAdressValid(value_ptr) && (void*)value_ptr > (void*) 0x1000)
+    *value_ptr = retval;
+  
   return 0;
 }
 
@@ -545,7 +564,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
   *stackaddr = (size_t*)currentUserThread->getStackInfo().userstack_start_;
-  *stacksize = STACK_SIZE_MAX_IN_MB * PAGE_SIZE * 512ULL * 512;
+  *stacksize = STACK_SIZE_IN_PAGES * PAGE_SIZE;
   return 0;
 }
 
@@ -591,3 +610,138 @@ bool Syscall::isExecPathValid(const char* path)
   debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
   return true;
 }
+size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  debug(SYSCALL, "Calling Syscall waitpid!\n");
+  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3, callingthread->getParentProcess());
+}
+
+int Syscall::get_pid()
+{
+  UserThread* callingthread = (UserThread*)currentThread;
+  debug(SYSCALL, "Calling Syscall getpid!\n");
+  return callingthread->getParentProcess()->getPID();
+}
+
+// wake up when getRDTSC == rdtsc_now + (cpu cycles) seconds
+  // while(getRDTSC != rdtsc_to_wake)
+  // yield
+  //
+  // ms = mili second 1s/1000 
+  // 54 ms = 0.054 s happens a tick
+  // CLOCKS_PER_SECOND = 1000000
+
+  // frequency is needed, with that we multiply clock_per_sec
+unsigned int Syscall::sleep(unsigned int seconds)
+{
+  debug(SLEEP, "Sleep system call started\n");
+  uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
+  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
+  debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
+  debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+  //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
+  while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
+  {
+    debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
+    
+    debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+    
+    //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
+     //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
+     //Scheduler::instance()->getFrequency());
+    Scheduler::instance()->yield();
+  }
+  return 0;
+}
+
+// 71.6 % 
+// 75.4 %
+
+
+// rdtsc now - rdtsc at program start
+// but thread can sleep or yield, so then it doesn't count
+// we need to increment the ticks variable for every thread of the process
+// then use the number of ticks to get the seconds
+// we know how many clocks(cycles i think) happen per second
+// we get the number of cycles
+size_t Syscall::clock()
+{
+  UserThread* thread = (UserThread*) currentThread;
+  return thread->getParentProcess()->getDuaration();
+}
+
+// commented out bc testing
+// The clock() function returns an approximation of processor time used by the program
+/*size_t Syscall::clock()
+{
+  UserThread* thread = (UserThread*) currentThread;
+  return getRDTSC() - thread->getParentProcess()->getDuaration();
+
+  //else
+  //  return (clock_t) -1;
+
+  //uint32 new_ticks = Scheduler::instance()->getTicks(); 
+  //size_t reuturn_d_ticks = return_ / new_ticks;
+  //size_t return_final = reuturn_d_ticks/1000000;
+  //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
+}*/
+
+/*size_t Syscall::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}*/
+
+
+/*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
+{
+  int number = 10;
+  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(DBEK, "arg1 smaller -1\n");
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(DBEK, "arg1 equals -1\n");
+  } 
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(DBEK, "arg1 equals 0\n");
+  }
+  else if((long int) arg1 > 0) // any specifed process
+  {
+    debug(DBEK, "arg1 greater 0\n");
+  }  
+  else //   something went wrong
+  {
+    debug(DBEK, "we have an error somewhere\n");
+  } 
+  if(arg2 != 0)
+  {
+    debug(DBEK, "arg2 different 0\n");
+  }
+  if(arg3 > 0) 
+  {
+    debug(DBEK, "arg3 bigger 0\n");
+  }
+  ustl::map<size_t, UserProcess*> list;
+  list = ProcessRegistry::getProcessList();
+  auto search = list.find(arg1);
+  if (search != list.end())
+  {
+    debug(DBEK, "Found\n");
+  }
+  else
+  {
+    debug(DBEK, "Not found\n");
+  }
+  //debug(DBEK, "%ld\n\n\n\n\n", search->first);
+  return number;
+}*/
+
+

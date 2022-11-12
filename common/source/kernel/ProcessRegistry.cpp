@@ -15,7 +15,8 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
+    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_"),
+    wait_pid_lock_("ProcessRegistry::wait_pid_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
   instance_ = this; // instance_ is static! -> Singleton-like behaviour
@@ -109,6 +110,15 @@ size_t ProcessRegistry::processFork()
 {
   debug(PROCESS_REG, "processFork() called starting process creation\n");
   auto parent = currentUserThread->getProcess();
+  
+  parent->lockKill();
+  if (parent->checkKill())
+  {
+    parent->unlockKill();
+    return -1;
+  }
+  parent->unlockKill();
+
   //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent);
 
@@ -127,6 +137,12 @@ size_t ProcessRegistry::processFork()
   debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
   return process->getPID();
 }
+
+ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
+{
+  return list_of_processes_;
+}
+
 
 void ProcessRegistry::createProcess(const char* path)
 {
@@ -159,11 +175,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
   int argc = areExecArgsValid(path, argv);
   if(argc == -1)
     return argc;
-
-  debug(PROCESS_REG, "execvProcess(path = %s, argv = %lx, argc = %d\n", path, (size_t)argv, argc);
-  UserProcess* currentProcess = currentUserThread->getProcess();
-  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
-  return currentProcess->execv(path, argv, argc);
+  return 0;
 }
 
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
@@ -199,3 +211,110 @@ int ProcessRegistry::execv(const char* path)
   debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
   return currentProcess->execv(path);
 }
+
+
+
+
+
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
+{
+  debug(WAITPID, "id: %ld\n", parent_process->getPID());
+  int return_pid = 0;
+  if((long int) arg1 > 0) // any specifed process
+  {
+    debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
+    auto search_child = list.find(arg1);
+    list_of_processes_lock_.release();
+    if (search_child == list.end())
+    {
+      debug(WAITPID, "Not found, process %ld\n", arg1);
+      return -1; //exit value returned
+    }
+    list_of_processes_lock_.acquire();
+    parent_process->setWaitStatus(1);
+    size_t process_state = search_child->second->getProcessState();
+    return_pid = search_child->second->getPID();
+    list_of_processes_lock_.release();
+    while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    {
+      Scheduler::instance()->yield();
+      if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+      {
+        list_of_processes_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        list_of_processes_lock_.release();
+      }
+    }
+  }
+  else if((long int) arg1 == -1) // any child process.
+  {
+    debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
+    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
+    UserProcess* child = parent_process;
+    list_of_processes_lock_.release();
+    for (ustl::map<size_t, UserProcess*>::iterator i = list.begin(); i != list.end(); ++i) 
+    {
+      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) && (child->getWaitStatus() == 0))
+      {
+        list_of_processes_lock_.acquire();
+        child = i->second;
+        list_of_processes_lock_.release();
+        break;
+      }
+    }
+    if(child->getPID() == parent_process->getPID()){
+      debug(WAITPID, "No child process\n");
+      return -1;
+    }
+    list_of_processes_lock_.acquire();
+    parent_process->setWaitStatus(1);
+    size_t process_state = child->getProcessState();
+    return_pid = child->getPID();
+    list_of_processes_lock_.release();
+    //maybe the child wait status can be changed to 1 with more waitpids
+    while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
+    {
+      debug(WAITPID, "in while  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
+      arg1, parent_process->getProcessState(), child->getProcessState(),
+      parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
+      parent_process->getWaitStatus(), child->getWaitStatus());
+
+      Scheduler::instance()->yield();
+      if(process_state != child->getProcessState() || child->getProcessState() == 0)
+      {
+        list_of_processes_lock_.acquire();
+        parent_process->setWaitStatus(0);
+        list_of_processes_lock_.release();
+      }
+    }
+    debug(WAITPID, "after while \n");
+  }
+  else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
+    return 0;
+  }
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(WAITPID, "arg1 equals 0\n"); // dont need to implement process groups
+    return 0;
+  }
+  else //   something went wrong
+  {
+    debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
+    return -1;
+  } 
+  if(arg2 != 0)
+  {
+    debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
+  }
+  if(arg3 > 0) 
+  {
+    debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
+  }
+  return return_pid;
+}
+

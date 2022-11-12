@@ -14,13 +14,12 @@ int fastroutine()
 }
 
 int stupidroutine(){
-    int retval;
-    int ret;
-    for (size_t i = 0; i < 12; i++)
-    {
-        ret = pthread_join(tids[i], (void**)&retval);
-        printf("ret stupid: %d for joining %ld\n", ret, tids[i]);
-    }
+    printf("i m just chillin \n");
+    //for (size_t i = 0; i < 12; i++)
+    //{
+        // ret = pthread_join(tids[i], (void**)&retval);
+    //    printf("ret stupid: %d for joining %ld\n", ret, tids[i]);
+    //}
     return 1;
 }
 
@@ -42,5 +41,6 @@ int main()
         ret =  pthread_join(tids[i], (void**)&retvals[i]);
         printf("join returned: %d was able to join %ld got val %d\n",ret, i, retvals[i]);
     }
+    printf("exit main...\n");
     return 0;
 }

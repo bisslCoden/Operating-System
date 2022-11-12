@@ -25,7 +25,9 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     offsetlist_lock_("UserProcess::offsets"),
     kill_lock_("UserProcess::kill_lock_"),
     KILLED_(false),
-    waiting_exec_lock_("UserProcess::waiting_exec_lock_")
+    waiting_exec_(0),
+    waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
+    archmem_lock_("UserProcess::archmem_lock_")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -34,12 +36,14 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   if(!setupLoader(fd_))
     return;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
-
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, UserProcess::getRandomPageOffset());
+  setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
+  setChildStatus(0);
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
 }
 
-// fork
+// User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent) :
   pid_(ProcessRegistry::instance()->createID()),
   fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
@@ -53,7 +57,10 @@ UserProcess::UserProcess(UserProcess *parent) :
   offsetlist_lock_("UserProcess::offsets"),
   kill_lock_("UserProcess::kill_lock_"),
   KILLED_(false),
-  waiting_exec_lock_("UserProcess::waiting_exec_lock_")
+  waiting_exec_(0),
+  waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
+  archmem_lock_("UserProcess::archmem_lock_")
+
 {
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
@@ -75,19 +82,22 @@ UserProcess::UserProcess(UserProcess *parent) :
   currentUserThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
   threads_lock_.release();
 
-  //local fd
-
   debug(USERPROCESS, "Creating new Thread for Fork\n");
-  auto thread = new UserThread(this, (UserThread*) currentThread);
+  UserThread* parent_thread = currentUserThread;
+  auto thread = new UserThread(this, parent_thread);
   if(!thread || thread->getTID()==0)
   {
     debug(USERPROCESS, "Failed to create Thread for Fork!\n");
     delete thread;
     return;
   }
-
+  setProcessState(RUNNING_AND_RUNNABLE);
+  setDuaration(0);
+  setChildStatus(1);
   addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
+  
+  //?
   Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
 }
@@ -132,7 +142,8 @@ bool UserProcess::addToThreadList(UserThread* thread)
 
 //this function locks internally!
 bool UserProcess::addToRetvalList(size_t tid, void* value){
-  returnvalue_lock_.acquire();
+  if(!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
 
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
@@ -144,7 +155,7 @@ bool UserProcess::addToRetvalList(size_t tid, void* value){
 
   returnvalues_.insert(ustl::make_pair(tid, value));
   debug(X_USERPROCESS, "Process: %ld : added retval %ld for thread %ld to my returnvalue list\n", pid_, (size_t)value, tid);
-  
+
   returnvalue_lock_.release();
   return true;
 }
@@ -171,10 +182,8 @@ bool UserProcess::removeFromThreadList(UserThread* thread)
   waiting_exec_lock_.acquire();
   if (threads_.size() == 2 && waiting_exec_ != 0)
   {
+    waiting_exec_->signalExec();
     waiting_exec_lock_.release();
-    waiting_exec_->lockJoin();
-    waiting_exec_->signalJoin();
-    waiting_exec_->unlockJoin();
   }
   else 
     waiting_exec_lock_.release();
@@ -194,7 +203,7 @@ size_t UserProcess::getRandomPageOffset()
   size_t firstbits;
   size_t lastbits;
   size_t page_offset = 0;
-  size_t rand; 
+  size_t rand;
   offsetlist_lock_.acquire();
   do
   {
@@ -273,7 +282,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
-  
+
   for(auto thread : threads_) // first = tid, second = *Thread
   {
     if(thread.first == currentThread->getTID());
@@ -281,7 +290,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     {
       if (!thread.second->checkFlagLock(currentThread))
         thread.second->lockFlagMutex();
-      
+
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
       thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
@@ -298,15 +307,14 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
   // callingThread->sendCancelRequest();
   // callingThread->unlockFlagMutex();
   if(kill_currentThread)
-  {
     Syscall::pthread_exit((void*) exit_code);
-  }
-
 }
-
+//unlocks the retvallock
 bool UserProcess::getRetVal(size_t tid, void** value)
 {
-  returnvalue_lock_.acquire();
+  if(!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
+
   if (returnvalues_.find(tid) != returnvalues_.end())
   {
     *value = returnvalues_[tid];
@@ -334,12 +342,12 @@ int UserProcess::execv(const char* path)
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   name_ = path;
 
-  // exec 
+  // exec
   debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
   removeOldProcessInformation();
   currentUserThread->execv();
-  
-  VfsSyscall::close(old_fd); 
+
+  VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
   debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
   return 0;
@@ -366,8 +374,8 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   removeOldProcessInformation();
   name_ = path;
   currentUserThread->execv(argv, argc);
-  
-  VfsSyscall::close(old_fd); 
+
+  VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
   debug(X_USERPROCESS, "[%ld] closed old_fd and deleted old_loader\n", getPID());
   return 0;
@@ -401,28 +409,45 @@ bool UserProcess::removeOldProcessInformation()
   threads_lock_.release();
 
   waiting_exec_lock_.acquire();
+  assert(waiting_exec_ && "exec called 2 times in one process is not possiblee!!!\n");
   if (waiting_exec_ == 0)
   {
     waiting_exec_ = currentUserThread;
-    waiting_exec_lock_.release();
-    currentUserThread->lockJoin();
-    currentUserThread->waitJoin(true);
-    currentUserThread->unlockJoin();
-  }
-  else
-  {
-    waiting_exec_lock_.release();
-    assert(false && "exec called 2 times in one process is not possiblee!!!");
+    currentUserThread->waitExec();
   }
 
+  waiting_exec_lock_.release();
+
 done:
-  returnvalue_lock_.acquire();
+  if (!returnvalue_lock_.isHeldBy(currentUserThread))
+    returnvalue_lock_.acquire();
   returnvalues_.clear();
   returnvalue_lock_.release();
 
-  offsetlist_lock_.acquire();
+  if (!offsetlist_lock_.isHeldBy(currentUserThread))
+    offsetlist_lock_.acquire();
   offsets_.clear();
   offsetlist_lock_.release();
   debug(X_USERPROCESS, "[%ld] removingOldProcessInformation() finished\n", getPID());
   return true;
+}
+
+void UserProcess::setWaitStatus(bool arg)
+{ 
+  wait_status_ = arg; 
+}
+
+void UserProcess::setChildStatus(bool arg)
+{ 
+  child_ = arg; 
+}
+
+void UserProcess::setProcessState(ProcessState state)
+{ 
+  state_ = state; 
+}
+
+void UserProcess::setDuaration(size_t duaration)
+{ 
+  duaration_ = duaration; 
 }

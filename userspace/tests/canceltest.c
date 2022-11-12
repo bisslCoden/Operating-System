@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include "pthread.h"
 
@@ -33,7 +34,7 @@ void simple_routine3()
 int main()
 {
   printf("1 - main: Hello! simple_routine lies at %lx\n", (size_t)simple_routine);
-  pthread_t tids[5]; 
+  pthread_t tids[5];
   int retvals[5];
 
   //int ret = pthread_create(&tid, NULL, (void*(*)(void*))++i&simple_routine, NULL);
