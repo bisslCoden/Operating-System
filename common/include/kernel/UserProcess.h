@@ -56,7 +56,7 @@ class UserProcess
      */
     int execv(const char* path);
 
-    void removeOldProcessInformation();
+    bool removeOldProcessInformation();
 
     /**
      * @brief does the Loader setup + fd check

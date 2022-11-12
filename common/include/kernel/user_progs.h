@@ -10,6 +10,7 @@ char const *user_progs[] = {
                             // "/usr/mudead2.sweb",
                             // "/usr/threadattack.sweb",
                             // "usr/execprinter2.sweb",
+                            "usr/pthreadfork.sweb",
                             0
                            };
 
