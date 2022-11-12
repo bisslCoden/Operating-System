@@ -114,6 +114,9 @@ public:
  */
   static void unmapKernelPage(uint64 virtual_page);
 
+  void lockArchmem(){ arch_memory_lock_.acquire();}
+  void unlockArchmem(){ arch_memory_lock_.release();}
+
   uint64 page_map_level_4_;
 
   uint64 getRootOfPagingStructure();
@@ -124,9 +127,6 @@ public:
 
   void copyVirtualMem(ArchMemory &destination);
   void copyOnWrite(size_t add);
-  ustl::map<size_t, size_t> cow_counter_;
-  Mutex arch_memory_lock_;
-  Mutex cow_cnt_lock_;
 
 private:
 
@@ -154,5 +154,8 @@ private:
   ArchMemory(ArchMemory const &src);
   ArchMemory &operator=(ArchMemory const &src);
 
+  Mutex arch_memory_lock_;
+  ustl::map<size_t, size_t> cow_counter_;
+  Mutex cow_cnt_lock_;
 };
 

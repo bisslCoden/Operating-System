@@ -102,9 +102,10 @@ UserProcess::~UserProcess()
 {
   debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
   assert(Scheduler::instance()->isCurrentlyCleaningUp());
+  archmem_lock_.acquire();
   delete loader_;
   loader_ = 0;
-
+  archmem_lock_.release();
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 

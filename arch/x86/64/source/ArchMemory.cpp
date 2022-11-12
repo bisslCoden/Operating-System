@@ -42,6 +42,8 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
 {
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
+  //here we should update the cow counter of that page in every archmem and NOT free the 
+  //Page if there are still references to it right?
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
   m.pt[m.pti].present = 0;
   PageManager::instance()->freePPN(m.page_ppn);
@@ -145,6 +147,7 @@ ArchMemory::~ArchMemory()
                 if (pt[pti].present)
                 {
                   cow_cnt_lock_.acquire();
+                  //also this could be problematic no? what if another process frees at the same time?
                   if  (cow_counter_.find(pt[pti].page_ppn) == cow_counter_.end())
                   {
                     pt[pti].present = 0;
