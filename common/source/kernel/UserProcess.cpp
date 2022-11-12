@@ -203,7 +203,7 @@ size_t UserProcess::getRandomPageOffset()
     rand =  lastbits | firstbits << 32;
     page_offset = rand % (MAX_STACKS);
     offsetlist_lock_.acquire();
-  } while (page_offset == NULL || checkInOffsetList(page_offset));
+  } while (page_offset == 0 || checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
   debug(X_USERPROCESS, "[%ld] read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", getPID(), rand, MAX_STACKS, page_offset);
@@ -363,8 +363,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 
   // exec 
   debug(X_USERPROCESS, "[%ld] execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", getPID(), path, (size_t)argv);
-  if(!removeOldProcessInformation())
-    return -1;
+  removeOldProcessInformation();
   name_ = path;
   currentUserThread->execv(argv, argc);
   
@@ -392,6 +391,7 @@ bool UserProcess::removeOldProcessInformation()
 {
   debug(X_USERPROCESS, "[%ld] removingOldProcessInformation() entered\n", getPID());
   exit(13579, false);
+
   threads_lock_.acquire();
   if (threads_.size() < 2)
   {
@@ -412,7 +412,7 @@ bool UserProcess::removeOldProcessInformation()
   else
   {
     waiting_exec_lock_.release();
-    return false;
+    assert(false && "exec called 2 times in one process is not possiblee!!!");
   }
 
 done:
