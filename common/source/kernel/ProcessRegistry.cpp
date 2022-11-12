@@ -173,9 +173,9 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
   if((size_t)argv >= USER_BREAK || (size_t)argv[0] >= USER_BREAK)
     return -1;
 
-  // first char* may null. call exec without process
+  // first char* may be null. call exec without args
   if(!argv[0])
-    execv(path);
+    return execv(path);
 
   // increase argc until NULL. also don't accept too long strings.
   int argc = 0;
