@@ -293,11 +293,12 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
   
   int joinstate = PTHREAD_CREATE_JOINABLE;
   if(attr >= 0x1000)
+  {
     if (((pthread_attr_t*) attr)->detach_state_ == PTHREAD_CREATE_DETACHED)
       joinstate = PTHREAD_CREATE_DETACHED;
     else if (((pthread_attr_t*) attr)->detach_state_ != PTHREAD_CREATE_JOINABLE)
       return -1;
-  
+  }
   
   UserThread* newthread = currentUserThread->getParentProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", newthread->getTID());
