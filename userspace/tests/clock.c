@@ -3,16 +3,11 @@
 
 int main(int argc, char *argv[]) {
   clock_t time_1 = clock();
-  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1/CLOCKS_PER_SEC));
-  int x = 100000;
-  for(int i = 0; i < 1000; i++)
-  {
-    x += 2;
-    x /= 2;
-    x *= 2;
-  }
+  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", time_1);
+
+  sleep(10);
   clock_t time_2 = clock();
-  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2/CLOCKS_PER_SEC));
-  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1) / CLOCKS_PER_SEC));
+  printf("This is the time now after 10s sleep: %d\n",time_2);
+
   return 0;
 }

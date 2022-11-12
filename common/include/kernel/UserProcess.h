@@ -136,7 +136,7 @@ class UserProcess
      * @param start_routine which thread should execute
      * @return size_t thread ID
      */
-    size_t createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate);
+    UserThread* createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate);
 
     /**
      * @brief exits the whole userprogram if kill_last is true. 
