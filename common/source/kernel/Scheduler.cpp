@@ -299,12 +299,12 @@ void Scheduler::printLockingInformation()
   unlockScheduling();
 }
 
-size_t Scheduler::getClockSum()
+size_t Scheduler::getClockSum(size_t pid)
 {
   size_t sum = 0;
   for (size_t c = 0; c < threads_.size(); ++c)
   {
-    sum += getRDTSC() - threads_[c]->getLastStart();
+      sum += getRDTSC() - threads_[c]->getLastStart();
   }
   return sum;
 }

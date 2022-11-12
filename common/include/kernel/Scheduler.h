@@ -31,7 +31,7 @@ class Scheduler
     uint32 getTicks();
     uint32 getThreadCount();
 
-    size_t getClockSum();
+    size_t getClockSum(size_t pid);
 
 
     size_t getRDTSC();

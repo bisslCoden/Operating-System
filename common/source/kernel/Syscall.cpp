@@ -599,6 +599,8 @@ int Syscall::get_pid()
   // frequency is needed, with that we multiply clock_per_sec
 unsigned int Syscall::sleep(unsigned int seconds)
 {
+  if(seconds == 0)
+    return 0;
   debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
   uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
@@ -631,13 +633,14 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 size_t Syscall::clock()
 {
-  return 0;
   UserThread* thread = (UserThread*) currentThread;
   //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
-  size_t duaration = Scheduler::instance()->getClockSum();
+  size_t duaration = Scheduler::instance()->getClockSum(thread->getParentProcess()->getPID());
   duaration += thread->getParentProcess()->getDuaration();
-  //return duaration;
+  return duaration;
 }
+
+// 78.3%
 
 // commented out bc testing
 // The clock() function returns an approximation of processor time used by the program
