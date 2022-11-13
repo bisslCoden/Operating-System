@@ -248,27 +248,49 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
   lock_.release();
 }
 
+//----------------------------------------------------------------------------------cow start
+bool PageManager::isInCowCnt(size_t ppn)
+{ 
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  return cow_cnt_.find(ppn) != cow_cnt_.end(); 
+}
+
+size_t PageManager::getNrOfCows(size_t ppn)
+{ 
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  assert(isInCowCnt(ppn) && "if you use this method pls check isInCowCnt(ppn) before");
+  debug(X_PAGEMANAGER, "TID [%ld] getNrOfCows(%lx) found value %ld\n", currentThread->getTID(), ppn, cow_cnt_[ppn]);
+  return cow_cnt_[ppn]; 
+}
+
 size_t PageManager::decreaseCowCnt(size_t ppn)
 {
-  // not found: remove page
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  size_t cnt = 0;
   if(!isInCowCnt(ppn)) 
-    return 0;
+    return cnt;
 
-  // decrease counter, erase entry if cnt = 0, return cnt
-  cow_cnt_[ppn]--;
-  size_t cow_ct = cow_cnt_[ppn]; 
-  if(getNrOfCows(ppn) == 0)
+  debug(X_PAGEMANAGER, "TID [%ld] decreaseCowCnt(%lx) found value %ld\n", getNrOfCows(ppn), ppn, cnt);
+
+  if(getNrOfCows(ppn) > 1)
+    cnt = cow_cnt_[ppn]--;
+  else
     cow_cnt_.erase(ppn);
-  debug(PM, "%ld cow cont now is %ld\n", ppn, cow_cnt_[ppn]);
-  return cow_ct;
+
+  debug(X_PAGEMANAGER, "TID [%ld] decreaseCowCnt(%lx) found decreased to value %ld\n", currentThread->getTID(), ppn, cnt);
+  return cnt;
 }
 
 void PageManager::increaseCowCnt(size_t ppn)
 {
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
   if(cow_cnt_.find(ppn) == cow_cnt_.end())
+  {
+    debug(X_PAGEMANAGER, "increaseCowCnt(): inserting ppn %lx\n", ppn);
     cow_cnt_.insert(ustl::make_pair(ppn, 1));
+  }
   cow_cnt_[ppn]++;
-  debug(PM, "%ld cow cont now is %ld\n", ppn, cow_cnt_[ppn]);
+  debug(X_PAGEMANAGER, "increaseCowCnt(): value for %lx now %ld\n", ppn, cow_cnt_[ppn]);
 }
 
 bool PageManager::checkForCow(size_t address)
@@ -303,9 +325,8 @@ bool PageManager::checkForCow(size_t address)
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   PageManager* pm = PageManager::instance();
   size_t ppn = m.page_ppn;
-  debug(PM, "At cow pagefault counter is %ld - %ld\n", ppn, pm->getNrOfCows(ppn));
   pm->lockCowCnt();
- 
+  debug(X_PAGEMANAGER, "At cow pagefault counter is %ld - %ld\n", ppn, pm->getNrOfCows(ppn));
   assert(pm->isInCowCnt(ppn) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
   size_t cow_cnts_left = decreaseCowCnt(ppn);
   debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, cow_cnts_left);
@@ -323,3 +344,5 @@ bool PageManager::checkForCow(size_t address)
   current_archmem->unlockArchMemory();
   return true;
 }
+
+//----------------------------------------------------------------------------------cow end

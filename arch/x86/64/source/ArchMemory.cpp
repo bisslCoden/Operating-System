@@ -51,7 +51,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   pm->lockCowCnt();
   if(pm->decreaseCowCnt(ppn) == 0)
   {
-    debug(X_USERTHREAD, "[%ld] counter of my page is 0 so I ll free it!\n", currentThread->getTID());
+    debug(X_ARCHMEM, "[%ld] unmapPage(): counter of my page is 0 so I ll free it!\n", currentThread->getTID());
     PageManager::instance()->freePPN(ppn);
     m.pt[m.pti].present = 0;
   }
@@ -162,7 +162,6 @@ ArchMemory::~ArchMemory()
                   size_t ppn = pt[pti].page_ppn;
                   PageManager* pm = PageManager::instance();
                   pm->lockCowCnt();
-                  // free if decreaseCowCnt() returns 0 (not in list or 0 after decrese)
                   if(pm->decreaseCowCnt(ppn) == 0)
                   {
                     debug(X_USERPROCESS, "Counter of my page is 0 so I ll free it!\n");
@@ -374,12 +373,12 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
               {
                 if(pt_src[pti].present)
                 {
-                  pt_src[pti].writeable = 0;
                   pt_src[pti].cow = 1;
+                  pt_src[pti].writeable = 0;
+                  pt_dest[pti].cow = 1;
+                  pt_dest[pti].writeable = 0;
                   PageManager::instance()->lockCowCnt();
                   PageManager::instance()->increaseCowCnt(pt_src[pti].page_ppn);
-                  debug(X_USERPROCESS, "after cow for page %ld and counter is: %ld\n", pt_src[pti].page_ppn, 
-                  PageManager::instance()->getNrOfCows((pt_src[pti].page_ppn)));
                   PageManager::instance()->unlockCowCnt();
                 }
               }

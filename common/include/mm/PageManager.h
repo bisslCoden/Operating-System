@@ -67,11 +67,14 @@ class PageManager
 
     void    lockCowCnt()                  { cow_cnt_lock_.acquire(); }
     void    unlockCowCnt()                { cow_cnt_lock_.release(); }
-    // MUST BE LOCKED WITH LOCKCOWCNT
+    //      initialized/increases counter.
     void    increaseCowCnt(size_t ppn);
+    //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
     size_t  decreaseCowCnt(size_t ppn);
-    bool    isInCowCnt(size_t ppn)        { return cow_cnt_.find(ppn) != cow_cnt_.end(); };
-    size_t  getNrOfCows(size_t ppn)       { return ( (cow_cnt_.find(ppn) != cow_cnt_.end())? cow_cnt_[ppn]: 0); };
+    //      isInCowCnt() returns true if ppn found in map
+    bool    isInCowCnt(size_t ppn);
+    //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
+    size_t  getNrOfCows(size_t ppn);
   private:
     /**
      * used internally to mark pages as reserved
