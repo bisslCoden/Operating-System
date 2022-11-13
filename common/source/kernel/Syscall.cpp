@@ -635,7 +635,7 @@ size_t Syscall::clock()
 {
   UserThread* thread = (UserThread*) currentThread;
   //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
-  size_t duaration = Scheduler::instance()->getClockSum();
+  size_t duaration = thread->getParentProcess()->getClockSum();
   duaration += thread->getParentProcess()->getDuaration();
   return duaration;
 }

@@ -380,3 +380,13 @@ void UserProcess::removeOldProcessInformation()
   offsetlist_lock_.release();
   debug(X_USERPROCESS, "removingOldProcessInformation() finished\n");
 }
+
+size_t UserProcess::getClockSum()
+{
+  size_t sum = 0;
+  for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
+  {
+    sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
+  }
+  return sum;
+}

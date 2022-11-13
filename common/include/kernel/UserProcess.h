@@ -180,6 +180,8 @@ class UserProcess
     
     void incDuaration(size_t duaration) { duaration_ += duaration; };
 
+    size_t getClockSum();
+
 
 
   //set these to protected to children can access aswell
