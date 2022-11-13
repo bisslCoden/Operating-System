@@ -618,23 +618,34 @@ int Syscall::get_pid()
   // frequency is needed, with that we multiply clock_per_sec
 unsigned int Syscall::sleep(unsigned int seconds)
 {
-  debug(SLEEP, "Sleep system call started\n");
+  if(seconds == 0)
+    return 0;
+  //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
+  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getDiffAvg() + rdtsc_now;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
-  while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
-  {
-    debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
+  
+  // see diff between avg and getdiffpertick
+
+  //
+  currentUserThread->setTimeToWake(time_to_wake);
+  debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
+  Scheduler::instance()->yield();
+  //while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
+  //{
+    //debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
     
-    debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
+    //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
     
     //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
-     //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
-     //Scheduler::instance()->getFrequency());
-    Scheduler::instance()->yield();
-  }
+    //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
+    //Scheduler::instance()->getFrequency());
+    
+    //Scheduler::instance()->yield();
+    
+  //}
   return 0;
 }
 
@@ -651,8 +662,13 @@ unsigned int Syscall::sleep(unsigned int seconds)
 size_t Syscall::clock()
 {
   UserThread* thread = (UserThread*) currentThread;
-  return thread->getParentProcess()->getDuaration();
+  //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
+  size_t duaration = thread->getParentProcess()->getClockSum();
+  duaration += thread->getParentProcess()->getDuaration();
+  return duaration / (Scheduler::instance()->getDiffAvg());
 }
+
+// 78.3%
 
 // commented out bc testing
 // The clock() function returns an approximation of processor time used by the program

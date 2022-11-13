@@ -194,6 +194,9 @@ class UserProcess
     void lockArchMem(){archmem_lock_.acquire();}
     void unlockArchMem(){archmem_lock_.release();}
     
+    void incDuaration(size_t duaration) { duaration_ += duaration; };
+
+    size_t getClockSum();
 
 
 
@@ -239,7 +242,7 @@ class UserProcess
     bool child_;
 
     // for clock
-    size_t duaration_;
+    size_t duaration_ = 0;
 
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
