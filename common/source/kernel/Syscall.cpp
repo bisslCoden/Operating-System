@@ -663,7 +663,7 @@ size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  return (duaration / Scheduler::instance()->getDiffAvg()) * 54;
+  return (duaration / (Scheduler::instance()->getDiffAvg());
 }
 
 // 78.3%
