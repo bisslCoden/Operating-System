@@ -242,15 +242,16 @@ void Scheduler::incTicks()
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
   rdtsc_diff_sum += rdtsc_diff_per_tick;
-  if(ticks_ <= 15)
+  /*if(ticks_ <= 15)
   {
     diff_avg = rdtsc_diff_sum / ticks_;
   }
   else
   {
     diff_avg = rdtsc_diff_sum / (ticks_ - 15);
-  }
-  if(ticks_ == 15)
+  }*/
+  diff_avg = rdtsc_diff_sum / ticks_;
+  if(ticks_ % 10 == 0)
   {
     rdtsc_diff_sum = 0;
   }
