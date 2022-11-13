@@ -117,7 +117,6 @@ void Scheduler::addNewThread(Thread *thread)
   lockScheduling();
   KernelMemoryManager::instance()->getKMMLock().release();
   threads_.push_back(thread);
-  thread->setLastStart(getRDTSC());
   unlockScheduling();
 }
 
@@ -253,9 +252,8 @@ void Scheduler::incTicks()
   if(ticks_ % 10 != 0)
     diff_avg = rdtsc_diff_sum / (ticks_ % 10);
   else
-    diff_avg = rdtsc_diff_per_tick;
-  if(ticks_ % 10 == 0)
   {
+    diff_avg = rdtsc_diff_per_tick;
     rdtsc_diff_sum = 0;
   }
   //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);

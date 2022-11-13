@@ -43,6 +43,7 @@ UserThread::UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl:
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
+  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -87,15 +88,19 @@ bool UserThread::schedulable(){
     
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, 0, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (sleepy == 0)
-    {
-      return true;
-    }
-    else if(sleepy == 1)
+    if(sleepy == 1)
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, 1, ustl::memory_order_seq_cst);
       return false;
+    }
+    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
+    {
+      return false;
+    }
+    else if(sleepy == 0)
+    {
+      return true;
     }
     else
     {
@@ -103,6 +108,7 @@ bool UserThread::schedulable(){
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
+
   return false;
 }
 
@@ -136,7 +142,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-
+  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   process_->lockKill();
@@ -185,6 +191,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
   Userthread = true;
+  last_start_ = Scheduler::instance()->getRDTSC();
 
 
 

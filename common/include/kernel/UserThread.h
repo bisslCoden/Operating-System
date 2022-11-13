@@ -8,6 +8,7 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_MAX_IN_MB 8
+#define currentUserThread ((UserThread*)currentThread)
 
 class UserProcess;
 
@@ -109,6 +110,14 @@ class UserThread : public Thread
     // no-args here
     int execv();
 
+    size_t getLastStart() {return last_start_; }
+
+    void setLastStart(size_t time) {last_start_ = time;}
+
+    size_t getTimeToWake() {return time_to_wake_; }
+
+    void setTimeToWake(size_t time) {time_to_wake_ = time;}
+
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
@@ -177,5 +186,11 @@ class UserThread : public Thread
     
     // only true if removeFromThreadList() detects last thread to delete process
     bool last_ = false; 
+
+    //clock
+    size_t last_start_;
+
+    //sleep
+    size_t time_to_wake_ = 0;
 };
 
