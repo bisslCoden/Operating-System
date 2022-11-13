@@ -248,26 +248,18 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
   lock_.release();
 }
 
-bool PageManager::decreaseCowCnt(size_t ppn)
+size_t PageManager::decreaseCowCnt(size_t ppn)
 {
   // not found: remove page
   if(!isInCowCnt(ppn)) 
-    return true;
+    return 0;
 
-  // found: (decrese if >1) OR (remove page if 1 process waits)
-  if(getNrOfCows(ppn) > 1)
-  {
-    cow_cnt_.at(ppn)--;
-    return false;
-  } 
-  else if(getNrOfCows(ppn) == 1)
-  {
+  // decrease counter, erase entry if cnt = 0, return cnt
+  cow_cnt_.at(ppn)--;
+  assert(getNrOfCows(ppn) && "cow cnt was 0");
+  if(getNrOfCows(ppn) == 1)
     cow_cnt_.erase(ppn);
-    return true;
-  }
-
-  assert(cow_cnt_.at(ppn) && "cow_cnt_.at(ppn) = 0?");
-  assert(false && "WTF?");
+  return getNrOfCows(ppn);
 }
 
 void PageManager::increaseCowCnt(size_t ppn)
@@ -306,21 +298,25 @@ bool PageManager::checkForCow(size_t address)
     return false;
   }
 
-  // check counter for this ppn. if counter = 1 take page else copy.
+  // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   PageManager* pm = PageManager::instance();
   pm->lockCowCnt();
-  size_t ppn_src = m.pt[m.pti].page_ppn;
-  assert(pm->isInCowCnt(ppn_src) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
-  debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnt_ for ppn is %ld. returning true\n", address, pm->getNrOfCows(ppn_src));
-  if(pm->getNrOfCows(ppn_src) > 1)
+  size_t ppn = m.pt[m.pti].page_ppn;
+  assert(pm->isInCowCnt(ppn) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
+  size_t cow_cnts_left = decreaseCowCnt(ppn);
+  debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, cow_cnts_left);
+  if(cow_cnts_left > 0)
   {
-    m.pt[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn_src);
-    PageManager::instance()->cow_cnt_.at(ppn_src)--;
+    m.pt[m.pti].present = 0;
+    m.pt[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+    m.pt[m.pti].present = 1;
   }
   else
-    pm->cow_cnt_.erase(ppn_src);
-  m.pt[m.pti].cow = 0;
-  m.pt[m.pti].writeable = 1;
+  {
+    m.pt[m.pti].cow = 0;
+    m.pt[m.pti].writeable = 1;
+  }
+
   pm->unlockCowCnt();
   current_archmem->unlockArchMemory();
   return true;

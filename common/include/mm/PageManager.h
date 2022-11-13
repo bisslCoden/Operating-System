@@ -69,7 +69,7 @@ class PageManager
     void    unlockCowCnt()                { cow_cnt_lock_.release(); }
     // MUST BE LOCKED WITH LOCKCOWCNT
     void    increaseCowCnt(size_t ppn);
-    bool    decreaseCowCnt(size_t ppn);
+    size_t  decreaseCowCnt(size_t ppn);
     bool    isInCowCnt(size_t ppn)        { return cow_cnt_.find(ppn) != cow_cnt_.end(); };
     size_t  getNrOfCows(size_t ppn)       { return ( (cow_cnt_.find(ppn) != cow_cnt_.end())? cow_cnt_[ppn]: 0); };
   private:

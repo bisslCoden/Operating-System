@@ -40,11 +40,22 @@ bool ArchMemory::checkAndRemove(pointer map_ptr, uint64 index)
 
 bool ArchMemory::unmapPage(uint64 virtual_page)
 {
+  lockArchMemory();
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
-  m.pt[m.pti].present = 0;
-  PageManager::instance()->freePPN(m.page_ppn);
+  
+  // free if counter not in map or after descresing counter = 0.
+  size_t ppn = m.pt[m.pti].page_ppn;
+  PageManager* pm = PageManager::instance();
+  pm->lockCowCnt();
+  if(pm->decreaseCowCnt(ppn) == 0)
+  {
+    PageManager::instance()->freePPN(ppn);
+    m.pt[m.pti].present = 0;
+  }
+  pm->unlockCowCnt();
+
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
   bool empty = checkAndRemove<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti);
   if (empty)
@@ -62,6 +73,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
     empty = checkAndRemove<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i);
     PageManager::instance()->freePPN(m.pdpt_ppn);
   }
+  unlockArchMemory();
   return true;
 }
 
@@ -149,8 +161,8 @@ ArchMemory::~ArchMemory()
                   size_t ppn = pt[pti].page_ppn;
                   PageManager* pm = PageManager::instance();
                   pm->lockCowCnt();
-                  // free if not in counter, or decreaseCowCnt() returned true
-                  if(pm->decreaseCowCnt(ppn))
+                  // free if decreaseCowCnt() returns 0 (not in list or 0 after decrese)
+                  if(pm->decreaseCowCnt(ppn) == 0)
                   {
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
@@ -362,8 +374,6 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
                 {
                   pt_src[pti].writeable = 0;
                   pt_src[pti].cow = 1;
-                  pt_dest[pti].writeable = 0;
-                  pt_dest[pti].cow = 1;
                   PageManager::instance()->lockCowCnt();
                   PageManager::instance()->increaseCowCnt(pt_src[pti].page_ppn);
                   PageManager::instance()->unlockCowCnt();
