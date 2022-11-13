@@ -66,28 +66,26 @@ UserProcess::UserProcess(UserProcess *parent) :
   waiting_exec_ = 0;
   waiting_exec_lock_.release();
 
-  debug(X_USERPROCESS, "Entering UserProcess fork constructor of pid %ld\n", pid_);
+  debug(X_USERPROCESS, "UserProcess() fork PID = [%ld]\n", pid_);
   if(!working_dir_)
   {
-    debug(USERPROCESS, "Failed to obtain working directory!\n");
+    debug(USERPROCESS, "UserProcess() fork: Failed to obtain working directory!\n");
     return;
   }
 
   if (!setupLoader(fd_))
     return;
-  debug(USERPROCESS, "UserProcess fork constructor sucessfully setupLoader()\n");
+  debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
 
-  debug(USERPROCESS, "Start copying virtual memory!\n");
-  threads_lock_.acquire();
-  currentUserThread->loader_->arch_memory_.copyVirtualMem(loader_->arch_memory_);
-  threads_lock_.release();
+  currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_);
+  debug(USERPROCESS, "UserProcess() fork: setCowToArchmemPages()\n");
 
-  debug(USERPROCESS, "Creating new Thread for Fork\n");
+  debug(USERPROCESS, "UserProcess() fork: Creating new Thread for Fork\n");
   UserThread* parent_thread = currentUserThread;
   auto thread = new UserThread(this, parent_thread);
   if(!thread || thread->getTID()==0)
   {
-    debug(USERPROCESS, "Failed to create Thread for Fork!\n");
+    debug(USERPROCESS, "UserProcess() fork: Failed to create Thread for Fork!\n");
     delete thread;
     return;
   }

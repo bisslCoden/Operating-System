@@ -234,6 +234,7 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
   assert((page_size % PAGE_SIZE) == 0);
   //debug(X_PAGEMANAGER, "freePPN(page_numer = %x, page_size = %d) entered.\n", page_number, page_size);
 
+  // does this also set present to 0?
   memset((void*)ArchMemory::getIdentAddressOfPPN(page_number), 0xFF, page_size);
 
   lock_.acquire();
@@ -249,35 +250,24 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
 
 bool PageManager::decreaseCowCnt(size_t ppn)
 {
-  // if ppn in map
-  if(cow_cnt_.find(ppn) != cow_cnt_.end()) 
+  // not found: remove page
+  if(!isInCowCnt(ppn)) 
+    return true;
+
+  // found: (decrese if >1) OR (remove page if 1 process waits)
+  if(getNrOfCows(ppn) > 1)
   {
-    if(cow_cnt_.at(ppn) > 1)
-    {
-      // decrese counter and return false (present stays 1)
-      cow_cnt_.at(ppn)--;
-      return false;
-    } 
-    else
-    {
-      // erase counter and free ppn. return true to 
-      cow_cnt_.erase(ppn);
-      PageManager::instance()->freePPN(ppn);
-      return true;
-    }
-  }
-  else
+    cow_cnt_.at(ppn)--;
+    return false;
+  } 
+  else if(getNrOfCows(ppn) == 1)
   {
-    PageManager::instance()->freePPN(ppn);
+    cow_cnt_.erase(ppn);
     return true;
   }
-  assert(false && "wtf?");
-}
 
-void PageManager::eraseCowCntEntry(size_t ppn)
-{
-  cow_cnt_.erase(ppn);
-  PageManager::instance()->freePPN(ppn);
+  assert(cow_cnt_.at(ppn) && "cow_cnt_.at(ppn) = 0?");
+  assert(false && "WTF?");
 }
 
 void PageManager::increaseCowCnt(size_t ppn)
@@ -287,10 +277,51 @@ void PageManager::increaseCowCnt(size_t ppn)
   cow_cnt_[ppn]++;
 }
 
-size_t PageManager::getNrOfCows(size_t ppn)
+bool PageManager::checkForCow(size_t address)
 {
-  if(cow_cnt_.find(ppn) == cow_cnt_.end())
+  // setup archmem and checkAddressValid()
+  ArchMemory* current_archmem = &(currentUserThread->getProcess()->getLoader()->arch_memory_);
+  current_archmem->lockArchMemory();
+  if(!current_archmem->checkAddressValid(address))
   {
-    
+    debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
+    current_archmem->unlockArchMemory();
+    return false;
   }
+  
+  // if !present OR !(cow =1 AND writable = 0) -> no cow, that's another problem
+  size_t vpn = address/PAGE_SIZE;
+  ArchMemoryMapping m = current_archmem->resolveMapping(vpn);
+  if(!m.pt[m.pti].present)
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
+    current_archmem->unlockArchMemory();
+    return false;
+  }
+
+  if(!(m.pt[m.pti].cow && !m.pt[m.pti].writeable))
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
+    current_archmem->unlockArchMemory();
+    return false;
+  }
+
+  // check counter for this ppn. if counter = 1 take page else copy.
+  PageManager* pm = PageManager::instance();
+  pm->lockCowCnt();
+  size_t ppn_src = m.pt[m.pti].page_ppn;
+  assert(pm->isInCowCnt(ppn_src) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
+  debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnt_ for ppn is %ld. returning true\n", address, pm->getNrOfCows(ppn_src));
+  if(pm->getNrOfCows(ppn_src) > 1)
+  {
+    m.pt[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn_src);
+    PageManager::instance()->cow_cnt_.at(ppn_src)--;
+  }
+  else
+    pm->cow_cnt_.erase(ppn_src);
+  m.pt[m.pti].cow = 0;
+  m.pt[m.pti].writeable = 1;
+  pm->unlockCowCnt();
+  current_archmem->unlockArchMemory();
+  return true;
 }

@@ -4,7 +4,7 @@
 #include "paging-definitions.h"
 #include "SpinLock.h"
 #include "Bitmap.h"
-#include "ustl.h"
+#include "umap.h"
 #include "Mutex.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
@@ -56,13 +56,22 @@ class PageManager
       page_usage_table_->bmprint();
     }
 
+    /**
+     * @brief 
+     * 
+     * @param address 
+     * @return true 
+     * @return false 
+     */
+    bool checkForCow(size_t address);
+
+    void    lockCowCnt()                  { cow_cnt_lock_.acquire(); }
+    void    unlockCowCnt()                { cow_cnt_lock_.release(); }
+    // MUST BE LOCKED WITH LOCKCOWCNT
     void    increaseCowCnt(size_t ppn);
     bool    decreaseCowCnt(size_t ppn);
-    void    eraseCowCntEntry(size_t ppn);
-    size_t  getNrOfCows(size_t ppn);
-    bool    isInCowCnt(size_t ppn) { return cow_cnt_.find(ppn) != cow_cnt_.end(); };
-    void    lockCowCnt()           { cow_cnt_lock_.acquire(); }
-    void    unlockCowCnt()         { cow_cnt_lock_.release(); }
+    bool    isInCowCnt(size_t ppn)        { return cow_cnt_.find(ppn) != cow_cnt_.end(); };
+    size_t  getNrOfCows(size_t ppn)       { return ( (cow_cnt_.find(ppn) != cow_cnt_.end())? cow_cnt_[ppn]: 0); };
   private:
     /**
      * used internally to mark pages as reserved

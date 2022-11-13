@@ -122,8 +122,23 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
-  void copyVirtualMem(ArchMemory &destination);
-  Mutex arch_memory_lock_;
+  /**
+   * @brief sets/increases the PageManager*::cow_cnt_ 
+   * 
+   * @param destination 
+   */
+  void setCowToArchmemPages(ArchMemory &destination);
+  /**
+   * @brief MUST BE LOCKED FROM OUTSIDE. 
+   * copies from src to dest. alloc new page for dest. 
+   * 
+   * @param ppn_src the src
+   * @return size_t the dest ppn
+   */
+  size_t allocDestAndCopySrc(size_t ppn_src);
+  
+  void lockArchMemory()   { arch_memory_lock_.acquire(); }
+  void unlockArchMemory() { arch_memory_lock_.release(); }
 private:
 
 /** 
@@ -149,5 +164,7 @@ private:
 
   ArchMemory(ArchMemory const &src);
   ArchMemory &operator=(ArchMemory const &src);
+
+  Mutex arch_memory_lock_ = "ArchMemory::arch_memory_lock_";
 };
 

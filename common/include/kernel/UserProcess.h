@@ -7,7 +7,6 @@
 #include "uvector.h"
 #include "Loader.h"
 
-#define NO_EXEC_CALL 123454321
 enum ProcessState
 {
 ZERO, //to check if the process exist or not with getProcessState()
@@ -16,8 +15,6 @@ RUNNING_AND_RUNNABLE,
 INTERRRUPTABLE_SLEEP,
 STOPPED
 };
-
-#define NO_EXEC_CALL 123454321
 
 class UserThread;
 class Syscall;
