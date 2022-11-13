@@ -661,11 +661,9 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 size_t Syscall::clock()
 {
-  UserThread* thread = (UserThread*) currentThread;
-  //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
-  size_t duaration = thread->getParentProcess()->getClockSum();
-  duaration += thread->getParentProcess()->getDuaration();
-  return duaration / (Scheduler::instance()->getDiffAvg());
+  size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+  duaration += currentUserThread->getParentProcess()->getDuaration();
+  return (duaration / (Scheduler::instance()->getDiffAvg()) * 54);
 }
 
 // 78.3%
