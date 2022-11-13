@@ -255,11 +255,13 @@ size_t PageManager::decreaseCowCnt(size_t ppn)
     return 0;
 
   // decrease counter, erase entry if cnt = 0, return cnt
-  cow_cnt_.at(ppn)--;
+  cow_cnt_[ppn]--;
+  size_t cow_ct = cow_cnt_[ppn]; 
   assert(getNrOfCows(ppn) && "cow cnt was 0");
-  if(getNrOfCows(ppn) == 1)
+  if(getNrOfCows(ppn) == 0)
     cow_cnt_.erase(ppn);
-  return getNrOfCows(ppn);
+  debug(PM, "%ld cow cont now is %ld\n", ppn, cow_cnt_[ppn]);
+  return cow_ct;
 }
 
 void PageManager::increaseCowCnt(size_t ppn)
@@ -267,6 +269,7 @@ void PageManager::increaseCowCnt(size_t ppn)
   if(cow_cnt_.find(ppn) == cow_cnt_.end())
     cow_cnt_.insert(ustl::make_pair(ppn, 1));
   cow_cnt_[ppn]++;
+  debug(PM, "%ld cow cont now is %ld\n", ppn, cow_cnt_[ppn]);
 }
 
 bool PageManager::checkForCow(size_t address)
@@ -300,21 +303,24 @@ bool PageManager::checkForCow(size_t address)
 
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   PageManager* pm = PageManager::instance();
-  pm->lockCowCnt();
   size_t ppn = m.pt[m.pti].page_ppn;
+  debug(PM, "At cow pagefault counter is %ld - %ld\n", ppn, pm->getNrOfCows(ppn));
+  pm->lockCowCnt();
+ 
   assert(pm->isInCowCnt(ppn) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
   size_t cow_cnts_left = decreaseCowCnt(ppn);
   debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, cow_cnts_left);
+  PageTableEntry* pt_src  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   if(cow_cnts_left > 0)
   {
-    m.pt[m.pti].present = 0;
-    m.pt[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
-    m.pt[m.pti].present = 1;
+    pt_src[m.pti].present = 0;
+    pt_src[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+    pt_src[m.pti].present = 1;
   }
   else
   {
-    m.pt[m.pti].cow = 0;
-    m.pt[m.pti].writeable = 1;
+    pt_src[m.pti].cow = 0;
+    pt_src[m.pti].writeable = 1;
   }
 
   pm->unlockCowCnt();

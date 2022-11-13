@@ -51,6 +51,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   pm->lockCowCnt();
   if(pm->decreaseCowCnt(ppn) == 0)
   {
+    debug(X_USERTHREAD, "[%ld] counter of my page is 0 so I ll free it!\n", currentThread->getTID());
     PageManager::instance()->freePPN(ppn);
     m.pt[m.pti].present = 0;
   }
@@ -164,6 +165,7 @@ ArchMemory::~ArchMemory()
                   // free if decreaseCowCnt() returns 0 (not in list or 0 after decrese)
                   if(pm->decreaseCowCnt(ppn) == 0)
                   {
+                    debug(X_USERPROCESS, "Counter of my page is 0 so I ll free it!\n");
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
                     assert(!pt[pti].present && "freePPN() does not set present bit to 0");
@@ -376,6 +378,8 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
                   pt_src[pti].cow = 1;
                   PageManager::instance()->lockCowCnt();
                   PageManager::instance()->increaseCowCnt(pt_src[pti].page_ppn);
+                  debug(X_USERPROCESS, "after cow for page %ld and counter is: %ld\n", pt_src[pti].page_ppn, 
+                  PageManager::instance()->getNrOfCows((pt_src[pti].page_ppn)));
                   PageManager::instance()->unlockCowCnt();
                 }
               }
@@ -442,6 +446,7 @@ size_t ArchMemory::allocDestAndCopySrc(size_t ppn_src)
   size_t ppn_dest = PageManager::instance()->allocPPN();
   size_t vaddr_dest = ArchMemory::getIdentAddressOfPPN(ppn_dest);
   size_t vaddr_src  = ArchMemory::getIdentAddressOfPPN(ppn_src);
+  //PageTableEntry* pt_src  = (PageTableEntry*) getIdentAddressOfPPN(pd_src[pdi].pt.page_ppn);
   memcpy((void*)vaddr_dest, (void*)vaddr_src, PAGE_SIZE);
   return ppn_dest;
 }

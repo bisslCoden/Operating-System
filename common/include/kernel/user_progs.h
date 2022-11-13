@@ -11,7 +11,7 @@ char const *user_progs[] = {
                             // "/usr/threadattack.sweb",
                             // "usr/execprinter2.sweb",
                             // "usr/pthreadfork.sweb",
-                            "usr/forkcow.sweb",
+                            //"usr/forkcow.sweb",
                             0
                            };
 
