@@ -622,7 +622,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
     return 0;
   //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getDiffAvg() + rdtsc_now;
+  uint64_t time_to_wake = seconds * (182 * Scheduler::instance()->getDiffAvg()) + rdtsc_now;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
@@ -649,10 +649,6 @@ unsigned int Syscall::sleep(unsigned int seconds)
   return 0;
 }
 
-// 71.6 % 
-// 75.4 %
-
-
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
 // we need to increment the ticks variable for every thread of the process
@@ -663,10 +659,8 @@ size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  return (duaration / (Scheduler::instance()->getDiffAvg());
+  return duaration / CLOCKS_PER_SEC;
 }
-
-// 78.3%
 
 // commented out bc testing
 // The clock() function returns an approximation of processor time used by the program
