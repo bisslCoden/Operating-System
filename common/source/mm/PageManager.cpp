@@ -259,7 +259,7 @@ size_t PageManager::getNrOfCows(size_t ppn)
 { 
   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
   assert(isInCowCnt(ppn) && "if you use this method pls check isInCowCnt(ppn) before");
-  debug(X_PAGEMANAGER, "TID [%ld] getNrOfCows(%lx) found value %ld\n", currentThread->getTID(), ppn, cow_cnt_[ppn]);
+  debug(X_PAGEMANAGER, "getNrOfCows(%lx) found value %ld\n", ppn, cow_cnt_[ppn]);
   return cow_cnt_[ppn]; 
 }
 
@@ -270,14 +270,16 @@ size_t PageManager::decreaseCowCnt(size_t ppn)
   if(!isInCowCnt(ppn)) 
     return cnt;
 
-  debug(X_PAGEMANAGER, "TID [%ld] decreaseCowCnt(%lx) found value %ld\n", getNrOfCows(ppn), ppn, cnt);
+  debug(X_PAGEMANAGER, "decreaseCowCnt(%lx) found value %ld\n", ppn, cow_cnt_[ppn]);
 
-  if(getNrOfCows(ppn) > 1)
-    cnt = cow_cnt_[ppn]--;
+  cow_cnt_[ppn]--;
+
+  if(cow_cnt_[ppn] > 0)
+    cnt = cow_cnt_[ppn];
   else
     cow_cnt_.erase(ppn);
 
-  debug(X_PAGEMANAGER, "TID [%ld] decreaseCowCnt(%lx) found decreased to value %ld\n", currentThread->getTID(), ppn, cnt);
+  debug(X_PAGEMANAGER, "decreaseCowCnt(%lx) found decreased to value %ld\n", ppn, cnt);
   return cnt;
 }
 
@@ -326,19 +328,17 @@ bool PageManager::checkForCow(size_t address)
   PageManager* pm = PageManager::instance();
   size_t ppn = m.page_ppn;
   pm->lockCowCnt();
-  debug(X_PAGEMANAGER, "At cow pagefault counter is %ld - %ld\n", ppn, pm->getNrOfCows(ppn));
   assert(pm->isInCowCnt(ppn) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
-  size_t cow_cnts_left = decreaseCowCnt(ppn);
-  debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, cow_cnts_left);
-  PageTableEntry* pt_src  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  if(cow_cnts_left > 0)
+  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+  if(decreaseCowCnt(ppn) > 0)
   {
-    pt_src[m.pti].present = 0;
-    pt_src[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
-    pt_src[m.pti].present = 1;
+    //debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, getNrOfCows(ppn));
+    pt_ident[m.pti].present = 0;
+    pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+    pt_ident[m.pti].present = 1;
   }
-  pt_src[m.pti].cow = 0;
-  pt_src[m.pti].writeable = 1;
+  pt_ident[m.pti].cow = 0;
+  pt_ident[m.pti].writeable = 1;
 
   pm->unlockCowCnt();
   current_archmem->unlockArchMemory();

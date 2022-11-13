@@ -51,7 +51,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   pm->lockCowCnt();
   if(pm->decreaseCowCnt(ppn) == 0)
   {
-    debug(X_ARCHMEM, "[%ld] unmapPage(): counter of my page is 0 so I ll free it!\n", currentThread->getTID());
+    debug(X_ARCHMEM, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     PageManager::instance()->freePPN(ppn);
     m.pt[m.pti].present = 0;
   }
@@ -164,7 +164,7 @@ ArchMemory::~ArchMemory()
                   pm->lockCowCnt();
                   if(pm->decreaseCowCnt(ppn) == 0)
                   {
-                    debug(X_USERPROCESS, "Counter of my page is 0 so I ll free it!\n");
+                    debug(X_ARCHMEM, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
                     assert(!pt[pti].present && "freePPN() does not set present bit to 0");
@@ -350,6 +350,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
     if(pml4_src[pml4i].present)
     {
       pml4_dest[pml4i].page_ppn = PageManager::instance()->allocPPN();
+      debug(X_ARCHMEM, "setCowToArchmemPages(): pml4_dest[pml4i].page_ppn = %lx\n",  (size_t)pml4_dest[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_src  = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_src[pml4i].page_ppn);
       PageDirPointerTableEntry *pdpt_dest = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4_dest[pml4i].page_ppn);
       memcpy((void*) pdpt_dest, (void*) pdpt_src, PAGE_SIZE);
@@ -358,6 +359,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
         if(pdpt_src[pdpti].pd.present)
         {
           pdpt_dest[pdpti].pd.page_ppn = PageManager::instance()->allocPPN();
+          debug(X_ARCHMEM, "setCowToArchmemPages(): pdpt_dest[pdpti].pd.page_ppn = %lx\n", (size_t)pdpt_dest[pdpti].pd.page_ppn);
           PageDirEntry* pd_src  = (PageDirEntry*) getIdentAddressOfPPN(pdpt_src[pdpti].pd.page_ppn);
           PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
           memcpy((void*) pd_dest, (void*) pd_src, PAGE_SIZE);
@@ -366,6 +368,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination)
             if(pd_src[pdi].pt.present)
             {
               pd_dest[pdi].pt.page_ppn = PageManager::instance()->allocPPN();
+              debug(X_ARCHMEM, "setCowToArchmemPages(): pd_dest[pdi].pt.page_ppn = %lx\n", (size_t)pd_dest[pdi].pt.page_ppn);
               PageTableEntry* pt_src  = (PageTableEntry*) getIdentAddressOfPPN(pd_src[pdi].pt.page_ppn);
               PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
               memcpy((void*) pt_dest, (void*) pt_src, PAGE_SIZE);
