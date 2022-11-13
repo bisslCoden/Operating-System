@@ -24,6 +24,15 @@ int main(int argc, char *argv[]) {
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  printf("join returned: %d got val %d\n",returner, ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  printf("join returned: %d got val %d\n",returner, ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  printf("join returned: %d got val %d\n",returner, ret);
   clock_t time_2 = clock();
   printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2));
   printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1)));

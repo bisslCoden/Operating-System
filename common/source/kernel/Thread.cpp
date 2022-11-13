@@ -38,6 +38,7 @@ Thread::Thread(FileSystemInfo *working_dir, ustl::string name, Thread::TYPE type
   ArchThreads::createKernelRegisters(kernel_registers_, (void*) (type == Thread::USER_THREAD ? 0 : threadStartHack), getKernelStackStartPointer());
   kernel_stack_[2047] = STACK_CANARY;
   kernel_stack_[0] = STACK_CANARY;
+  //currentThread->setLastStart(Scheduler::instance()->getRDTSC());
 }
 
 Thread::~Thread()
@@ -67,6 +68,8 @@ void Thread::kill()
 
   debug(THREAD, "kill called by currentThread-> TID: [%ld]. killing TID: [%ld]\n", getTID(), currentThread->getTID());
 
+  ((UserThread*)currentThread)->getParentProcess()->incDuaration(
+    Scheduler::instance()->getRDTSC() - currentThread->getLastStart());
   setState(ToBeDestroyed); // vvv Code below this line may not be executed vvv
 
   if (currentThread == this)

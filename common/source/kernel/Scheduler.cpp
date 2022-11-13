@@ -242,15 +242,15 @@ void Scheduler::incTicks()
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
   rdtsc_diff_sum += rdtsc_diff_per_tick;
-  if(ticks_ <= 20)
+  if(ticks_ <= 10)
   {
     diff_avg = rdtsc_diff_sum / ticks_;
   }
-  if(ticks_ > 20)
+  if(ticks_ > 10)
   {
-    diff_avg = rdtsc_diff_sum / (ticks_ - 20);
+    diff_avg = rdtsc_diff_sum / (ticks_ - 10);
   }
-  if(ticks_ == 20)
+  if(ticks_ == 10)
   {
     rdtsc_diff_sum = 0;
   }
@@ -307,7 +307,7 @@ void Scheduler::printLockingInformation()
   unlockScheduling();
 }
 
-size_t Scheduler::getClockSum()
+/*
 {
   size_t sum = 0;
   for (size_t c = 0; c < threads_.size(); ++c)
@@ -315,4 +315,4 @@ size_t Scheduler::getClockSum()
     sum += getRDTSC() - threads_[c]->getLastStart();
   }
   return sum;
-}
+}*/
