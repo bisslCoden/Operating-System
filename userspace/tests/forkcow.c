@@ -14,16 +14,18 @@ void printArrayVals(int* array, pid_t pid)
   for(int i = 0; i < NR_OF_ARGS; i++)
   {
     if(pid > 0)
-      printf("parent array[%d] = %d\n", i, array[i]);
+      printf("  parent array[%d] = %d\n", i, array[i]);
     else if(pid == 0)
-      printf("child array[%d] = %d\n", i, array[i]);
+      printf("  child array[%d] = %d\n", i, array[i]);
     else
       return;
   }
+  printf("finished printArrayvals(pid = %ld)\n", pid);
 }
 
 int main()
 {
+  printf("main() starting..\n");
 	int values[NR_OF_ARGS];
   setArrayVals(values, -1000);
   printArrayVals(values, -1000);
