@@ -257,7 +257,6 @@ size_t PageManager::decreaseCowCnt(size_t ppn)
   // decrease counter, erase entry if cnt = 0, return cnt
   cow_cnt_[ppn]--;
   size_t cow_ct = cow_cnt_[ppn]; 
-  assert(getNrOfCows(ppn) && "cow cnt was 0");
   if(getNrOfCows(ppn) == 0)
     cow_cnt_.erase(ppn);
   debug(PM, "%ld cow cont now is %ld\n", ppn, cow_cnt_[ppn]);
@@ -303,7 +302,7 @@ bool PageManager::checkForCow(size_t address)
 
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   PageManager* pm = PageManager::instance();
-  size_t ppn = m.pt[m.pti].page_ppn;
+  size_t ppn = m.page_ppn;
   debug(PM, "At cow pagefault counter is %ld - %ld\n", ppn, pm->getNrOfCows(ppn));
   pm->lockCowCnt();
  
@@ -317,11 +316,8 @@ bool PageManager::checkForCow(size_t address)
     pt_src[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
     pt_src[m.pti].present = 1;
   }
-  else
-  {
-    pt_src[m.pti].cow = 0;
-    pt_src[m.pti].writeable = 1;
-  }
+  pt_src[m.pti].cow = 0;
+  pt_src[m.pti].writeable = 1;
 
   pm->unlockCowCnt();
   current_archmem->unlockArchMemory();
