@@ -540,42 +540,7 @@ int32 Syscall::pthread_cancel(size_t thread)
   cancel_victim->unlockFlagMutex();
   current->getProcess()->unLockThreadMutex();
   return 0;
-  //Threadflags* its_flags = cancel_victim->getflags();
 
-
-/* WE DONT NEED THIS ANYMORE
-  if ((its_flags->cancelable == PTHREAD_CANCEL_ENABLE) &&
-    its_flags->deferred == PTHREAD_CANCEL_ASYNCHRONOUS) //queue cancellation request
-  {
- 
-    debug(X_USERTHREAD, "Thread [%ld] could be cancelled right away and is now killed!\n", cancel_victim->getTID());
-    cancel_victim->lockJoin();
-    if (cancel_victim->getJoiner() != -1)
-    {
-      UserThread* to_be_signaled;
-      if((to_be_signaled = (UserThread*)cancel_victim->getProcess()->findInThreadList(cancel_victim->getJoiner()))!= 0x00)
-      {
-        to_be_signaled->lockJoin();
-        to_be_signaled->signalJoin();
-        to_be_signaled->unlockJoin();
-      }
-      else
-      {
-        debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process?\n");
-      }
-    }
-    cancel_victim->getProcess()->addToRetvalList(cancel_victim->getTID(), PTHREAD_CANCELED);
-    cancel_victim->getProcess()->removeFromThreadList(cancel_victim);
-    cancel_victim->unlockJoin();
-    cancel_victim->unlockFlagMutex();
-    current->getProcess()->unLockThreadMutex();
-    cancel_victim->kill();
-    return 0;
-  }
-  else
-    debug(X_USERTHREAD, "Thread [%ld]: could not kill bc its flags were state: %d type: %d!\n", current->getTID(), cancel_victim->getflags()->cancelable,
-    cancel_victim->getflags()->deferred);
-*/
 }
 
 //this should never be called when holding any locks
