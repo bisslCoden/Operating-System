@@ -603,7 +603,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
     return 0;
   //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getRDTSCdiff() + rdtsc_now;
+  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getDiffAvg() + rdtsc_now;
   //debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
@@ -637,7 +637,7 @@ size_t Syscall::clock()
   //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
   size_t duaration = thread->getParentProcess()->getClockSum();
   duaration += thread->getParentProcess()->getDuaration();
-  return duaration;
+  return duaration / (Scheduler::instance()->getDiffAvg());
 }
 
 // 78.3%

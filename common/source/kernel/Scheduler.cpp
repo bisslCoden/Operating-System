@@ -246,7 +246,7 @@ void Scheduler::incTicks()
   {
     diff_avg = rdtsc_diff_sum / ticks_;
   }
-  if(ticks_ > 15)
+  else
   {
     diff_avg = rdtsc_diff_sum / (ticks_ - 15);
   }
