@@ -659,7 +659,7 @@ size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  return duaration / CLOCKS_PER_SEC;
+  return duaration / CLOCKS_PER_SEC ;
 }
 
 // commented out bc testing
