@@ -64,10 +64,15 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
         switch_to_us);
 
   ArchThreads::printThreadRegisters(currentThread, false);
-
+  
+  if (currentThread->loader_)
+    currentThread->loader_->arch_memory_.lockArchMemory();
+  
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    if (PageManager::instance()->checkForCow(address))
+  if (currentThread->loader_)
+    currentThread->loader_->arch_memory_.unlockArchMemory();
+  if (PageManager::instance()->checkForCow(address))
     {
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       return;
@@ -100,6 +105,8 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   }
   else
   {
+    if (currentThread->loader_)
+      currentThread->loader_->arch_memory_.unlockArchMemory();
     // the page-fault seems to be faulty, print out the thread stack traces
     ArchThreads::printThreadRegisters(currentThread, true);
     currentThread->printBacktrace(true);
