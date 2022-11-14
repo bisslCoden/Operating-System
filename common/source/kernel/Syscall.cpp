@@ -634,6 +634,8 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
+  currentUserThread->getParentProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
   return 0;
 }
@@ -644,11 +646,16 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // then use the number of ticks to get the seconds
 // we know how many clocks(cycles i think) happen per second
 // we get the number of cycles
+
+//duaration is in cycles
+//duaration/avg_cycle_per_tick = ticks
+//tick = 54 milisecond
+// 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  return duaration;
+  return (duaration/Scheduler::instance()->getDiffAvg()) * 1000;
 }
 
 
