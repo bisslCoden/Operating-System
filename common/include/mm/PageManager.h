@@ -6,12 +6,14 @@
 #include "Bitmap.h"
 #include "umap.h"
 #include "Mutex.h"
+#include "UserProcess.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
 
-#define WAS_LAST 123
+#define WAS_LAST 0x82426784
 
+class UserProcess;
 class PageManager
 {
   public:
@@ -57,24 +59,25 @@ class PageManager
     }
 
     /**
-     * @brief 
+     * @brief Handles a cow Pagefault and refreshes the cow ist accordingly 
+     * IMPORTANT: Locking Policy: 1st aquire Pagemanager::cnt_lock_ and then 
+     * acquire the Archmem lock of the CURRENT PROCESS
      * 
-     * @param address 
-     * @return true 
-     * @return false 
+     * @param address the Pagefault adress
+     * @return true if Pagefault could be handled correctly 
+     * @return false else
      */
     bool checkForCow(size_t address);
 
     void    lockCowCnt()                  { cow_cnt_lock_.acquire(); }
     void    unlockCowCnt()                { cow_cnt_lock_.release(); }
     //      initialized/increases counter.
-    void    increaseCowCnt(size_t ppn);
+
+    void    addRef(size_t ppn, UserProcess* proc);
     //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
-    size_t  decreaseCowCnt(size_t ppn);
+    size_t  deleteRef(size_t ppn, UserProcess* proc);
     //      isInCowCnt() returns true if ppn found in map
-    bool    isInCowCnt(size_t ppn);
     //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
-    size_t  getNrOfCows(size_t ppn);
   private:
     /**
      * used internally to mark pages as reserved
@@ -97,6 +100,6 @@ class PageManager
     size_t HEAP_PAGES;
 
     // the cow_cnt_ maps the ppn of a page to the number of processes that haven't copied yet
-    ustl::map<size_t, size_t> cow_cnt_;
-    Mutex cow_cnt_lock_ = "PageManager::cow_cnt_lock_";
+    ustl::map<size_t, ustl::vector<UserProcess*>> cow_list_;
+    Mutex cow_cnt_lock_;
 };

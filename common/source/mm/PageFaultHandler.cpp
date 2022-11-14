@@ -64,11 +64,20 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
         switch_to_us);
 
   ArchThreads::printThreadRegisters(currentThread, false);
-
+  
+  PageManager::instance()->lockCowCnt();
+  if (currentThread->loader_)
+  {
+    if(!currentThread->loader_->arch_memory_.checkArchMemory())
+      currentThread->loader_->arch_memory_.lockArchMemory();
+  }
+  
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
     if (PageManager::instance()->checkForCow(address))
     {
+      currentThread->loader_->arch_memory_.unlockArchMemory();
+      PageManager::instance()->unlockCowCnt();
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       return;
     }
@@ -87,6 +96,8 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
             // the page-fault seems to be faulty, print out the thread stack traces
         ArchThreads::printThreadRegisters(currentThread, true);
         currentThread->printBacktrace(true);
+        currentThread->loader_->arch_memory_.unlockArchMemory();
+        PageManager::instance()->unlockCowCnt();
         if (currentThread->loader_)
           Syscall::exit(9999);
         else
@@ -100,6 +111,9 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   }
   else
   {
+    if (currentThread->loader_)
+      currentThread->loader_->arch_memory_.unlockArchMemory();
+    PageManager::instance()->unlockCowCnt();
     // the page-fault seems to be faulty, print out the thread stack traces
     ArchThreads::printThreadRegisters(currentThread, true);
     currentThread->printBacktrace(true);
@@ -108,6 +122,9 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     else
       currentThread->kill();
   }
+  if(currentThread->loader_)
+    currentThread->loader_->arch_memory_.unlockArchMemory();
+  PageManager::instance()->unlockCowCnt();
   debug(PAGEFAULT, "Page fault handling finished for Address: %18zx.\n", address);
 }
 
