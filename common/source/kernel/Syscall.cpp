@@ -656,10 +656,11 @@ size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   debug(CLOCK, "clock sum %ld\n", ((duaration/Scheduler::instance()->getDiffAvg()) * 1000 * 54) / CLOCKS_PER_SEC);
-  duaration += currentUserThread->getParentProcess()->getDuaration();
-  debug(CLOCK, "duaration %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000 * 54 / CLOCKS_PER_SEC);
+  size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
+  debug(CLOCK, "duaration_2 %ld\n", (duaration_2/Scheduler::instance()->getDiffAvg()) * 1000 * 54 / CLOCKS_PER_SEC);
+  duaration += duaration_2;
   duaration = (duaration/Scheduler::instance()->getDiffAvg());
-  duaration = duaration * 54;
+  //duaration = duaration * 54;
   duaration = duaration * 1000;
   debug(CLOCK, "result    %ld\n", (duaration));
   return duaration;
