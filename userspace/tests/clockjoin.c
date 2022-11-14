@@ -18,6 +18,10 @@ int fastroutine()
 
 int main(int argc, char *argv[]) {
   clock_t time_1 = clock();
+  sleep(1);
+  clock_t time_21 = clock();
+  printf("SYSCALL CLOCK time1 %d\n", (time_1));
+  printf("SYSCALL CLOCK time2 %d\n", (time_21));
   printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1));
   int ret;
   int returner;

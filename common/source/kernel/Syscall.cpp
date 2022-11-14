@@ -648,19 +648,19 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 
 //duaration is in cycles
-//duaration/avg_cycle_per_tick = ticks
+//duaration/avg_cycle_per_tick = number of ticks
 //tick = 54 milisecond
+//divide by 54 to get the number of miliseconds 
 // 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
-  debug(CLOCK, "clock sum %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
+  debug(CLOCK, "clock sum %ld\n", ((duaration/Scheduler::instance()->getDiffAvg()) * 1000 * 54) / CLOCKS_PER_SEC);
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  debug(CLOCK, "duaration %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
+  debug(CLOCK, "duaration %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000 * 54 / CLOCKS_PER_SEC);
   duaration = (duaration/Scheduler::instance()->getDiffAvg());
+  duaration = duaration * 54;
   duaration = duaration * 1000;
-  debug(CLOCK, "result    %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
-  return 0;
+  debug(CLOCK, "result    %ld\n", (duaration));
+  return duaration;
 }
-
-
