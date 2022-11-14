@@ -251,17 +251,17 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   else if((long int) arg1 == -1) // any child process.
   {
     debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
-    list_of_processes_lock_.acquire();
+    wait_pid_lock_.acquire();
     ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     UserProcess* child = parent_process;
-    list_of_processes_lock_.release();
+    wait_pid_lock_.release();
     for (ustl::map<size_t, UserProcess*>::iterator i = list.begin(); i != list.end(); ++i) 
     {
       if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) && (child->getWaitStatus() == 0))
       {
-        list_of_processes_lock_.acquire();
+        wait_pid_lock_.acquire();
         child = i->second;
-        list_of_processes_lock_.release();
+        wait_pid_lock_.release();
         break;
       }
     }
@@ -269,11 +269,11 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       debug(WAITPID, "No child process\n");
       return -1;
     }
-    list_of_processes_lock_.acquire();
+    wait_pid_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = child->getProcessState();
     return_pid = child->getPID();
-    list_of_processes_lock_.release();
+    wait_pid_lock_.release();
     //maybe the child wait status can be changed to 1 with more waitpids
     while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
     {
@@ -285,9 +285,9 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       Scheduler::instance()->yield();
       if(process_state != child->getProcessState() || child->getProcessState() == 0)
       {
-        list_of_processes_lock_.acquire();
+        wait_pid_lock_.acquire();
         parent_process->setWaitStatus(0);
-        list_of_processes_lock_.release();
+        wait_pid_lock_.release();
       }
     }
     debug(WAITPID, "after while \n");

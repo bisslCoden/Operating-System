@@ -44,7 +44,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
-  
+
   // free if counter not in map or after descresing counter = 0.
   size_t ppn = m.pt[m.pti].page_ppn;
   PageManager* pm = PageManager::instance();

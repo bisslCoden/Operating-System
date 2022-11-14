@@ -240,10 +240,21 @@ void Scheduler::incTicks()
   rdtsc_value_old = rdtsc_value;
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
-  if(ticks_ > 20)
+  rdtsc_diff_sum += rdtsc_diff_per_tick;
+  /*if(ticks_ <= 15)
   {
-    rdtsc_diff_sum += rdtsc_diff_per_tick;
-    diff_avg = rdtsc_diff_sum / (ticks_ - 20);
+    diff_avg = rdtsc_diff_sum / ticks_;
+  }
+  else
+  {
+    diff_avg = rdtsc_diff_sum / (ticks_ - 15);
+  }*/
+  if(ticks_ % 10 != 0)
+    diff_avg = rdtsc_diff_sum / (ticks_ % 10);
+  else
+  {
+    diff_avg = rdtsc_diff_per_tick;
+    rdtsc_diff_sum = 0;
   }
   //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);
   //debug(SLEEP,"diff is     %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
@@ -297,3 +308,13 @@ void Scheduler::printLockingInformation()
   debug(LOCK, "Scheduler::printLockingInformation finished\n");
   unlockScheduling();
 }
+
+/*
+{
+  size_t sum = 0;
+  for (size_t c = 0; c < threads_.size(); ++c)
+  {
+    sum += getRDTSC() - threads_[c]->getLastStart();
+  }
+  return sum;
+}*/

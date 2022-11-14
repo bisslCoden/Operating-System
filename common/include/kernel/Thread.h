@@ -107,6 +107,7 @@ class Thread
     void setState(ThreadState state);
 
     /**
+    size_t time_to_wake_;
      * A part of the single-chained waiters list for the locks.
      * It references to the next element of the list.
      * In case of a spinlock it is a busy-waiter, else usually it is a sleeper ^^.
@@ -146,6 +147,7 @@ class Thread
 
     ustl::string name_;
     bool Userthread = false;
+
 
 };
 
