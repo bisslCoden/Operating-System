@@ -330,7 +330,7 @@ bool PageManager::checkForCow(size_t address)
   size_t ppn = m.page_ppn;
   pm->lockCowCnt();
   assert(pm->isInCowCnt(ppn) && "cow_cnt_ does not have entry with that ppn but cow =1 AND writable = 0");
-  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.page_ppn);
+  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   if(decreaseCowCnt(ppn) > 0)
   {
     //debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, getNrOfCows(ppn));
