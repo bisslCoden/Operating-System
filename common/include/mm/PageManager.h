@@ -68,13 +68,12 @@ class PageManager
     void    lockCowCnt()                  { cow_cnt_lock_.acquire(); }
     void    unlockCowCnt()                { cow_cnt_lock_.release(); }
     //      initialized/increases counter.
-    void    increaseCowCnt(size_t ppn);
+
+    void    addRef(size_t ppn, UserProcess*);
     //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
-    size_t  decreaseCowCnt(size_t ppn);
+    size_t  deleteRef(size_t ppn, UserProcess*);
     //      isInCowCnt() returns true if ppn found in map
-    bool    isInCowCnt(size_t ppn);
     //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
-    size_t  getNrOfCows(size_t ppn);
   private:
     /**
      * used internally to mark pages as reserved
@@ -97,6 +96,6 @@ class PageManager
     size_t HEAP_PAGES;
 
     // the cow_cnt_ maps the ppn of a page to the number of processes that haven't copied yet
-    ustl::map<size_t, size_t> cow_cnt_;
-    Mutex cow_cnt_lock_ = "PageManager::cow_cnt_lock_";
+    ustl::map<size_t, ustl::vector<UserProcess*>> cow_list_;
+    Mutex cow_cnt_lock_;
 };

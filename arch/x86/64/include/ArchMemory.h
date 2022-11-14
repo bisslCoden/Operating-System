@@ -165,6 +165,6 @@ private:
   ArchMemory(ArchMemory const &src);
   ArchMemory &operator=(ArchMemory const &src);
 
-  Mutex arch_memory_lock_ = "ArchMemory::arch_memory_lock_";
+  Mutex arch_memory_lock_;
 };
 
