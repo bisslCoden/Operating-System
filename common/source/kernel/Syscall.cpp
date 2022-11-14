@@ -634,9 +634,11 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
-  Scheduler::instance()->yield();
   currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   currentUserThread->setLastStart(time_to_wake);
+  Scheduler::instance()->yield();
+
+
   return 0;
 }
 
@@ -657,7 +659,11 @@ size_t Syscall::clock()
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
   debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
   duaration += duaration_2;
-  duaration = duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10));
+  debug(CLOCK, "duaration before divide %ld\n", duaration);
+  if((duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10))) > 0)
+    duaration = (duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10))) * CLOCKS_PER_SEC;
+  else
+    duaration = (duaration * CLOCKS_PER_SEC) /(Scheduler::instance()->getDiffAvg() * (182 / 10));
   debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration * CLOCKS_PER_SEC;
+  return duaration;
 }
