@@ -225,13 +225,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     list_of_processes_lock_.acquire();
     ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     auto search_child = list.find(arg1);
-    list_of_processes_lock_.release();
     if (search_child == list.end())
     {
+      list_of_processes_lock_.release();
       debug(WAITPID, "Not found, process %ld\n", arg1);
       return -1; //exit value returned
     }
-    list_of_processes_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = search_child->second->getProcessState();
     return_pid = search_child->second->getPID();

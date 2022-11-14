@@ -5,6 +5,7 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "uvector.h"
+#include "Semaphore.h"
 #include "Loader.h"
 
 #define NO_EXEC_CALL 123454321
@@ -254,5 +255,7 @@ class UserProcess
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
     Mutex archmem_lock_;
+    
+    Semaphore waitpid_sem;
 };
 
