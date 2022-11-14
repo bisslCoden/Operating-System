@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 
   if(pid)
     printf("parent from child [%ld] here\n", pid);
-  else  
-    printf("some child returning...\n");
+  /*else  
+    printf("some child returning...\n");*/
   return 0;
 }

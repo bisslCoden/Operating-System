@@ -299,7 +299,7 @@ bool UserThread::setupStack()
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
   
-  debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %ld) and ends at %lx (VPN %ld) flag is at %lx"
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %lx) and ends at %lx (VPN %lx) flag is at %lx"
   "and guardpages are at %ld and %ld\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
   mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
   mystack_.guardpage_back_nr_);

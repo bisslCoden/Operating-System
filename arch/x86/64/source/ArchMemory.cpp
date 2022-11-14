@@ -62,16 +62,19 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   if (empty)
   {
     empty = checkAndRemove<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi);
+    debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pt_ppn = %zx)\n", virtual_page, m.pt_ppn);
     PageManager::instance()->freePPN(m.pt_ppn);
   }
   if (empty)
   {
     empty = checkAndRemove<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti);
+    debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pd_ppn = %zx)\n", virtual_page, m.pd_ppn);
     PageManager::instance()->freePPN(m.pd_ppn);
   }
   if (empty)
   {
     empty = checkAndRemove<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i);
+    debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pdpt_ppn = %zx)\n", virtual_page, m.pdpt_ppn);
     PageManager::instance()->freePPN(m.pdpt_ppn);
   }
   unlockArchMemory();
@@ -101,33 +104,37 @@ bool ArchMemory::insert(pointer map_ptr, uint64 index, uint64 ppn, uint64 bzero,
 
 bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_access)
 {
-  debug(A_MEMORY, "%zx %zx %zx %zx\n", page_map_level_4_, virtual_page, physical_page, user_access);
+  debug(A_MEMORY, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) page_map_level_4_ = %zx\n", virtual_page, physical_page, user_access, page_map_level_4_);
   ArchMemoryMapping m = resolveMapping(page_map_level_4_, virtual_page);
   assert((m.page_size == 0) || (m.page_size == PAGE_SIZE));
 
   if (m.pdpt_ppn == 0)
   {
     m.pdpt_ppn = PageManager::instance()->allocPPN();
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pdpt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pdpt_ppn);
     insert<PageMapLevel4Entry>((pointer) m.pml4, m.pml4i, m.pdpt_ppn, 1, 0, 1, 1);
   }
 
   if (m.pd_ppn == 0)
   {
     m.pd_ppn = PageManager::instance()->allocPPN();
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pd_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pd_ppn);
     insert<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, m.pd_ppn, 1, 0, 1, 1);
   }
 
   if (m.pt_ppn == 0)
   {
     m.pt_ppn = PageManager::instance()->allocPPN();
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pt_ppn);
     insert<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi, m.pt_ppn, 1, 0, 1, 1);
   }
 
   if (m.page_ppn == 0)
   {
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.page_ppn was zero. inserting. will return true.\n", virtual_page, physical_page, user_access);
     return insert<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, physical_page, 0, 0, user_access, 1);
   }
-
+  debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) RETURNING FALSE HOPEFULLY WE ASSERT SOON.\n", virtual_page, physical_page, user_access);
   return false;
 }
 
@@ -167,7 +174,6 @@ ArchMemory::~ArchMemory()
                     debug(X_ARCHMEM, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
-                    assert(!pt[pti].present && "freePPN() does not set present bit to 0");
                   }
                   pm->unlockCowCnt();
                 }

@@ -254,11 +254,11 @@ size_t UserProcess::getRandomPageOffset()
   } while (page_offset == 0 || checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
-  debug(X_USERPROCESS, "[%ld] read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", getPID(), rand, MAX_STACKS, page_offset);
+  debug(X_USERPROCESS, "[%ld] read %ld from tsc and MAX STACKS btw is %lld offset is %lx!!\n", getPID(), rand, MAX_STACKS, page_offset);
   
   offsetlist_lock_.acquire();
   for(size_t i = 0; i < offsets_.size(); i++)
-    debug(X_USERPROCESS, "[%ld] getRandomPageOffset(): UserProcess::offsets_.at(%ld) = %ld\n", getPID(), i, offsets_.at(i));
+    debug(X_USERPROCESS, "[%ld] getRandomPageOffset(): UserProcess::offsets_.at(%ld) = %lx\n", getPID(), i, offsets_.at(i));
   offsetlist_lock_.release();
 
 
