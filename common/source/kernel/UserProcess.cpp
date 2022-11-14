@@ -499,7 +499,10 @@ size_t UserProcess::getClockSum()
   clock_lock_.acquire();
   for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
   {
-    sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
+    if(i->second->getLastStart() < Scheduler::instance()->getRDTSC())
+    {
+      sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
+    }
   }
   clock_lock_.release();
   return sum;
