@@ -622,7 +622,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
     return 0;
   //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = seconds * (182 * Scheduler::instance()->getRDTSCdiff()) + rdtsc_now;
+  uint64_t time_to_wake = seconds * (182 * Scheduler::instance()->getDiffAvg()) + rdtsc_now;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
@@ -630,22 +630,11 @@ unsigned int Syscall::sleep(unsigned int seconds)
   // see diff between avg and getdiffpertick
 
   //
+  debug(SLEEP, "avg:    %ld\n", Scheduler::instance()->getDiffAvg());
+  debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
   Scheduler::instance()->yield();
-  //while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
-  //{
-    //debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
-    
-    //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
-    
-    //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
-    //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
-    //Scheduler::instance()->getFrequency());
-    
-    //Scheduler::instance()->yield();
-    
-  //}
   return 0;
 }
 
