@@ -654,8 +654,13 @@ unsigned int Syscall::sleep(unsigned int seconds)
 size_t Syscall::clock()
 {
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+  debug(CLOCK, "clock sum %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
   duaration += currentUserThread->getParentProcess()->getDuaration();
-  return (duaration/Scheduler::instance()->getDiffAvg()) * 1000;
+  debug(CLOCK, "duaration %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
+  duaration = (duaration/Scheduler::instance()->getDiffAvg());
+  duaration = duaration * 1000;
+  debug(CLOCK, "result    %ld\n", (duaration/Scheduler::instance()->getDiffAvg()) * 1000);
+  return 0;
 }
 
 
