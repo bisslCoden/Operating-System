@@ -8,6 +8,7 @@
 #include "Syscall.h"
 #include "ArchThreads.h"
 #include "PageManager.h"
+#include "ArchMemory.h"
 
 extern "C" void arch_contextSwitch();
 
@@ -68,7 +69,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   PageManager::instance()->lockCowCnt();
   if (currentThread->loader_)
   {
-    if(!currentThread->loader_->arch_memory_.checkArchMemory())
+    if(!currentThread->loader_->arch_memory_.checkArchMemory(currentThread))
       currentThread->loader_->arch_memory_.lockArchMemory();
   }
   

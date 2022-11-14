@@ -187,7 +187,7 @@ ArchMemory::~ArchMemory()
   }
   PageManager::instance()->freePPN(page_map_level_4_);
   unlockArchMemory();
-  PageManager::unlockCowCnt();
+  PageManager::instance()->unlockCowCnt();
 }
 
 pointer ArchMemory::checkAddressValid(uint64 vaddress_to_check)

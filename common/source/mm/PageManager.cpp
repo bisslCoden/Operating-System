@@ -290,7 +290,7 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc)
     bool in = false;
     for (size_t i = 0; i < cow_list_[ppn].size(); i++)
     {
-      if(cow_list_[ppn].at[i] == proc)
+      if(cow_list_[ppn][i] == proc)
       {
         debug(X_USERPROCESS, "Tried to at proc %ld twice?!\n", proc->getPID());
         in = true;
@@ -299,7 +299,7 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc)
     }
     if(!in)
       cow_list_[ppn].push_back(proc);
-    debug("[%lx] added Proc [%ld] size is then %ld\n", ppn,proc->getPID(), cow_list_[ppn].size());
+    //debug("added Proc %p size is then\n",(size_t)(proc->getPID()));
   }
   return;
 }
@@ -340,7 +340,7 @@ size_t PageManager::deleteRef(size_t ppn, UserProcess* proc)
         return cow_list_.size();
       }
       else
-        assert(false && "really weird!: cow list is in the negatiiives\n")
+        assert(false && "really weird!: cow list is in the negatiiives\n");
     }
     else
       debug(X_USERPROCESS, "Wtf? tried to delete my ref even though I dont habe one!!!\n");
@@ -386,7 +386,7 @@ bool PageManager::checkForCow(size_t address)
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  debug(X_USERPROCESS, "my PageTable is at page %lx the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
+  debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
   int ret = deleteRef(ppn, current_proc);
   if (ret == -1)
   {
@@ -394,7 +394,7 @@ bool PageManager::checkForCow(size_t address)
     //unlockCowCnt();
     return false;
   }
-  else if (ret == WAS_LAST)
+  else if (ret == (int)WAS_LAST)
   {
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
