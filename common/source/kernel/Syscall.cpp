@@ -634,9 +634,9 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
+  Scheduler::instance()->yield();
   currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   currentUserThread->setLastStart(time_to_wake);
-  Scheduler::instance()->yield();
   return 0;
 }
 
