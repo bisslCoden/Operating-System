@@ -26,12 +26,12 @@ void printArrayVals(int* array, pid_t pid)
 int main()
 {
   printf("main() starting..\n");
-	int values[NR_OF_ARGS];
+  int values[NR_OF_ARGS];
   setArrayVals(values, -1000);
   printArrayVals(values, -1000);
 
-	pid_t pid = fork();
-  
+  pid_t pid = fork();
+
   if(pid == 0)
     setArrayVals(values, 0);
   else if(pid > 0)
@@ -41,5 +41,5 @@ int main()
 
   printArrayVals(values, pid);
 
-	return 0;
+  return 0;
 }
