@@ -18,6 +18,8 @@ STOPPED
 
 class UserThread;
 class Syscall;
+class ArchMemory;
+class Loader;
 class UserProcess
 {
   public:
@@ -41,8 +43,6 @@ class UserProcess
      * @param parent_process
      *
      */
-
-    UserProcess(const UserProcess& parent_process);
 
 
     ~UserProcess();

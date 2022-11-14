@@ -5,7 +5,7 @@
 #include "paging-definitions.h"
 #include "Mutex.h"
 #include "umap.h"
-
+#include "PageManager.h"
 //vpn to adress shift by 12 or divide through Page size
 //userbreak ends 0x8000000
 // vadress % Page size : get offset
@@ -32,6 +32,9 @@ class ArchMemoryMapping
     uint64 pdi;
     uint64 pti;
 };
+
+class UserProcess;
+class Loader;
 
 class ArchMemory
 {
@@ -123,11 +126,11 @@ public:
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
   /**
-   * @brief sets/increases the PageManager*::cow_cnt_ 
+   * @brief sets cow to pages: LOCK ARCHMEM AND COUNTER BEFORE
    * 
    * @param destination 
    */
-  void setCowToArchmemPages(ArchMemory &destination);
+  void setCowToArchmemPages(ArchMemory &destination, UserProcess* child_proc);
   /**
    * @brief MUST BE LOCKED FROM OUTSIDE. 
    * copies from src to dest. alloc new page for dest. 
@@ -138,9 +141,10 @@ public:
   size_t allocDestAndCopySrc(size_t ppn_src);
   
   void lockArchMemory()   { arch_memory_lock_.acquire(); }
+  bool checkArchMemory(Thread* thread)  { return arch_memory_lock_.isHeldBy(thread);}
   void unlockArchMemory() { arch_memory_lock_.release(); }
+  void setProcess(UserProcess* proc) { my_proc = proc; }
 private:
-
 /** 
  * Adds a page directory entry to the given page directory.
  * (In other words, adds the reference to a new page table to a given
@@ -166,5 +170,6 @@ private:
   ArchMemory &operator=(ArchMemory const &src);
 
   Mutex arch_memory_lock_;
+  UserProcess* my_proc = 0;
 };
 

@@ -6,12 +6,14 @@
 #include "Bitmap.h"
 #include "umap.h"
 #include "Mutex.h"
+#include "UserProcess.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
 
-#define WAS_LAST 123
+#define WAS_LAST 0x82426784
 
+class UserProcess;
 class PageManager
 {
   public:
@@ -57,11 +59,13 @@ class PageManager
     }
 
     /**
-     * @brief 
+     * @brief Handles a cow Pagefault and refreshes the cow ist accordingly 
+     * IMPORTANT: Locking Policy: 1st aquire Pagemanager::cnt_lock_ and then 
+     * acquire the Archmem lock of the CURRENT PROCESS
      * 
-     * @param address 
-     * @return true 
-     * @return false 
+     * @param address the Pagefault adress
+     * @return true if Pagefault could be handled correctly 
+     * @return false else
      */
     bool checkForCow(size_t address);
 
@@ -69,9 +73,9 @@ class PageManager
     void    unlockCowCnt()                { cow_cnt_lock_.release(); }
     //      initialized/increases counter.
 
-    void    addRef(size_t ppn, UserProcess*);
+    void    addRef(size_t ppn, UserProcess* proc);
     //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
-    size_t  deleteRef(size_t ppn, UserProcess*);
+    size_t  deleteRef(size_t ppn, UserProcess* proc);
     //      isInCowCnt() returns true if ppn found in map
     //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
   private:

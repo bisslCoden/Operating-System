@@ -76,10 +76,16 @@ UserProcess::UserProcess(UserProcess *parent) :
   if (!setupLoader(fd_))
     return;
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
+  PageManager::instance()->lockCowCnt();
+  currentUserThread->loader_->arch_memory_.lockArchMemory();
+  loader_->arch_memory_.lockArchMemory();
 
-  currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_);
+  currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
   debug(USERPROCESS, "UserProcess() fork: setCowToArchmemPages()\n");
 
+  loader_->arch_memory_.unlockArchMemory();
+  currentUserThread->loader_->arch_memory_.unlockArchMemory();
+  PageManager::instance()->unlockCowCnt();
   debug(USERPROCESS, "UserProcess() fork: Creating new Thread for Fork\n");
   UserThread* parent_thread = currentUserThread;
   auto thread = new UserThread(this, parent_thread);
@@ -443,6 +449,7 @@ bool UserProcess::setupLoader(ssize_t fd)
     return false;
 
   loader_ = new_loader;
+  loader_->arch_memory_.setProcess(this);
   return true;
 }
 

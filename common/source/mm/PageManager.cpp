@@ -275,6 +275,18 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc)
   }
   else
   {
+    //I think this rare edgecase shouldnt happen... lets hope i am right
+    // if (cow_list_[ppn].size() == 1)
+    // {
+    //   ArchMemory* dest_archmem = &cow_list_[ppn][0]->getLoader()->arch_memory_;
+    //   if(!dest_archmem.checkArchMemory())
+    //     dest_archmem.lockArchMemory();
+    //   ArchMemoryMapping m = dest_archmem->resolveMapping(vpn);
+    //   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+    //   pt_ident[m.pti].cow = 1;
+    //   pt_ident[m.pti].writeable = 0;
+    //   dest_archmem->unlockArchMemory();
+    // }
     bool in = false;
     for (size_t i = 0; i < cow_list_[ppn].size(); i++)
     {
@@ -311,23 +323,28 @@ size_t PageManager::deleteRef(size_t ppn, UserProcess* proc)
     }
     if(it != cow_list_[ppn].end())
     {
-      debug("[%lx] erasing Proc [%ld] size is then %ld\n", ppn,proc->getPID(), cow_list_[ppn].size() - 1);
-      cow_list_[ppn].erase(it);
-      if (cow_list_[ppn].size() == 0)
+      debug(X_USERPROCESS, "[%lx] erasing Proc [%ld] size is then %ld\n", ppn,proc->getPID(), cow_list_[ppn].size() - 1);
+      int cow_if_del = (int)cow_list_[ppn].size() - 1;
+      if (cow_if_del == 0)
+      {
+        return WAS_LAST;
+      }
+      else if (cow_if_del == -1)
       {
         cow_list_.erase(ppn);
         return 0;
       }
-      else
+      else if (cow_if_del >= 1)
       {
+        cow_list_[ppn].erase(it);
         return cow_list_.size();
       }
+      else
+        assert(false && "really weird!: cow list is in the negatiiives\n")
     }
     else
-    {
       debug(X_USERPROCESS, "Wtf? tried to delete my ref even though I dont habe one!!!\n");
-      return -1;
-    }
+    return -1;
   }
 }
 
@@ -337,11 +354,11 @@ bool PageManager::checkForCow(size_t address)
   // setup archmem and checkAddressValid()
   UserProcess* current_proc = currentUserThread->getProcess();
   ArchMemory* current_archmem = &current_proc->getLoader()->arch_memory_;
-  lockCowCnt();
+  //lockCowCnt();
   if(!current_archmem->checkAddressValid(address))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
-    unlockCowCnt();
+    //unlockCowCnt();
     //current_archmem->unlockArchMemory();
     return false;
   }
@@ -354,7 +371,7 @@ bool PageManager::checkForCow(size_t address)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
     //current_archmem->unlockArchMemory();
-    unlockCowCnt();
+    //unlockCowCnt();
     return false;
   }
 
@@ -362,7 +379,7 @@ bool PageManager::checkForCow(size_t address)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
     //current_archmem->unlockArchMemory();
-    unlockCowCnt();
+    //unlockCowCnt();
     return false;
   }
 
@@ -370,17 +387,21 @@ bool PageManager::checkForCow(size_t address)
   size_t ppn = m.page_ppn;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   debug(X_USERPROCESS, "my PageTable is at page %lx the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
-  size ret = deleteRef(ppn, current_proc);
+  int ret = deleteRef(ppn, current_proc);
   if (ret == -1)
   {
     debug(X_USERPROCESS, "Something went wrong with deleting my ref!\n");
-    unlockCowCnt();
+    //unlockCowCnt();
     return false;
   }
-  else if (ret == 0)
+  else if (ret == WAS_LAST)
   {
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
+  }
+  else if (ret == 0)
+  {
+    assert(false && "wanted to free page in cow? This shouldnt happen!");
   }
   else
   {
@@ -388,18 +409,9 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
     pt_ident[m.pti].present = 1;
   }
-  
-  
-  if(decreaseCowCnt(ppn) > 0)
-  {
-    //debug(X_PAGEFAULT, "checkForCow(%lx) says cow_cnts_left is %ld. returning true\n", address, getNrOfCows(ppn));
 
-  }
-  pt_ident[m.pti].cow = 0;
-  pt_ident[m.pti].writeable = 1;
-
-  pm->unlockCowCnt();
-  current_archmem->unlockArchMemory();
+  //pm->unlockCowCnt();
+  //current_archmem->unlockArchMemory();
   return true;
 }
 
