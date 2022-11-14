@@ -495,9 +495,11 @@ void UserProcess::setDuaration(size_t duaration)
 size_t UserProcess::getClockSum()
 {
   size_t sum = 0;
+  clock_lock_.acquire();
   for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
   {
     sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
   }
+  clock_lock_.release();
   return sum;
 }

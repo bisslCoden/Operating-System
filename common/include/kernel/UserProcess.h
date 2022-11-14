@@ -254,5 +254,6 @@ class UserProcess
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
     Mutex archmem_lock_;
+    Mutex clock_lock_;
 };
 
