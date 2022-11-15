@@ -448,5 +448,5 @@ bool PageManager::checkForCow(size_t address)
   //current_archmem->unlockArchMemory();
   return true;
 }
-
+//
 //----------------------------------------------------------------------------------cow end
