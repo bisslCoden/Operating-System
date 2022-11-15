@@ -41,6 +41,7 @@ typedef struct Threadflags
   ustl::atomic_flag kasynchronous;
 }Threadflags;
 
+class Semaphore;
 typedef struct StackInfo
 {
   size_t userstack_start_ = 0;
@@ -134,7 +135,7 @@ class UserThread : public Thread
     int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
-    void freeMyPages();
+    void freeMyPagesAndDie();
 
     //acquie retvallock before!
     void setJoiner(UserThread* thread){join_waiter_ = thread;}
@@ -201,6 +202,7 @@ class UserThread : public Thread
     ustl::vector<size_t> my_pages_;
     Mutex my_pages_lock_;
     Condition exec_wait_;
+    ustl::atomic<bool> DYING_;
     
     // only true if removeFromThreadList() detects last thread to delete process
 

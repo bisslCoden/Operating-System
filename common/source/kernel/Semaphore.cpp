@@ -1,6 +1,6 @@
-#include "Semaphore.h"
+#include "KernelSemaphore.h"
 
-void Semaphore::wait(){
+void KernelSemaphore::wait(){
     counter_lock_.acquire();
     if (max_threads_ > 0)
     {
@@ -23,7 +23,7 @@ void Semaphore::wait(){
     return;
 }
 
-void Semaphore::post(){
+void KernelSemaphore::post(){
     counter_lock_.acquire();
     ++max_threads_;
     counter_lock_.release();

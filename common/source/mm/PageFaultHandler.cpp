@@ -72,26 +72,12 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    PageManager::instance()->lockCowCnt();
-    if (currentThread->loader_)
-    {
-      if(!currentThread->loader_->arch_memory_.checkArchMemory(currentThread))
-       currentThread->loader_->arch_memory_.lockArchMemory();
-    }
+ 
     if (PageManager::instance()->checkForCow(address))
     {
-      currentThread->loader_->arch_memory_.unlockArchMemory();
-      PageManager::instance()->unlockCowCnt();
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       return;
     }
-
-    PageManager::instance()->unlockCowCnt();
-    if (currentThread->loader_)
-    {
-        currentThread->loader_->arch_memory_.unlockArchMemory();
-    }
-
     if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");

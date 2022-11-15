@@ -79,7 +79,7 @@ bool UserThread::schedulable(){
       }
       else
         getflags()->knotcancelable.clear();
-    
+
     
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
@@ -88,22 +88,30 @@ bool UserThread::schedulable(){
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+     // my_pages_lock_.release();
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
+     // my_pages_lock_.release();
       return false;
     }
     else if (sleepy == AWAKE_KS)
+    {
+     // my_pages_lock_.release();
+      return true;
+    }
+    else if(DYING_)
     {
       return true;
     }
     else
     {
+      // my_pages_lock_.release();
       debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
-    debug(X_THREADSTACK, "schedulable finished!\n");
+//    debug(X_THREADSTACK, "schedulable finished!\n");
   }
   return false;
 }
@@ -198,7 +206,7 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-  freeMyPages();
+  // freeMyPages();
   debug(X_USERTHREAD, "[%ld] freed my pages now...\n",tid_);
   if(isLast())
   {
@@ -232,8 +240,9 @@ void UserThread::sendCancelRequest(){
   }
 
 void UserThread::getNewStackPage(size_t adress){
+  if(process_->checkKill())
+    return;
   my_pages_lock_.acquire();
-  process_->lockArchMem();
   size_t new_page = PageManager::instance()->allocPPN();
   if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
   {
@@ -242,12 +251,26 @@ void UserThread::getNewStackPage(size_t adress){
     assert(false);
   }
   my_pages_.push_back(adress / PAGE_SIZE);
-  process_->unlockArchMem();
   my_pages_lock_.release();
   return;
 }
 
-void UserThread::freeMyPages(){
+void UserThread::freeMyPagesAndDie(){
+  // if (loader_ == 0)
+  //   return;
+  // process_->lockKill();
+  // if(process_->checkKill())
+  // {
+  //   process_->unlockKill();
+  //   return;
+  // } 
+  // process_->unlockKill();
+  if (process_->checkKill())
+  {
+    this->kill();
+  }
+  
+  DYING_ = true;
   my_pages_lock_.acquire();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
@@ -255,7 +278,10 @@ void UserThread::freeMyPages(){
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
+  //state_ = ToBeDestroyed;
   my_pages_lock_.release();
+  this->kill();
+  //Scheduler::instance()->yield();
 }
 
 
@@ -273,12 +299,19 @@ bool UserThread::setupStack()
   size_t stackend = stack_start_ptr - PAGE_SIZE * STACK_SIZE_IN_PAGES;
   size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
-  // ppn
-  size_t ppn_for_stack = PageManager::instance()->allocPPN();
+  
+  // just act like everythings allright i ll die anywayys 
+  // process_->lockKill();
+  // if(process_->checkKill())
+  // {
+  //   process_->unlockKill();
+  //   return true;
+  // } 
+  // process_->unlockKill();
   // check stack vpn and ppn + mapPage()
+ 
+  size_t ppn_for_stack = PageManager::instance()->allocPPN();
   assert(vpn_for_stack && ppn_for_stack);
-
-  process_->lockArchMem();
   if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
@@ -287,7 +320,6 @@ bool UserThread::setupStack()
     return false;
   }
   debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
-  process_->unlockArchMem();
 
   my_pages_lock_.acquire();
   my_pages_.push_back(vpn_for_stack);
@@ -344,9 +376,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   // setup copy
   size_t ppn = PageManager::instance()->allocPPN();
   size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE;
-  process_->lockArchMem();
   assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
-  process_->unlockArchMem();
 
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;

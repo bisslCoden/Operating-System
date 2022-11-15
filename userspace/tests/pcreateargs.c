@@ -1,7 +1,7 @@
 #include "pthread.h"
 #include "stdio.h"
 
-#define PTHREAD_CALLS 2000
+#define PTHREAD_CALLS 1000
 
 void* subroutine(void* args)
 {

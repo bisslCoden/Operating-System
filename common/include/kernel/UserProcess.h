@@ -4,8 +4,12 @@
 #include "umap.h"
 #include "UserThread.h"
 #include "Syscall.h"
+#include "uatomic.h"
 #include "uvector.h"
+#include "KernelSemaphore.h"
 #include "Loader.h"
+
+
 
 enum ProcessState
 {
@@ -144,10 +148,6 @@ class UserProcess
      */
     void exit(size_t exit_code, bool kill_currentThread = true);
 
-    void lockKill()                       {kill_lock_.acquire();}
-    void unlockKill()                     {kill_lock_.release();}
-    bool checkKill()                      { return KILLED_;}
-
     void lockRetVal()                     { returnvalue_lock_.acquire();}
     void unlockRetVal()                   { returnvalue_lock_.release();}
     bool checkRetValLock(Thread* thread)  { return returnvalue_lock_.isHeldBy(thread);}
@@ -175,6 +175,8 @@ class UserProcess
     bool checkInOffsetList(size_t NR);
     void removeFromOffsetList(size_t NR);
 
+    bool checkKill(){ return (KILLED_) ? true : false; }
+
     UserThread* checkStackAdress(size_t address);
 
     bool getWaitStatus(){ return wait_status_; }
@@ -192,9 +194,6 @@ class UserProcess
     size_t getDuaration(){ return duaration_; }
     
     void setDuaration(size_t duaration);
-    
-    void lockArchMem(){archmem_lock_.acquire();}
-    void unlockArchMem(){archmem_lock_.release();}
     
     void incDuaration(size_t duaration) { duaration_ += duaration; };
 
@@ -249,13 +248,13 @@ class UserProcess
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
 
-    Mutex kill_lock_;
-    bool KILLED_ = false;
+    ustl::atomic<bool> KILLED_ = false;
 
     // tells us which thread is waiting for other threads to be killed before exec-ing
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
-    Mutex archmem_lock_;
+    
+    KernelSemaphore waitpid_sem;
     Mutex clock_lock_;
 };
 

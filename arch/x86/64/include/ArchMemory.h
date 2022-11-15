@@ -117,9 +117,6 @@ public:
  */
   static void unmapKernelPage(uint64 virtual_page);
 
-  void lockArchmem(){ arch_memory_lock_.acquire();}
-  void unlockArchmem(){ arch_memory_lock_.release();}
-
   uint64 page_map_level_4_;
 
   uint64 getRootOfPagingStructure();

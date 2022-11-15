@@ -36,7 +36,7 @@ private:
                                      bool fetch, bool switch_to_us);
 
   
-  static bool checkForCow(size_t address);
+  //static bool checkForCow(size_t address);
 
 public:
   /**
