@@ -75,7 +75,7 @@ class PageManager
 
     void    addRef(size_t ppn, UserProcess* proc);
     //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
-    size_t  deleteRef(size_t ppn, UserProcess* proc);
+    size_t  deleteRef(size_t ppn, UserProcess* proc, bool cow_del);
     //      isInCowCnt() returns true if ppn found in map
     //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
   private:

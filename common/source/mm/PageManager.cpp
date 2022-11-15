@@ -299,19 +299,20 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc)
     }
     if(!in)
       cow_list_[ppn].push_back(proc);
-    //debug("added Proc %p size is then\n",(size_t)(proc->getPID()));
+    
+    debug(X_USERPROCESS, "added Proc %ld to page %lx size is then %ld\n",proc->getPID(), ppn, cow_list_[ppn].size());
   }
   return;
 }
 
-size_t PageManager::deleteRef(size_t ppn, UserProcess* proc)
+size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow_del)
 {
   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
 
   if (cow_list_.find(ppn) == cow_list_.end())
   {
     debug(X_USERPROCESS, "Wtf? tried to delete my ref even though the page isnt cow!!!\n");
-    return -1;
+    return 0;
   }
   else
   {
@@ -327,10 +328,20 @@ size_t PageManager::deleteRef(size_t ppn, UserProcess* proc)
       int cow_if_del = (int)cow_list_[ppn].size() - 1;
       if (cow_if_del == 0)
       {
-        return WAS_LAST;
+        if (cow_del)
+        {
+          cow_list_.erase(ppn);
+          return WAS_LAST;
+        }
+        else
+        {
+          cow_list_.erase(ppn);
+          return 0;
+        }
       }
       else if (cow_if_del == -1)
       {
+        assert(false && "just a check that this never happens\n");
         cow_list_.erase(ppn);
         return 0;
       }
@@ -387,7 +398,8 @@ bool PageManager::checkForCow(size_t address)
   size_t ppn = m.page_ppn;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
-  int ret = deleteRef(ppn, current_proc);
+  int ret = deleteRef(ppn, current_proc, true);
+  bool dbg_gave = false;
   if (ret == -1)
   {
     debug(X_USERPROCESS, "Something went wrong with deleting my ref!\n");
@@ -398,6 +410,7 @@ bool PageManager::checkForCow(size_t address)
   {
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
+    dbg_gave = true;
   }
   else if (ret == 0)
   {
@@ -407,9 +420,13 @@ bool PageManager::checkForCow(size_t address)
   {
     pt_ident[m.pti].present = 0;
     pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+    pt_ident[m.pti].cow = 0;
+    pt_ident[m.pti].writeable = 1;
     pt_ident[m.pti].present = 1;
   }
 
+  debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), 
+  pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
   //pm->unlockCowCnt();
   //current_archmem->unlockArchMemory();
   return true;

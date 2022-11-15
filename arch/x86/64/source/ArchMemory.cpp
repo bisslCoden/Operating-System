@@ -50,13 +50,15 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   // free if counter not in map or after descresing counter = 0.
   size_t ppn = m.pt[m.pti].page_ppn;
-  if(pm->deleteRef(ppn, my_proc) == 0)
+  if(pm->deleteRef(ppn, my_proc, false) == 0)
   {
-    debug(X_ARCHMEM, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
-    PageManager::instance()->freePPN(ppn);
+    debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     pt_ident[m.pti].present = 0;
+    PageManager::instance()->freePPN(ppn);
   }
-  pm->unlockCowCnt();
+  else
+    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
+  //pm->unlockCowCnt();
 
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
   bool empty = checkAndRemove<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti);
@@ -164,9 +166,9 @@ ArchMemory::~ArchMemory()
                 {
                   size_t ppn = pt[pti].page_ppn;
                   PageManager* pm = PageManager::instance();
-                  if(pm->deleteRef(ppn, my_proc) == 0)
+                  if(pm->deleteRef(ppn, my_proc, false) == 0)
                   {
-                    debug(X_ARCHMEM, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", my_proc->getPID(), ppn);
+                    debug(X_USERPROCESS, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", my_proc->getPID(), ppn);
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
                     assert(!pt[pti].present && "freePPN() does not set present bit to 0");
@@ -343,7 +345,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
 {
   debug(A_MEMORY, "locking setCowToArchmemPages()!\n");
   UserProcess* parent = currentUserThread->getProcess();
-  PageManager::instance()->lockCowCnt();
+  //PageManager::instance()->lockCowCnt();
   // lockArchMemory();
   // destination.lockArchMemory();
   PageMapLevel4Entry *pml4_src  = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);

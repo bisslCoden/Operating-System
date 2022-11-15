@@ -199,8 +199,8 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-  
   freeMyPages();
+  debug(X_USERTHREAD, "[%ld] freed my pages now...\n",tid_);
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
@@ -250,13 +250,12 @@ void UserThread::getNewStackPage(size_t adress){
 
 void UserThread::freeMyPages(){
   my_pages_lock_.acquire();
-  process_->lockArchMem();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     //might delete the assert later
+    debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
-  process_->unlockArchMem();
   my_pages_lock_.release();
 }
 
