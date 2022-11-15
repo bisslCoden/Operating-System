@@ -1,6 +1,11 @@
 #include "stdio.h"
 #include "time.h"
 
+
+//////////////////////////////////////////////////
+// TEST WAS MADE WITH A MODIFIED SLEEP FUNCTION //
+//////////////////////////////////////////////////
+
 int main(int argc, char *argv[]) {
   int pid = fork();
   if(pid == 0)
