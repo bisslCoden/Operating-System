@@ -100,7 +100,7 @@ bool UserThread::schedulable(){
     }
     else if (sleepy == AWAKE_KS)
     {
-      //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
      // my_pages_lock_.release();
       return true;
