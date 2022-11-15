@@ -634,12 +634,13 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
-  //currentUserThread->getParentProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  //currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   //currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
+
+
   return 0;
 }
-
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
 // we need to increment the ticks variable for every thread of the process
@@ -648,21 +649,20 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 
 //duaration is in cycles
-//duaration/avg_cycle_per_tick = number of ticks
-//tick = 54 milisecond
-//divide by 54 to get the number of miliseconds 
-// 54 * 1000 = 54 000 micro seconds
+//duaration/(avg_cycle_per_tick * 18.2) = number of cycles per sec
+//that all times 10⁶(CLOCKS_PER_SEC) = micro seconds
 size_t Syscall::clock()
 {
-  //size_t avg_per_sec = (182 * Scheduler::instance()->getDiffAvg());
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   debug(CLOCK, "clock sum %ld\n", duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10));
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
   debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
   duaration += duaration_2;
-  duaration = duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10);
-  //duaration = duaration * 54;
-  duaration = duaration;
+  debug(CLOCK, "duaration before divide %ld\n", duaration);
+  if((duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10))) > 0)
+    duaration = (duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10))) * CLOCKS_PER_SEC;
+  else
+    duaration = (duaration * CLOCKS_PER_SEC) /(Scheduler::instance()->getDiffAvg() * (182 / 10));
   debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration * CLOCKS_PER_SEC;
+  return duaration;
 }

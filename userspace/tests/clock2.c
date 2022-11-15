@@ -1,17 +1,20 @@
 #include "stdio.h"
 #include "time.h"
 
-
-//////////////////////////////////////////////////
-// TEST WAS MADE WITH A MODIFIED SLEEP FUNCTION //
-// WHERE SLEEPING THREAD CYCLES ARE COUNTED     //
-//////////////////////////////////////////////////
-
 int main(int argc, char *argv[]) {
   int pid = fork();
-  if(pid == 0)
-  {clock_t time_1 = clock();
+  int x  = 0;
+  for(int i = 100000; i >0; i--)
+  {
+    x = i - pid;
+  }
+  printf("x %d\n", x);
+  clock_t time_1 = clock();
   printf("SYSCALL CLOCK has been started and  the return value is: %d\n", time_1/CLOCKS_PER_SEC);
+  if(pid == 0)
+  {
+  time_1 = clock();
+  printf("SYSCALL CLOCK has been started in fork and  the return value is: %d\n", time_1/CLOCKS_PER_SEC);
 
   sleep(10);
   clock_t time_2 = clock();

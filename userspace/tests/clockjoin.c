@@ -4,6 +4,11 @@
 #include "pthread.h"
 #include <unistd.h>
 
+//////////////////////////////////////////////////
+// TEST WAS MADE WITH A MODIFIED SLEEP FUNCTION //
+// WHERE SLEEPING THREAD CYCLES ARE COUNTED     //
+//////////////////////////////////////////////////
+
 pthread_t tid;
 
 int fastroutine()
@@ -18,18 +23,23 @@ int fastroutine()
 
 int main(int argc, char *argv[]) {
   clock_t time_1 = clock();
+  time_1 = clock();
   sleep(1);
   clock_t time_21 = clock();
-  printf("SYSCALL CLOCK time1 %d\n", (time_1));
-  printf("SYSCALL CLOCK time2 %d\n", (time_21));
-  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1));
+  printf("SYSCALL CLOCK time1 %d\n", (time_1)/ CLOCKS_PER_SEC);
+  printf("SYSCALL CLOCK time2 %d\n", (time_21)/ CLOCKS_PER_SEC);
+  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1) / CLOCKS_PER_SEC);
   int ret;
   int returner;
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  for(int i = 10000; i > 0; i--)
+  {
+    int j = 1 + i;
+  }
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
   clock_t time_2 = clock();
-  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2));
-  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1)));
+  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2) / CLOCKS_PER_SEC);
+  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1)) / CLOCKS_PER_SEC);
   return 0;
 }

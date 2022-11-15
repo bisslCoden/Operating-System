@@ -69,6 +69,7 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
+            setLastStart(Scheduler::instance()->getRDTSC());
             return true;
           }
           else
@@ -96,6 +97,7 @@ bool UserThread::schedulable(){
     }
     else if (sleepy == AWAKE_KS)
     {
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else
@@ -104,6 +106,10 @@ bool UserThread::schedulable(){
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
+  }
+  else if(state_ == ToBeDestroyed)
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   }
   return false;
 }
