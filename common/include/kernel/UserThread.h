@@ -10,8 +10,6 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
-#define SLEEPING_KS 0x46334234
-#define AWAKE_KS 0x54321432
 #define NO_LOCK_KS 0x92246879
 
 class UserProcess;
@@ -126,6 +124,7 @@ class UserThread : public Thread
 
     void setTimeToWake(size_t time) {time_to_wake_ = time;}
 
+    void setUserMutex(size_t* address) { mystack_.UserMutex = address; }
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!

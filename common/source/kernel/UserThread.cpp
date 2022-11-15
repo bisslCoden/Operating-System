@@ -101,11 +101,10 @@ bool UserThread::schedulable(){
     else
     {
       debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
-      //assert(false && "Sleep flag was neither sleeping nor awake?\n");
+      assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
-
   return false;
 }
 
@@ -206,7 +205,7 @@ UserThread::~UserThread()
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
     delete process_;
   }
-  switch_to_userspace_ = 1;
+  //switch_to_userspace_ = 0;
 }
 
 

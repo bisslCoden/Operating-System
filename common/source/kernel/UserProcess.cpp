@@ -95,6 +95,7 @@ UserProcess::UserProcess(UserProcess *parent) :
     delete thread;
     return;
   }
+  offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
   setProcessState(RUNNING_AND_RUNNABLE);
   setChildStatus(1);
   addToThreadList(thread);

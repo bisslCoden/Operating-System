@@ -396,17 +396,23 @@ bool PageManager::checkForCow(size_t address)
 
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
+  size_t mutexflag = AWAKE_KS;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
   int ret = deleteRef(ppn, current_proc, true);
   bool dbg_gave = false;
   if (ret == -1)
   {
-    debug(X_USERPROCESS, "Something went wrong with deleting my ref!\n");
+    assert(false && "Something went wrong with deleting my ref!\n");
     //unlockCowCnt();
     return false;
   }
-  else if (ret == (int)WAS_LAST)
+  if (address > END_OF_STACKS && address < USER_BREAK)
+  {
+    debug(X_PAGEMANAGER, "seems like we re cowing a stackpage... time to change ident\n");
+    mutexflag = *currentUserThread->getStackInfo().UserMutex;
+  }
+  if (ret == (int)WAS_LAST)
   {
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
@@ -424,6 +430,17 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].writeable = 1;
     pt_ident[m.pti].present = 1;
   }
+
+  if (address > END_OF_STACKS && address < USER_BREAK)
+  {
+    size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(pt_ident[m.pti].page_ppn);
+    location += PAGE_SIZE - sizeof(size_t);
+    debug(X_USERTHREAD, "PREV my mutexflag is now at %p\n", currentUserThread->getStackInfo().UserMutex);
+    currentUserThread->setUserMutex((size_t*) location);
+    debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", currentUserThread->getStackInfo().UserMutex);
+    *currentUserThread->getStackInfo().UserMutex = mutexflag;
+  }
+  
 
   debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), 
   pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
