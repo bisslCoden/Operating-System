@@ -111,6 +111,8 @@ extern int checkAdress(void* adress, int null_ok);
 
 extern pthread_t pthread_self(void);
 
+extern void kernelsem_wait();
+extern void kernelsem_post();
 
 
 extern int pthread_cancel(pthread_t thread);

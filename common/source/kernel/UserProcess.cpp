@@ -25,9 +25,11 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     offsetlist_lock_("UserProcess::offsets"),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    waitpid_sem(0),
-    clock_lock_("UserProcess::clock_lock_")
+    waitpid_sem_("Userprocess::waitpid_sem_"),
+    clock_lock_("UserProcess::clock_lock_"),
+    waiter_lock_("UserProcess::waiter_lock_")
 {
+  waitpid_sem_.init(0);
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
@@ -35,7 +37,6 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   if(!setupLoader(fd_))
     return;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
-  setProcessState(RUNNING_AND_RUNNABLE);
   setChildStatus(0);
   threads_lock_.acquire();
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
@@ -57,9 +58,11 @@ UserProcess::UserProcess(UserProcess *parent) :
   offsetlist_lock_("UserProcess::offsets"),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  waitpid_sem(0),
-  clock_lock_("UserProcess::clock_lock_")
+  waitpid_sem_("Userprocess::waitpid_sem_"),
+  clock_lock_("UserProcess::clock_lock_"),
+  waiter_lock_("UserProcess::waiter_lock_")
 {
+  waitpid_sem_.init(0);
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
   waiting_exec_lock_.release();
@@ -88,7 +91,6 @@ UserProcess::UserProcess(UserProcess *parent) :
     return;
   }
   offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
-  setProcessState(RUNNING_AND_RUNNABLE);
   setChildStatus(1);
 
   if (!threads_lock_.isHeldBy(currentThread))
@@ -118,6 +120,10 @@ UserProcess::~UserProcess()
   delete working_dir_;
   working_dir_ = 0;
 
+  lockWaiter();
+  if (waiter_ != 0)
+    waiter_->postPIDSem();
+  unlockWaiter();
   ProcessRegistry::instance()->processExit();
   debug(X_USERPROCESS, "PID [%ld]: destructor done\n", pid_);
 }
@@ -502,10 +508,6 @@ void UserProcess::setChildStatus(bool arg)
   child_ = arg; 
 }
 
-void UserProcess::setProcessState(ProcessState state)
-{ 
-  state_ = state; 
-}
 
 void UserProcess::setDuaration(size_t duaration)
 { 

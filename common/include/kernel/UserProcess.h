@@ -131,6 +131,14 @@ class UserProcess
      */
     size_t getRandomPageOffset();
 
+    void waitPIDSem(){ waitpid_sem_.wait(); }
+    void postPIDSem(){ waitpid_sem_.post(); }
+    void lockWaiter() { waiter_lock_.acquire();}
+    void unlockWaiter() { waiter_lock_.release();}
+    UserProcess* checkWaiter(){ return waiter_; }
+    void setWaiter(UserProcess* waiter){ waiter_ = waiter; };  
+
+
     /**
      * @brief Create a New Thread object (pthread_create)
      * 
@@ -188,9 +196,8 @@ class UserProcess
     
     void setChildStatus(bool arg);
 
-    ProcessState getProcessState() const {return state_; }
 
-    void setProcessState(ProcessState state);
+
 
     size_t getDuaration(){ return duaration_; }
     
@@ -255,7 +262,9 @@ class UserProcess
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
     
-    KernelSemaphore waitpid_sem;
+    KernelSemaphore waitpid_sem_;
     Mutex clock_lock_;
+    Mutex waiter_lock_;
+    UserProcess* waiter_ = 0;
 };
 

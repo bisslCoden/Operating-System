@@ -41,6 +41,15 @@ size_t findStackStackStart(size_t inputadress){
   return outputadress;
 }
 
+void kernelsem_wait(){
+  __syscall(sc_ks_wait, 0x0, 0x0, 0x0, 0x0, 0x0);
+}
+void kernelsem_post(){
+  __syscall(sc_ks_post, 0x0, 0x0, 0x0, 0x0, 0x0);
+
+}
+
+
 /**
  * @brief also used for deadlock detection: checks if a thread is waiting on a lock
  * 
