@@ -53,10 +53,11 @@ uint32 Scheduler::schedule()
   {
     if((*it)->schedulable())
     {
-      currentThread = *it;
+      currentThread = *it; /// MAYBE SET HERE THE LASTSTART?
       break;
     }
   }
+
 
   assert(it != threads_.end() && "No schedulable thread found");
 
