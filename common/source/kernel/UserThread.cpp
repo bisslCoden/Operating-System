@@ -69,7 +69,7 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
-            getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+            //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
             setLastStart(Scheduler::instance()->getRDTSC());
             return true;
           }
@@ -98,7 +98,7 @@ bool UserThread::schedulable(){
     }
     else if (sleepy == AWAKE_KS)
     {
-      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
