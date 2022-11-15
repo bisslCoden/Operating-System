@@ -14,9 +14,9 @@ int main(int argc, char** argv)
 
   }
   if (pid == 0)
-    printf("Hello from Child! %d\n" ,pid);
+    printf("Hello from Child! %d\n", pid);
   else
-    printf("Hello from Parent! %d\n",pid);
+    printf("Hello from Parent! %d\n", pid);
   printf("Test Done!\n");
   return 0;
 }

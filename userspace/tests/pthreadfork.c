@@ -16,8 +16,9 @@ int main()
   printf("main(): fork().\n");
   fork();
 
-  int evecv_retval = execv("/usr/pthreadfork.sweb", NULL);
-  printf("main(): after execv() o_O. ret_val = %d\n", evecv_retval);
+  //int evecv_retval = execv("/usr/pthreadfork.sweb", NULL);
+  //printf("main(): after execv() o_O. ret_val = %d\n", evecv_retval);
 
+  printf("main ret\n");
   return 0;
 }
