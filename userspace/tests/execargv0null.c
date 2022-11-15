@@ -10,7 +10,7 @@ int main(int argc, const char *argv[])
 	char* const args[] = {NULL};
   
 	printf("before exec\n");
-	int ret_exec = execv(path, NULL);
+	int ret_exec = execv(path, args);
   printf("execv failed with return value %d!\n", ret_exec);
   return 0;
 }

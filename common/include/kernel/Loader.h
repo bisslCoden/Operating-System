@@ -9,10 +9,13 @@
 #include <uvector.h>
 
 class Stabs2DebugInfo;
+//class ArchMemory;
 
 class Loader
 {
   public:
+  
+  
     Loader(ssize_t fd);
     ~Loader();
 

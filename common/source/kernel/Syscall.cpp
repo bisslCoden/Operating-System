@@ -281,16 +281,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
 
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
 
-  currentUserThread->getProcess()->lockKill();
-  if(currentUserThread->getProcess()->checkKill())
-  {
-    currentUserThread->getProcess()->unlockKill();
-    return -1;
-  };
-  currentUserThread->getProcess()->unlockKill();
-
   // could be dangerous but we have NO locks here...
-  
   int joinstate = PTHREAD_CREATE_JOINABLE;
   if(attr >= 0x1000)
   {
@@ -305,14 +296,11 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
 
   if(newthread != 0)
   {
-    currentUserThread->getProcess()->lockKill();
     if(currentUserThread->getProcess()->checkKill())
     {
       newthread->reDirectToDeath();
-      currentUserThread->getProcess()->unlockKill();
       return -1;
     };
-    currentUserThread->getProcess()->unlockKill();
 
     *(size_t*)thread = newthread->getTID();
     return 0;
@@ -362,7 +350,8 @@ void Syscall::pthread_exit(void* value)
     currentUserThread->getParentProcess()->unLockThreadMutex();
     currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo().page_offset_);
     //experimentaaal: free my pages on my own!
-    currentThread->kill();
+    currentUserThread->freeMyPagesAndDie();
+    //currentThread->kill();
   }
   else
   {

@@ -23,6 +23,9 @@
 #define USER_BREAK 0x0000800000000000ULL
 #define END_OF_STACKS 0x0000700000000000ULL
 
+#define SLEEPING_KS 0x46334234
+#define AWAKE_KS 0x54321432
+
 #define MAX_STACKS (USER_BREAK - END_OF_STACKS) / (PAGE_SIZE * (STACK_SIZE_IN_PAGES + 2))
 /**
  * End of the non-canonical space, start of kernel space

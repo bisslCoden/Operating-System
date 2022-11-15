@@ -9,11 +9,7 @@
 int main(int argc, char** argv)
 {
   printf("Sleep test started!\n"); // clock return RDTSC in this case
-  int x = sleep(1); 
-  x = sleep(1);
-  printf("Sleep test!\n"); 
-  x = sleep(1);
-  printf("Sleep test!\n"); 
+  int x = sleep(1);
   x = sleep(1);
   printf("Sleep test!\n");
   x = sleep(1);
@@ -24,7 +20,11 @@ int main(int argc, char** argv)
   printf("Sleep test!\n");
   x = sleep(1);
   printf("Sleep test!\n");
-  x = sleep(1); 
+  x = sleep(1);
+  printf("Sleep test!\n");
+  x = sleep(1);
+  printf("Sleep test!\n");
+  x = sleep(1);
   printf("Sleep test!\n");
   printf("Sleep test enden!\n"); // clock return RDTSC in this case
   return x;

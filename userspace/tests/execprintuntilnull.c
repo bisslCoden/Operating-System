@@ -33,7 +33,7 @@ int main()
 	char* const arg5 = "Mehl";
 
 	// exec call
-	char* const args[] = {path, arg1, arg2, arg3, arg4, arg5, NULL};
+	char* const args[] = {path, arg1, arg2, NULL, arg3, arg4, arg5, NULL};
 	printf("before exec\n");
 	int ret = execv(path, args);
   printf("execv failed with return value %d!\n", ret);

@@ -111,14 +111,11 @@ size_t ProcessRegistry::processFork()
   debug(PROCESS_REG, "processFork() called starting process creation\n");
   auto parent = currentUserThread->getProcess();
   
-  parent->lockKill();
   if (parent->checkKill())
   {
-    parent->unlockKill();
     return -1;
   }
-  parent->unlockKill();
-
+  
   //debug(PROCESS_REG, "After parent read %p\n", parent);
   auto process = new UserProcess(parent);
 
@@ -181,14 +178,15 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 {
   debug(X_PROCESS_REG, "areExecArgsValid()?\n");
-  // here we already know that path is okay and argv != NULL
-  if((size_t)argv >= USER_BREAK)
+  // here we already know that path is okay and argv != NULL -> check if 
+  if((size_t)argv >= USER_BREAK || (size_t)argv[0] >= USER_BREAK)
     return -1;
 
-  // first char* may null. call exec without process
+  // first char* may be null. call exec without args
   if(!argv[0])
-    execv(path);
+    return execv(path);
 
+  // increase argc until NULL. also don't accept too long strings.
   int argc = 0;
   while(argv[argc])
   {
@@ -225,13 +223,12 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     list_of_processes_lock_.acquire();
     ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
     auto search_child = list.find(arg1);
-    list_of_processes_lock_.release();
     if (search_child == list.end())
     {
+      list_of_processes_lock_.release();
       debug(WAITPID, "Not found, process %ld\n", arg1);
       return -1; //exit value returned
     }
-    list_of_processes_lock_.acquire();
     parent_process->setWaitStatus(1);
     size_t process_state = search_child->second->getProcessState();
     return_pid = search_child->second->getPID();

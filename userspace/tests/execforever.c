@@ -15,8 +15,8 @@ int main(int argc, const char *argv[])
   printf("calling exec now\n");
 
 	// exec call
-	char* const args[] = {path, arg1, arg2, arg3, arg4, arg5, NULL};
+	char* const args[] = {arg1, arg2, arg3, arg4, arg5, NULL};
 	int ret_exec = execv(path, args);
   printf("execv failed with return value %d!\n", ret_exec);
-	return 42;
+	return 0;
 }
