@@ -384,10 +384,13 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
                 {
                   pt_src[pti].cow = 1;
                   pt_src[pti].writeable = 0;
-                  pt_dest[pti].cow = 1;
-                  pt_dest[pti].writeable = 0;
-                  pt_dest[pti].page_ppn = pt_src[pti].page_ppn;
+                  // pt_dest[pti].cow = 1;
+                  // pt_dest[pti].writeable = 0;
+                  // pt_dest[pti].page_ppn = pt_src[pti].page_ppn;
+                  pt_dest[pti] = pt_src[pti];
+                  //debug(X_USERPROCESS, "adding proc %ld\n", parent->getPID());
                   PageManager::instance()->addRef(pt_src[pti].page_ppn, parent);
+                  //debug(X_USERPROCESS, "adding proc %ld\n", child_proc->getPID());
                   PageManager::instance()->addRef(pt_dest[pti].page_ppn, child_proc);
                 }
               }
