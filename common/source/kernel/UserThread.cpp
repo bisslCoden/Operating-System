@@ -107,7 +107,6 @@ bool UserThread::schedulable(){
     }
     else if(DYING_)
     {
-      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
