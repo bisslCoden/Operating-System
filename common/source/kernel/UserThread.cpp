@@ -88,10 +88,14 @@ bool UserThread::schedulable(){
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
+      setLastStart(Scheduler::instance()->getRDTSC());
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
+      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
+      setLastStart(Scheduler::instance()->getRDTSC());
       return false;
     }
     else if (sleepy == AWAKE_KS)
@@ -105,7 +109,8 @@ bool UserThread::schedulable(){
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
-
+  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
+  setLastStart(Scheduler::instance()->getRDTSC());
   return false;
 }
 
