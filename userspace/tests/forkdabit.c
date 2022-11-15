@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-// 6 forks is max that works consistenty 
+// 6 forks is max that works consistenty
 #define FORKS 6
 
 int main(int argc, char** argv)
@@ -20,7 +20,8 @@ int main(int argc, char** argv)
 
   if(pid)
     printf("parent from child [%ld] here\n", pid);
-  else  
+  else
     printf("some child returning...\n");
   return 0;
 }
+

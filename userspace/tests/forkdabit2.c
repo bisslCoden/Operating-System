@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define FORKS 7
+#define FORKS 5
 
 int main(int argc, char** argv)
 {

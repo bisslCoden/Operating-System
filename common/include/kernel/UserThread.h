@@ -10,8 +10,6 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
-#define SLEEPING_KS 0x46334234
-#define AWAKE_KS 0x54321432
 #define NO_LOCK_KS 0x92246879
 
 class UserProcess;
@@ -43,6 +41,7 @@ typedef struct Threadflags
   ustl::atomic_flag kasynchronous;
 }Threadflags;
 
+class Semaphore;
 typedef struct StackInfo
 {
   size_t userstack_start_ = 0;
@@ -126,47 +125,48 @@ class UserThread : public Thread
 
     void setTimeToWake(size_t time) {time_to_wake_ = time;}
 
+    void setUserMutex(size_t* address) { mystack_.UserMutex = address; }
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
      * 
      */
-    void setJoinState(int state){myflags_.joinable = state;}
-    int getJoinState(){return myflags_.joinable;}
+    void setJoinState(int state)      {myflags_.joinable = state;}
+    int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
     void freeMyPages();
 
     //acquie retvallock before!
     void setJoiner(UserThread* thread){join_waiter_ = thread;}
-    void waitJoin(){join_cond_.wait();}
-    void signalJoin(){join_cond_.signal();}
+    void waitJoin()                   {join_cond_.wait();}
+    void signalJoin()                 {join_cond_.signal();}
     
     bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
 
-    size_t getPageOffset(){return mystack_.page_offset_;}
+    size_t getPageOffset()            {return mystack_.page_offset_;}
 
 
-    StackInfo getStackInfo() { return mystack_; }
+    StackInfo getStackInfo()          { return mystack_; }
 
     // tells if thread is the last thread of its process
     // return process of thread
-    UserProcess* getParentProcess() { return process_; }
+    UserProcess* getParentProcess()   { return process_; }
 
     bool schedulable() override;
 
-    void signalExec(){exec_wait_.signal();}
-    void waitExec(){exec_wait_.wait();}
+    void signalExec()                 {exec_wait_.signal();}
+    void waitExec()                   {exec_wait_.wait();}
 
-    void lockFlagMutex(){ flag_mutex_.acquire();}
-    void unlockFlagMutex(){ flag_mutex_.release();}
+    void lockFlagMutex()              { flag_mutex_.acquire();}
+    void unlockFlagMutex()            { flag_mutex_.release();}
 
     void setCancelState(int state);
     void setCancelType(int type);
     void sendCancelRequest();
-    void setLast(){last_ = true;}    
-
+    void setLast()                    {last_ = true;}    
     void reDirectToDeath();
+
     // getters
     Threadflags*  getflags()          { return &myflags_;}     //lock before!
     UserThread*   getJoiner()         { return join_waiter_;}  //lock before!

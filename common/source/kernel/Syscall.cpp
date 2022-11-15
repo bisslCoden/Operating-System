@@ -622,7 +622,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
     return 0;
   //debug(SLEEP, "Sleep system call started\n");
   uint64_t rdtsc_now = Scheduler::instance()->getRDTSC() * 10;
-  uint64_t time_to_wake = (seconds * 182) * Scheduler::instance()->getDiffAvg() + rdtsc_now;
+  uint64_t time_to_wake = seconds * (182 * Scheduler::instance()->getDiffAvg()) + rdtsc_now;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
   //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
@@ -630,28 +630,15 @@ unsigned int Syscall::sleep(unsigned int seconds)
   // see diff between avg and getdiffpertick
 
   //
+  debug(SLEEP, "avg:    %ld\n", Scheduler::instance()->getDiffAvg());
+  debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
+  //currentUserThread->getParentProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  //currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
-  //while(time_to_wake > Scheduler::instance()->getRDTSC() * 10)
-  //{
-    //debug(SLEEP, "rdtsc_now:    %ld\n",  Scheduler::instance()->getRDTSC() * 10);
-    
-    //debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
-    
-    //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake,
-    //Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ),
-    //Scheduler::instance()->getFrequency());
-    
-    //Scheduler::instance()->yield();
-    
-  //}
   return 0;
 }
-
-// 71.6 % 
-// 75.4 %
-
 
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
@@ -659,88 +646,23 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // then use the number of ticks to get the seconds
 // we know how many clocks(cycles i think) happen per second
 // we get the number of cycles
+
+//duaration is in cycles
+//duaration/avg_cycle_per_tick = number of ticks
+//tick = 54 milisecond
+//divide by 54 to get the number of miliseconds 
+// 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
-  UserThread* thread = (UserThread*) currentThread;
-  //ustl::list<Thread*> list = Scheduler::instance()->getThreadList();
-  size_t duaration = thread->getParentProcess()->getClockSum();
-  duaration += thread->getParentProcess()->getDuaration();
-  return duaration / (Scheduler::instance()->getDiffAvg());
+  //size_t avg_per_sec = (182 * Scheduler::instance()->getDiffAvg());
+  size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+  debug(CLOCK, "clock sum %ld\n", duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10));
+  size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
+  debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
+  duaration += duaration_2;
+  duaration = duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10);
+  //duaration = duaration * 54;
+  duaration = duaration;
+  debug(CLOCK, "result    %ld\n", (duaration));
+  return duaration * CLOCKS_PER_SEC;
 }
-
-// 78.3%
-
-// commented out bc testing
-// The clock() function returns an approximation of processor time used by the program
-/*size_t Syscall::clock()
-{
-  UserThread* thread = (UserThread*) currentThread;
-  return getRDTSC() - thread->getParentProcess()->getDuaration();
-
-  //else
-  //  return (clock_t) -1;
-
-  //uint32 new_ticks = Scheduler::instance()->getTicks(); 
-  //size_t reuturn_d_ticks = return_ / new_ticks;
-  //size_t return_final = reuturn_d_ticks/1000000;
-  //CLOCKS_PER_SECOND * (RUNNING TIME OF WHATEVER)
-}*/
-
-/*size_t Syscall::getRDTSC()
-{
-  size_t firstbits;
-  size_t lastbits; 
-  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
-  //debug(USERPROCESS,"read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", rand, MAX_STACKS, page_offset);
-  size_t return_ = firstbits << 32 | lastbits;
-  return return_;
-}*/
-
-
-/*size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
-{
-  int number = 10;
-  if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
-  {
-    debug(DBEK, "arg1 smaller -1\n");
-  }
-  else if((long int) arg1 == -1) // any child process.
-  {
-    debug(DBEK, "arg1 equals -1\n");
-  } 
-  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
-  {
-    debug(DBEK, "arg1 equals 0\n");
-  }
-  else if((long int) arg1 > 0) // any specifed process
-  {
-    debug(DBEK, "arg1 greater 0\n");
-  }  
-  else //   something went wrong
-  {
-    debug(DBEK, "we have an error somewhere\n");
-  } 
-  if(arg2 != 0)
-  {
-    debug(DBEK, "arg2 different 0\n");
-  }
-  if(arg3 > 0) 
-  {
-    debug(DBEK, "arg3 bigger 0\n");
-  }
-  ustl::map<size_t, UserProcess*> list;
-  list = ProcessRegistry::getProcessList();
-  auto search = list.find(arg1);
-  if (search != list.end())
-  {
-    debug(DBEK, "Found\n");
-  }
-  else
-  {
-    debug(DBEK, "Not found\n");
-  }
-  //debug(DBEK, "%ld\n\n\n\n\n", search->first);
-  return number;
-}*/
-
-

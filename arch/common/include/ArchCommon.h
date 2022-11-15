@@ -4,6 +4,10 @@
 #include "paging-definitions.h"
 
 class Console;
+// class Userprocess;
+// class ArchMemory;
+// class Loader;
+
 
 class ArchCommon
 {

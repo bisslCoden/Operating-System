@@ -5,10 +5,11 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "uvector.h"
-#include "Semaphore.h"
+#include "KernelSemaphore.h"
 #include "Loader.h"
 
-#define NO_EXEC_CALL 123454321
+
+
 enum ProcessState
 {
 ZERO, //to check if the process exist or not with getProcessState()
@@ -18,10 +19,10 @@ INTERRRUPTABLE_SLEEP,
 STOPPED
 };
 
-#define NO_EXEC_CALL 123454321
-
 class UserThread;
 class Syscall;
+class ArchMemory;
+class Loader;
 class UserProcess
 {
   public:
@@ -46,8 +47,6 @@ class UserProcess
      *
      */
 
-    UserProcess(const UserProcess& parent_process);
-
 
     ~UserProcess();
 
@@ -61,17 +60,22 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
-     * @brief creates a thread that starts the binary of the program
+     * @brief kills all threads except for one + opens the file +
+     *  creates loader and sets to loader_. old loaders are deleted
      * 
      * @param path the path to the binary
      * @param argv the arguments 
      * @param argc the argument count
      */
     int execv(const char* path, char *const argv[], size_t argc);
-    // this is non-args version of execv
+    /**
+     * @brief creates a thread that starts the binary of the program
+     * 
+     * @param path the path to the binary
+     */
     int execv(const char* path);
 
-    void removeOldProcessInformation();
+    bool removeOldProcessInformation();
 
     /**
      * @brief does the Loader setup + fd check
@@ -143,11 +147,11 @@ class UserProcess
      */
     void exit(size_t exit_code, bool kill_currentThread = true);
 
-    void lockKill(){kill_lock_.acquire();}
-    void unlockKill(){kill_lock_.release();}
-    bool checkKill(){ return KILLED_;}
+    void lockKill()   {kill_lock_.acquire();}
+    void unlockKill() {kill_lock_.release();}
+    bool checkKill()  { return KILLED_;}
 
-    void lockRetVal(){ returnvalue_lock_.acquire();}
+    void lockRetVal() { returnvalue_lock_.acquire();}
     void unlockRetVal(){ returnvalue_lock_.release();}
     bool checkRetVal(Thread* thread){ return returnvalue_lock_.isHeldBy(thread);}
 
@@ -256,6 +260,7 @@ class UserProcess
     Mutex waiting_exec_lock_;
     Mutex archmem_lock_;
     
-    Semaphore waitpid_sem;
+    KernelSemaphore waitpid_sem;
+    Mutex clock_lock_;
 };
 

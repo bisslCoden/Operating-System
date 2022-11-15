@@ -1,10 +1,9 @@
 #include "types.h"
-#include "UserThread.h"
+//#include "UserThread.h"
 #include "Mutex.h"
 #include "Condition.h"
-#include "uvector.h"
 
-class Semaphore
+class KernelSemaphore
 {
 private:
     Mutex counter_lock_;
@@ -14,10 +13,9 @@ private:
     size_t max_threads_;
     
 public:
-    Semaphore(size_t count) : counter_lock_{"sem::counter_lock_"}, threads_lock_{"sem::threads_lock_"}, condition_lock_{"sem::condition_lock_"},
+    KernelSemaphore(size_t count) : counter_lock_{"sem::counter_lock_"}, threads_lock_{"sem::threads_lock_"}, condition_lock_{"sem::condition_lock_"},
     threads_cond_{&condition_lock_, "sem::condition"}, max_threads_{count}{}
 
-    ~Semaphore();
 
     void wait();
     void post();

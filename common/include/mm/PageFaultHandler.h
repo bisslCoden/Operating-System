@@ -35,6 +35,9 @@ private:
                                      bool present, bool writing,
                                      bool fetch, bool switch_to_us);
 
+  
+  static bool checkForCow(size_t address);
+
 public:
   /**
    * Enter a new pagefault. The pagefault is processed.
