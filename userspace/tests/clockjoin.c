@@ -17,29 +17,57 @@ int fastroutine()
 //     printf("old val was %d\n", old);
 //    // pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
     printf("graceful exit!\n");
+    for(int i_ = 10000; i_ > 0; i_--)
+    {
+      for(int k_ = 10000; k_ > 0; k_--)
+      {
+        int l_ = 1 + l_;
+      }
+    }
+    for(int i_ = 10000; i_ > 0; i_--)
+    {
+      for(int k_ = 10000; k_ > 0; k_--)
+      {
+        int l_ = 1 + l_;
+      }
+    }
     pthread_exit((void*)99);
     return 1;
 }
 
 int main(int argc, char *argv[]) {
-  clock_t time_1 = clock();
-  time_1 = clock();
+   for(int i_ = 10000; i_ > 0; i_--)
+    {
+      for(int k_ = 10000; k_ > 0; k_--)
+      {
+        int l_ = 1 + l_;
+      }
+    }
+  size_t time_1 = clock();
+
+
   sleep(1);
-  clock_t time_21 = clock();
-  printf("SYSCALL CLOCK time1 %d\n", (time_1)/ CLOCKS_PER_SEC);
-  printf("SYSCALL CLOCK time2 %d\n", (time_21)/ CLOCKS_PER_SEC);
-  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1) / CLOCKS_PER_SEC);
+  size_t time_21 = clock();
+  printf("SYSCALL CLOCK time1 in ms%ld\n", (time_1));
+  printf("SYSCALL CLOCK time2 in ms%ld\n", (time_21));
   int ret;
   int returner;
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
-  for(int i = 10000; i > 0; i--)
-  {
-    int j = 1 + i;
-  }
+  returner =  pthread_join(tid, (void**)&ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  returner =  pthread_join(tid, (void**)&ret);
+  pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
-  clock_t time_2 = clock();
-  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2) / CLOCKS_PER_SEC);
-  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1)) / CLOCKS_PER_SEC);
+  size_t time_2 = clock();
+  printf("SYSCALL CLOCK has been called and the return value is in ms: %ld\n", (time_2));
+  printf("CLOCK TEST has been finished and the difference is in ms: %ld\n", ((time_2) - (time_1)));
+  printf("CLOCK TEST has been finished and the difference is in s: %ld\n", (time_2)/ CLOCKS_PER_SEC - (time_1) / CLOCKS_PER_SEC);
   return 0;
 }

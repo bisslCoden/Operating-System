@@ -43,7 +43,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -65,6 +64,7 @@ bool UserThread::schedulable(){
     //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!getflags()->knotcancelable.test_and_set())
       {
+        
         if (getflags()->kasynchronous.test_and_set())
         {
           if (getflags()->kcancelreq.test_and_set())
@@ -107,6 +107,8 @@ bool UserThread::schedulable(){
     }
     else if(DYING_)
     {
+      getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else
@@ -117,10 +119,7 @@ bool UserThread::schedulable(){
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
-  else if(state_ == ToBeDestroyed)
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart()); 
-  }
+  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   return false;
 }
 

@@ -44,6 +44,6 @@ int main(int argc, char *argv[]) {
   printf("join returned: %d got val %d\n",returner, ret);
   clock_t time_2 = clock();
   printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2)/ CLOCKS_PER_SEC);
-  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1))/ CLOCKS_PER_SEC);
+  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2/ CLOCKS_PER_SEC) - (time_1/CLOCKS_PER_SEC)));
   return 0;
 }

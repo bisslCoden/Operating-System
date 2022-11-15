@@ -648,7 +648,9 @@ size_t Syscall::clock()
   debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
   duaration += duaration_2;
   debug(CLOCK, "duaration before divide %ld\n", duaration);
-  duaration = (duaration/(Scheduler::instance()->getDiffAvg() * (182 / 10))) * CLOCKS_PER_SEC;
+  duaration = (duaration * CLOCKS_PER_SEC) /(Scheduler::instance()->getDiffAvg() * (182 / 10));
   debug(CLOCK, "result    %ld\n", (duaration));
   return duaration;
 }
+
+// clock 8 - good result

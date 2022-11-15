@@ -14,7 +14,8 @@ int main(int argc, char** argv)
     pid = fork();
     pid = fork();
     pid = fork();
-    
+    pid = fork();
+
     printf("pid : %d, and mine process id: %d\n", pid, getpid());
     if(pid != 0)
     {
