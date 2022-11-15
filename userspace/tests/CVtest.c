@@ -17,7 +17,7 @@ int never_false = 1;
 int simple_routine()
 {
   int condret = 0;
-  pthread_mutex_lock(&mutex);
+  assert(pthread_mutex_lock(&mutex) == 0 && "this seems to be a mutex error!\n");
   condret = pthread_cond_wait(&condition, &mutex);
   printf("cond returned %d.\n", condret);
   assert(never_false == 1 && "never false aint 1? whaat?\n");
@@ -49,6 +49,7 @@ int main()
     assert((ret = pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL)) == 0 && 
     "something went wrong in thread creation\n");
   }
+  sched_yield();
   sched_yield();
 
   printf("until now there should be no prints...\n");
