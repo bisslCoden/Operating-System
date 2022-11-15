@@ -8,6 +8,7 @@
 
 int main(int argc, char** argv)
 {
+  int pid = 0;
   for(int i = 0; i < 3; i++)
   {
     printf("Call to wait_pid!\n");
