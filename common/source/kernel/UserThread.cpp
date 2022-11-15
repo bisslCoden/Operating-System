@@ -43,6 +43,7 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
+  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -82,20 +83,25 @@ bool UserThread::schedulable(){
     
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (sleepy == AWAKE_KS)
-    {
-      return true;
-    }
-    else if(sleepy == SLEEPING_KS)
+
+    if(sleepy == SLEEPING_KS)
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
       return false;
     }
+    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
+    {
+      return false;
+    }
+    else if (sleepy == AWAKE_KS)
+    {
+      return true;
+    }
     else
     {
       debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
-      //assert(false && "Sleep flag was neither sleeping nor awake?\n");
+      assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
     debug(X_THREADSTACK, "schedulable finished!\n");
   }
@@ -135,7 +141,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-
+  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
@@ -177,6 +183,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
   Userthread = true;
+  last_start_ = Scheduler::instance()->getRDTSC();
 
 
 
@@ -191,14 +198,14 @@ UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
   //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-  
   freeMyPages();
+  debug(X_USERTHREAD, "[%ld] freed my pages now...\n",tid_);
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
     delete process_;
   }
-  switch_to_userspace_ = 1;
+  //switch_to_userspace_ = 0;
 }
 
 
@@ -242,13 +249,12 @@ void UserThread::getNewStackPage(size_t adress){
 
 void UserThread::freeMyPages(){
   my_pages_lock_.acquire();
-  process_->lockArchMem();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     //might delete the assert later
+    debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
-  process_->unlockArchMem();
   my_pages_lock_.release();
 }
 

@@ -33,6 +33,9 @@ class ArchMemoryMapping
     uint64 pti;
 };
 
+class UserProcess;
+class Loader;
+
 class ArchMemory
 {
 public:
@@ -114,6 +117,9 @@ public:
  */
   static void unmapKernelPage(uint64 virtual_page);
 
+  void lockArchmem(){ arch_memory_lock_.acquire();}
+  void unlockArchmem(){ arch_memory_lock_.release();}
+
   uint64 page_map_level_4_;
 
   uint64 getRootOfPagingStructure();
@@ -127,20 +133,21 @@ public:
    * 
    * @param destination 
    */
-  void setCowToArchmemPages(ArchMemory &destination);
+  void setCowToArchmemPages(ArchMemory &destination, UserProcess* child_proc);
   /**
-   * @brief MUST BE LOCKED FROM OUTSIDE. 
-   * copies from src to dest. alloc new page for dest. 
-   * 
+   * @brief MUST BE LOCKED FROM OUTSIDE.
+   * copies from src to dest. alloc new page for dest.
+   *
    * @param ppn_src the src
    * @return size_t the dest ppn
    */
   size_t allocDestAndCopySrc(size_t ppn_src);
-  
-  void lockArchMemory()   { arch_memory_lock_.acquire(); }
-  void unlockArchMemory() { arch_memory_lock_.release(); }
-private:
 
+  void lockArchMemory()   { arch_memory_lock_.acquire(); }
+  bool checkArchMemory(Thread* thread)  { return arch_memory_lock_.isHeldBy(thread);}
+  void unlockArchMemory() { arch_memory_lock_.release(); }
+  void setProcess(UserProcess* proc) { my_proc = proc; }
+private:
 /** 
  * Adds a page directory entry to the given page directory.
  * (In other words, adds the reference to a new page table to a given
@@ -165,6 +172,7 @@ private:
   ArchMemory(ArchMemory const &src);
   ArchMemory &operator=(ArchMemory const &src);
 
-  Mutex arch_memory_lock_ = "ArchMemory::arch_memory_lock_";
+  Mutex arch_memory_lock_;
+  UserProcess* my_proc = 0;
 };
 

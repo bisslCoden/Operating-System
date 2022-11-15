@@ -10,8 +10,6 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
-#define SLEEPING_KS 0x46334234
-#define AWAKE_KS 0x54321432
 #define NO_LOCK_KS 0x92246879
 
 class UserProcess;
@@ -118,6 +116,15 @@ class UserThread : public Thread
 
     //lock retval before!
     bool detectCircularJoin(UserThread* to_be_joined);
+    size_t getLastStart() {return last_start_; }
+
+    void setLastStart(size_t time) {last_start_ = time;}
+
+    size_t getTimeToWake() {return time_to_wake_; }
+
+    void setTimeToWake(size_t time) {time_to_wake_ = time;}
+
+    void setUserMutex(size_t* address) { mystack_.UserMutex = address; }
 
     /**
      * @brief join functions: locks and setters for the join mechanics. setJoiner needs to be locked!
@@ -196,5 +203,11 @@ class UserThread : public Thread
     Condition exec_wait_;
     
     // only true if removeFromThreadList() detects last thread to delete process
+
+    //clock
+    size_t last_start_;
+
+    //sleep
+    size_t time_to_wake_ = 0;
 };
 

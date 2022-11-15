@@ -8,6 +8,7 @@
 #include "Syscall.h"
 #include "ArchThreads.h"
 #include "PageManager.h"
+#include "ArchMemory.h"
 
 extern "C" void arch_contextSwitch();
 
@@ -64,15 +65,32 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
         switch_to_us);
 
   ArchThreads::printThreadRegisters(currentThread, false);
+  
 
+  
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
+    PageManager::instance()->lockCowCnt();
+    if (currentThread->loader_)
+    {
+      if(!currentThread->loader_->arch_memory_.checkArchMemory(currentThread))
+       currentThread->loader_->arch_memory_.lockArchMemory();
+    }
     if (PageManager::instance()->checkForCow(address))
     {
+      currentThread->loader_->arch_memory_.unlockArchMemory();
+      PageManager::instance()->unlockCowCnt();
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       return;
     }
-    else if (switch_to_us && address > END_OF_STACKS)
+
+    PageManager::instance()->unlockCowCnt();
+    if (currentThread->loader_)
+    {
+        currentThread->loader_->arch_memory_.unlockArchMemory();
+    }
+
+    if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");
       UserThread* stack_owner = 0;

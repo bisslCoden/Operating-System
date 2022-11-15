@@ -18,6 +18,8 @@ STOPPED
 
 class UserThread;
 class Syscall;
+class ArchMemory;
+class Loader;
 class UserProcess
 {
   public:
@@ -41,8 +43,6 @@ class UserProcess
      * @param parent_process
      *
      */
-
-    UserProcess(const UserProcess& parent_process);
 
 
     ~UserProcess();
@@ -196,6 +196,9 @@ class UserProcess
     void lockArchMem(){archmem_lock_.acquire();}
     void unlockArchMem(){archmem_lock_.release();}
     
+    void incDuaration(size_t duaration) { duaration_ += duaration; };
+
+    size_t getClockSum();
 
 
 
@@ -241,7 +244,7 @@ class UserProcess
     bool child_;
 
     // for clock
-    size_t duaration_;
+    size_t duaration_ = 0;
 
     Mutex offsetlist_lock_;
     ustl::vector<size_t> offsets_;
@@ -253,5 +256,6 @@ class UserProcess
     UserThread* waiting_exec_ = 0;
     Mutex waiting_exec_lock_;
     Mutex archmem_lock_;
+    Mutex clock_lock_;
 };
 

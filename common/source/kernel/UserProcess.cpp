@@ -27,7 +27,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     KILLED_(false),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    archmem_lock_("UserProcess::archmem_lock_")
+    archmem_lock_("UserProcess::archmem_lock_"),
+    clock_lock_("UserProcess::clock_lock_")
 {
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
@@ -37,7 +38,6 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     return;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setProcessState(RUNNING_AND_RUNNABLE);
-  setDuaration(0);
   setChildStatus(0);
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
   assert(first_thread && "UserThread constructor failed");
@@ -59,8 +59,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   KILLED_(false),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  archmem_lock_("UserProcess::archmem_lock_")
-
+  archmem_lock_("UserProcess::archmem_lock_"),
+  clock_lock_("UserProcess::clock_lock_")
 {
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
@@ -76,10 +76,16 @@ UserProcess::UserProcess(UserProcess *parent) :
   if (!setupLoader(fd_))
     return;
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
+  PageManager::instance()->lockCowCnt();
+  currentUserThread->loader_->arch_memory_.lockArchMemory();
+  loader_->arch_memory_.lockArchMemory();
 
-  currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_);
+  currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
   debug(USERPROCESS, "UserProcess() fork: setCowToArchmemPages()\n");
 
+  loader_->arch_memory_.unlockArchMemory();
+  currentUserThread->loader_->arch_memory_.unlockArchMemory();
+  PageManager::instance()->unlockCowCnt();
   debug(USERPROCESS, "UserProcess() fork: Creating new Thread for Fork\n");
   UserThread* parent_thread = currentUserThread;
   auto thread = new UserThread(this, parent_thread);
@@ -89,8 +95,8 @@ UserProcess::UserProcess(UserProcess *parent) :
     delete thread;
     return;
   }
+  offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
   setProcessState(RUNNING_AND_RUNNABLE);
-  setDuaration(0);
   setChildStatus(1);
   addToThreadList(thread);
   ProcessRegistry::instance()->processStart();
@@ -104,9 +110,10 @@ UserProcess::~UserProcess()
 {
   debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
   assert(Scheduler::instance()->isCurrentlyCleaningUp());
+  archmem_lock_.acquire();
   delete loader_;
   loader_ = 0;
-
+  archmem_lock_.release();
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -443,6 +450,7 @@ bool UserProcess::setupLoader(ssize_t fd)
     return false;
 
   loader_ = new_loader;
+  loader_->arch_memory_.setProcess(this);
   return true;
 }
 
@@ -501,4 +509,15 @@ void UserProcess::setProcessState(ProcessState state)
 void UserProcess::setDuaration(size_t duaration)
 { 
   duaration_ = duaration; 
+}
+size_t UserProcess::getClockSum()
+{
+  size_t sum = 0;
+  clock_lock_.acquire();
+  for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
+  {
+    sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
+  }
+  clock_lock_.release();
+  return sum;
 }

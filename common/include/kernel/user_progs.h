@@ -12,6 +12,7 @@ char const *user_progs[] = {
                             // "usr/execprinter2.sweb",
                             // "usr/pthreadfork.sweb",
                             // "usr/forkdabit.sweb",
+                            // "usr/forkcow.sweb",
                             0
                            };
 

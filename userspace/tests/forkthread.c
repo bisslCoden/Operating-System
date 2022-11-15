@@ -38,6 +38,8 @@ int initroutine(){
 int main()
 {
     size_t old;
+    fork();
+    fork();
     int ret = 0;
     if (WITHOUT_MAIN)
     {
