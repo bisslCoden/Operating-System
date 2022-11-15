@@ -23,11 +23,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
     threads_lock_("UserProcess::threads_lock_"),
     returnvalue_lock_("UserProcess::retvallock"),
     offsetlist_lock_("UserProcess::offsets"),
-    kill_lock_("UserProcess::kill_lock_"),
-    KILLED_(false),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    archmem_lock_("UserProcess::archmem_lock_"),
     waitpid_sem(0),
     clock_lock_("UserProcess::clock_lock_")
 {
@@ -40,7 +37,9 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setProcessState(RUNNING_AND_RUNNABLE);
   setChildStatus(0);
+  threads_lock_.acquire();
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
+  threads_lock_.release();
   assert(first_thread && "UserThread constructor failed");
 }
 
@@ -56,11 +55,8 @@ UserProcess::UserProcess(UserProcess *parent) :
   threads_lock_("UserProcess::threads_lock_"),
   returnvalue_lock_("UserProcess::retvallock"), 
   offsetlist_lock_("UserProcess::offsets"),
-  kill_lock_("UserProcess::kill_lock_"),
-  KILLED_(false),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  archmem_lock_("UserProcess::archmem_lock_"),
   waitpid_sem(0),
   clock_lock_("UserProcess::clock_lock_")
 {
@@ -78,16 +74,9 @@ UserProcess::UserProcess(UserProcess *parent) :
   if (!setupLoader(fd_))
     return;
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
-  PageManager::instance()->lockCowCnt();
-  currentUserThread->loader_->arch_memory_.lockArchMemory();
-  loader_->arch_memory_.lockArchMemory();
-
+  
   currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
   debug(USERPROCESS, "UserProcess() fork: setCowToArchmemPages()\n");
-
-  loader_->arch_memory_.unlockArchMemory();
-  currentUserThread->loader_->arch_memory_.unlockArchMemory();
-  PageManager::instance()->unlockCowCnt();
 
   debug(USERPROCESS, "UserProcess() fork: Creating new Thread for Fork\n");
   UserThread* parent_thread = currentUserThread;
@@ -101,7 +90,14 @@ UserProcess::UserProcess(UserProcess *parent) :
   offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
   setProcessState(RUNNING_AND_RUNNABLE);
   setChildStatus(1);
+
+  if (!threads_lock_.isHeldBy(currentThread))
+  {
+    threads_lock_.acquire();
+  }
+  
   addToThreadList(thread);
+  threads_lock_.release();
   ProcessRegistry::instance()->processStart();
   
   //?
@@ -111,12 +107,11 @@ UserProcess::UserProcess(UserProcess *parent) :
 
 UserProcess::~UserProcess()
 {
+
   debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
   assert(Scheduler::instance()->isCurrentlyCleaningUp());
-  archmem_lock_.acquire();
   delete loader_;
   loader_ = 0;
-  archmem_lock_.release();
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -129,7 +124,7 @@ UserProcess::~UserProcess()
 
 bool UserProcess::addToThreadList(UserThread* thread)
 {
-  threads_lock_.acquire();
+  //threads_lock_.acquire();
   size_t tid = thread->getTID();
 
   if(threads_.find(tid) != threads_.end())
@@ -144,7 +139,7 @@ bool UserProcess::addToThreadList(UserThread* thread)
   threads_.insert(ustl::make_pair(tid, thread));
   debug(X_USERPROCESS, "added TID: [%ld] to UserProcess::threads_\n", tid);
 
-  threads_lock_.release();
+  //threads_lock_.release();
   return true;
 }
 
@@ -304,7 +299,17 @@ size_t UserProcess::getNrOfThreads()
 UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate = PTHREAD_CREATE_JOINABLE)
 {
   // pthread
-  UserThread* thread = new UserThread(wrapper, getRandomPageOffset());
+  UserThread* thread = 0;
+  
+  threads_lock_.acquire();
+  if (!KILLED_)
+    thread = new UserThread(wrapper, getRandomPageOffset());
+  if (KILLED_)
+  {
+    assert(false && "this is baaad... created thread even though i should be dead1\n");
+  }
+  threads_lock_.release();
+  
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
@@ -333,13 +338,6 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
 void UserProcess::exit(size_t exit_code, bool kill_currentThread)
 {
   debug(USERPROCESS, "PID: [%ld] exit(exit_code = %ld) called\n", pid_, exit_code);
-  kill_lock_.acquire();
-  if (checkKill())
-  {
-    kill_lock_.release();
-    return;
-  }
-  KILLED_ = true;
 
   if (!threads_lock_.isHeldBy(currentThread))
     threads_lock_.acquire();
@@ -359,8 +357,8 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
       thread.second->unlockFlagMutex();
     }
   }
+  KILLED_ = true;
   threads_lock_.release();
-  kill_lock_.release();
   debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());
   // callingThread->lockFlagMutex();
   // callingThread->setCancelState(PTHREAD_CANCEL_ENABLE);

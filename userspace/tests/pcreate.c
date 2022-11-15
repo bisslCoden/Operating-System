@@ -4,6 +4,7 @@
 void simple_routine()
 {
   printf("2 - PTHREAD: FUNCTION CALL WORKES\n");
+  pthread_exit((void*)99);
 }
 
 int main()
@@ -13,6 +14,8 @@ int main()
   //int ret = pthread_create(&tid, NULL, (void*(*)(void*))&simple_routine, NULL);
   int ret = pthread_create(&tid, NULL, (void*)&simple_routine, NULL);
 
-  printf("3 - main again: pthread_create() returned %d and tid %ld. \n", ret, tid);
+
+  pthread_join(tid, (void**) &ret);
+  printf("3 - main again: joined and got retval %d.\n", ret);
   return 0;
 }

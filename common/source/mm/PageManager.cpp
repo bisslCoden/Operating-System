@@ -311,7 +311,7 @@ size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow_del)
 
   if (cow_list_.find(ppn) == cow_list_.end())
   {
-    debug(X_USERPROCESS, "Wtf? tried to delete my ref even though the page isnt cow!!!\n");
+    //debug(X_USERPROCESS, "Wtf? tried to delete my ref even though the page isnt cow!!!\n");
     return 0;
   }
   else
@@ -365,12 +365,16 @@ bool PageManager::checkForCow(size_t address)
   // setup archmem and checkAddressValid()
   UserProcess* current_proc = currentUserThread->getProcess();
   ArchMemory* current_archmem = &current_proc->getLoader()->arch_memory_;
+  
+  if (!current_archmem->checkArchMemory(currentThread))
+    current_archmem->lockArchMemory();
+  
   //lockCowCnt();
   if(!current_archmem->checkAddressValid(address))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
     //unlockCowCnt();
-    //current_archmem->unlockArchMemory();
+    current_archmem->unlockArchMemory();
     return false;
   }
   
@@ -381,7 +385,7 @@ bool PageManager::checkForCow(size_t address)
   if(!m.pt[m.pti].present)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
-    //current_archmem->unlockArchMemory();
+    current_archmem->unlockArchMemory();
     //unlockCowCnt();
     return false;
   }
@@ -389,11 +393,11 @@ bool PageManager::checkForCow(size_t address)
   if(!(m.pt[m.pti].cow && !m.pt[m.pti].writeable))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
-    //current_archmem->unlockArchMemory();
+    current_archmem->unlockArchMemory();
     //unlockCowCnt();
     return false;
   }
-
+  lockCowCnt();
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
   size_t mutexflag = AWAKE_KS;
@@ -403,6 +407,7 @@ bool PageManager::checkForCow(size_t address)
   bool dbg_gave = false;
   if (ret == -1)
   {
+    unlockCowCnt();
     assert(false && "Something went wrong with deleting my ref!\n");
     //unlockCowCnt();
     return false;
@@ -444,7 +449,10 @@ bool PageManager::checkForCow(size_t address)
 
   debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), 
   pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
-  //pm->unlockCowCnt();
+  
+  unlockCowCnt();
+  current_archmem->unlockArchMemory();
+
   //current_archmem->unlockArchMemory();
   return true;
 }
