@@ -641,7 +641,6 @@ unsigned int Syscall::sleep(unsigned int seconds)
 
   return 0;
 }
-^
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
 // we need to increment the ticks variable for every thread of the process
