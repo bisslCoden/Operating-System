@@ -276,7 +276,7 @@ void Syscall::trace()
 
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
-  debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx) called\n", thread, attr, start_routine, arg);
+  debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx, wrapper = %lx) called\n", thread, attr, start_routine, arg, wrapper);
   // add as much parameter checking as possible and return -1
 
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
@@ -330,7 +330,7 @@ void Syscall::pthread_exit(void* value)
   
   if (currentUserThread->getProcess()->findInThreadList(my_tid) != 0x00)
   {
-    if (!currentUserThread->getProcess()->checkRetVal(currentThread))
+    if (!currentUserThread->getProcess()->checkRetValLock(currentThread))
       currentUserThread->getProcess()->lockRetVal();
     
     if (currentUserThread->getJoiner() != 0)

@@ -110,7 +110,7 @@ uint32 Scheduler::schedule()
 void Scheduler::addNewThread(Thread *thread)
 {
   assert(thread);
-  debug(SCHEDULER, "addNewThread: %p  %zd:%s\n", thread, thread->getTID(), thread->getName());
+  debug(SCHEDULER, "addNewThread: %p  [%zd]: %s\n", thread, thread->getTID(), thread->getName());
   if (currentThread)
     ArchThreads::debugCheckNewThread(thread);
   KernelMemoryManager::instance()->getKMMLock().acquire();
@@ -190,8 +190,15 @@ void Scheduler::printThreadList()
   lockScheduling();
   debug(SCHEDULER, "Scheduler::printThreadList: %zd Threads in List\n", threads_.size());
   for (size_t c = 0; c < threads_.size(); ++c)
-    debug(SCHEDULER, "Scheduler::printThreadList: threads_[%zd]: %p  %zd:%s     [%s]\n", c, threads_[c],
-          threads_[c]->getTID(), threads_[c]->getName(), Thread::threadStatePrintable[threads_[c]->state_]);
+    debug(SCHEDULER,  "Scheduler::printThreadList: threads_[%zd]: %p  [%zd] %s with PID %ld, with state: [%s] called %s\n", 
+                      c,      
+                      threads_[c],       
+                      threads_[c]->getTID(), 
+                      ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? "UserThread" : "KernelThread"),
+                      ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? ((UserThread*)currentThread)->getProcess()->getPID() : 0),
+                      Thread::threadStatePrintable[threads_[c]->state_],
+                      threads_[c]->getName()
+                      );
   unlockScheduling();
 }
 

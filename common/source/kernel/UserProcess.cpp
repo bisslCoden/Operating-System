@@ -110,10 +110,12 @@ UserProcess::~UserProcess()
 {
   debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
   assert(Scheduler::instance()->isCurrentlyCleaningUp());
+
   archmem_lock_.acquire();
   delete loader_;
   loader_ = 0;
   archmem_lock_.release();
+  
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -285,6 +287,7 @@ bool UserProcess::checkInOffsetList(size_t NR)
 
 Thread* UserProcess::findInThreadList(size_t tid)
 {
+  assert(testThreadMutex(currentThread) && "PLEASE LOCK BEFORE UserProcess::findInThreadList()");
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
