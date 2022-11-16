@@ -520,7 +520,7 @@ size_t UserProcess::getClockSum()
   {
     if(i->second->getLastStart() < Scheduler::instance()->getRDTSC())
     {
-      debug(CLOCK, "number to sum: %d\n", Scheduler::instance()->getRDTSC() - i->second->getLastStart());
+      debug(CLOCK, "RDTSC - last start %d\n", Scheduler::instance()->getRDTSC() - i->second->getLastStart());
       sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
       debug(CLOCK, "sum: %d\n", sum);
     }

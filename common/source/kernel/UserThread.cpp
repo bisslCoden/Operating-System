@@ -56,6 +56,7 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
+  //debug(CLOCK, "Time in schedulable %ld\n", Scheduler::instance()->getRDTSC());
 
   if (getState() == Running)
   {
@@ -118,7 +119,6 @@ bool UserThread::schedulable(){
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
-  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   return false;
 }
 
