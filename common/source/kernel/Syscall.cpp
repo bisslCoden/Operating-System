@@ -375,6 +375,7 @@ void Syscall::pthread_exit(void* value)
   {
     debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
     currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserThread->kill();
   }
   debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", currentUserThread->getTID());
   return;

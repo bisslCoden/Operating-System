@@ -24,12 +24,21 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
   Userthread = true;
+  mystack_.page_offset_ = page_offset;
+  setupStack();
+
+  process_->threads_lock_.acquire();
+  if (process_-> KILLED_)
+  {
+    process_->threads_lock_.release();
+    *returnto = 9;
+    return;
+  }
+
   //  size_t sleepflag = 1;
   // size_t res = __atomic_exchange_n(&sleepflag, 0, ustl::memory_order_seq_cst);
   // debug(X_THREADSTACK, "jst checking exchange: sleep = %ld and check = %ld\n", sleepflag, res);
   // setup stack, UserRegisters and address space
-  mystack_.page_offset_ = page_offset;
-  setupStack();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
                                    (void*) mystack_.userstack_start_,
                                    getKernelStackStartPointer());
@@ -49,6 +58,7 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   //should be threadsafe??
   *returnto = 0;
   switch_to_userspace_ = 1;
+  process_->threads_lock_.release();
   return;
 }
 
@@ -62,21 +72,24 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = process_->getLoader();
-  // process_->threads_lock_.acquire();
-  // if (process_-> KILLED_)
-  // {
-  //   process_->threads_lock_.release();
-  //   *returnto = 9;
-  //   return;
-  // }
+  mystack_.page_offset_ = page_offset;
+  setupStack();
+
+  process_->threads_lock_.acquire();
+  if (process_-> KILLED_)
+  {
+    process_->threads_lock_.release();
+    *returnto = 9;
+    return;
+  }
+ // process_->threads_lock_.release();
+
   
   // process_->threads_lock_.release();
-  mystack_.page_offset_ = page_offset;
 
   Userthread = true;
 
   // set up user registers and adressspace
-  setupStack();
 
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    (void*) mystack_.userstack_start_, getKernelStackStartPointer());
@@ -92,12 +105,13 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
     setTerminal(main_console->getTerminal(terminal_number));
 
   // add Thread to process to scheduler
-  process_->addToThreadList(this);
   last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
   *returnto = 0;
+  process_->addToThreadList(this);
+  process_->threads_lock_.release();
   return;
 }
 

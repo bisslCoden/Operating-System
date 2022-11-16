@@ -42,9 +42,9 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setChildStatus(0);
-  threads_lock_.acquire();
+  //threads_lock_.acquire();
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset(), &returnto_th);
-  threads_lock_.release();
+  //threads_lock_.release();
   assert(first_thread && "UserThread constructor failed");
   if (returnto_th != 0)
   {
@@ -335,18 +335,29 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   UserThread* thread = 0;
   size_t return_to = 6;
   threads_lock_.acquire();
-  if (!KILLED_)
-    thread = new UserThread(wrapper, getRandomPageOffset(), &return_to);
+  if (KILLED_)
+  {
+    threads_lock_.release();
+    return 0;
+  }
+  threads_lock_.release();
+
+  thread = new UserThread(wrapper, getRandomPageOffset(), &return_to);
+  
+  threads_lock_.acquire();
   if (KILLED_ && return_to == 0)
   {
     assert(false && "this is baaad... created thread even though i should be dead1\n");
   }
-  threads_lock_.release();
   if (return_to != 0)
   {
+    threads_lock_.release();
+    delete thread;
     debug(PROCESS_REG, "Ups, something went wrong creating the Userthread for proc [%ld] [%ld]... assert!\n", pid_, return_to);
-    assert(false);
+    return 0;
   }
+    threads_lock_.release();
+
 
   /*First Argument: RDI
     Second Argument: RSI
