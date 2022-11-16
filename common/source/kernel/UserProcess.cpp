@@ -546,7 +546,7 @@ void UserProcess::setDuaration(size_t duaration)
 size_t UserProcess::getClockSum()
 {
   size_t sum = 0;
-  clock_lock_.acquire();
+  threads_lock_.acquire();
   debug(CLOCK, "Number of threads %ld\n", getNrOfThreads());
   for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
   {
@@ -557,6 +557,6 @@ size_t UserProcess::getClockSum()
       debug(CLOCK, "sum: %ld\n", sum);
     }
   }
-  clock_lock_.release();
+  threads_lock_.release();
   return sum;
 }

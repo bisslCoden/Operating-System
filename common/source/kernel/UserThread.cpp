@@ -60,7 +60,7 @@ void UserThread::reDirectToDeath(){
 bool UserThread::schedulable(){
 if(was_scheduled_ == 1)
 {
-getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
 }
   if (getState() == Running)
   {
@@ -116,8 +116,6 @@ getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStar
     }
     else if(DYING_)
     {
-      setLastStart(Scheduler::instance()->getRDTSC());
-      was_scheduled_ = 1;
       return true;
     }
     else

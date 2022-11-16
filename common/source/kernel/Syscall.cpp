@@ -660,22 +660,22 @@ int Syscall::get_pid()
 size_t Syscall::clock()
 {
   //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserThread->getParentProcess()->getClockSum())/54925;
-  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54000;
-  size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
+  //size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   
-  debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
+  //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
   
   debug(CLOCK, "duaration_2 %ld\n", duaration_2/cyc_per_microsec);
-  duaration += duaration_2;
+ // duaration += duaration_2;
   
-  debug(CLOCK, "duaration before divide %ld\n", duaration);
+  debug(CLOCK, "duaration before divide %ld\n", duaration_2);
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
   
-  duaration = (duaration/cyc_per_microsec);
+  duaration_2 = (duaration_2/cyc_per_microsec);
   
-  debug(CLOCK, "result    %ld\n", (duaration));
-  return 0;
+  debug(CLOCK, "result    %ld\n", (duaration_2));
+  return duaration_2;
 }
 
 
