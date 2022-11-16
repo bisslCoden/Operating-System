@@ -665,8 +665,16 @@ size_t Syscall::clock()
   debug(CLOCK, "duaration_2 in micro seconds: %ld\n", duaration_2/cyc_per_microsec);
 
   duaration_2 = (duaration_2/cyc_per_microsec); 
-  
+
   debug(CLOCK, "result    %ld\n", (duaration_2));
-  return duaration_2;
+
+  size_t time_to_add = Scheduler::instance()->getRDTSC()/cyc_per_microsec - currentUserThread->getLastStart()/cyc_per_microsec;
+  debug(CLOCK, "time needed for clock: %ld\n", (time_to_add));
+
+  return duaration_2 + time_to_add;
+
+  //sum, time from this function thread 
+
+  // 
 }
 

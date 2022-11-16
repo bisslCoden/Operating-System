@@ -43,7 +43,7 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-  last_start_ = Scheduler::instance()->getRDTSC();
+  //last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -59,10 +59,6 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-  if(was_scheduled_ == 1)
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-  }
   if (getState() == Running)
   {
     //testsystem
@@ -97,12 +93,20 @@ bool UserThread::schedulable(){
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
       // my_pages_lock_.release();
+      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+      {
+        getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      }
       was_scheduled_ = 0;
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
       // my_pages_lock_.release();
+      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+      {
+        getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      }
       was_scheduled_ = 0;
       return false;
     }
@@ -124,6 +128,10 @@ bool UserThread::schedulable(){
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
+  }
+  if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   }
   was_scheduled_ = 0;
   return false;
@@ -162,7 +170,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-  last_start_ = Scheduler::instance()->getRDTSC();
+  //last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
@@ -206,9 +214,11 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
   Userthread = true;
-  last_start_ = Scheduler::instance()->getRDTSC();
+  //last_start_ = Scheduler::instance()->getRDTSC();
 
 
+  //user_progs.h try here clock
+  // try as much as possible clock test one after another
 
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
