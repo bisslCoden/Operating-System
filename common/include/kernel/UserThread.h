@@ -36,9 +36,9 @@ typedef struct Threadflags
   //TODO joinable
   bool cancelreq = false;
   int joinable = PTHREAD_CREATE_JOINABLE;
-  ustl::atomic_flag kcancelreq;
-  ustl::atomic_flag knotcancelable;
-  ustl::atomic_flag kasynchronous;
+  ustl::atomic<bool> kcancelreq = false;
+  ustl::atomic<bool> knotcancelable = false;
+  ustl::atomic<bool> kasynchronous = false;
 }Threadflags;
 
 class Semaphore;
@@ -174,6 +174,7 @@ class UserThread : public Thread
     UserProcess*  getProcess()        { return process_; }
     bool          isLast()            { return last_; }        // tells if thread is the last thread of its process (important: on thread destuction, the process is destroyed if set!)
   private:
+    friend class Scheduler;
     // the process that contains this thread
     UserProcess* process_;
 

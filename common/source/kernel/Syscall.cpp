@@ -563,11 +563,11 @@ int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
   
-  currentUserThread->switch_to_userspace_ = 0;
+  //currentUserThread->switch_to_userspace_ = 0;
   int ret = ProcessRegistry::instance()->processFork();
-  debug(X_USERTHREAD, "[%ld]switching to US now... my locks: %s\n", currentUserThread->getTID(),
-  (currentThread->holding_lock_list_ == 0) ? "none" : currentThread->holding_lock_list_->getName());
-  currentUserThread->switch_to_userspace_ = 1;
+  //debug(X_USERTHREAD, "[%ld]switching to US now... my locks: %s\n", currentUserThread->getTID(),
+  //(currentThread->holding_lock_list_ == 0) ? "none" : currentThread->holding_lock_list_->getName());
+  //currentUserThread->switch_to_userspace_ = 1;
   return ret;
 }
 

@@ -52,75 +52,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   return;
 }
 
-void UserThread::reDirectToDeath(){
-    switch_to_userspace_ = 0;
-    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
-    return;
-}
-
-bool UserThread::schedulable(){
-
-  if (getState() == Running)
-  {
-    //testsystem
-    //checks if exit is called
-    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
-    if (!getflags()->knotcancelable.test_and_set())
-      {
-        if (getflags()->kasynchronous.test_and_set())
-        {
-          if (getflags()->kcancelreq.test_and_set())
-          {
-            return true;
-          }
-          else
-            getflags()->kcancelreq.clear();
-        }
-        else
-          getflags()->kasynchronous.clear();
-      }
-      else
-        getflags()->knotcancelable.clear();
-
-    
-    
-    if(DYING_)
-    {
-      return true;
-    }
-
-    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
-    //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-
-    if(sleepy == SLEEPING_KS)
-    {
-      //get the right flag back
-      __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
-     // my_pages_lock_.release();
-      return false;
-    }
-    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
-    {
-     // my_pages_lock_.release();
-      return false;
-    }
-    else if (sleepy == AWAKE_KS)
-    {
-     // my_pages_lock_.release();
-      return true;
-    }
-    else
-    {
-      // my_pages_lock_.release();
-      debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
-      assert(false && "Sleep flag was neither sleeping nor awake?\n");
-    }
-//    debug(X_THREADSTACK, "schedulable finished!\n");
-  }
-  return false;
-}
-
-
 // pthread_create
 UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number) :
   Thread(currentUserThread->working_dir_, currentUserThread->name_, 
@@ -225,25 +156,78 @@ UserThread::~UserThread()
 }
 
 
+void UserThread::reDirectToDeath(){
+    switch_to_userspace_ = 0;
+    ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
+    return;
+}
+
+bool UserThread::schedulable(){
+
+  if (getState() == Running)
+  {
+    //testsystem
+    //checks if exit is called
+    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
+    if (!myflags_.knotcancelable)
+        if (myflags_.kasynchronous)
+          if (myflags_.kcancelreq)
+            return true;
+
+    if(DYING_)
+    {
+      return true;
+    }
+
+    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
+    //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
+
+    if(sleepy == SLEEPING_KS)
+    {
+      //get the right flag back
+      __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+     // my_pages_lock_.release();
+      return false;
+    }
+    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
+    {
+     // my_pages_lock_.release();
+      return false;
+    }
+    else if (sleepy == AWAKE_KS)
+    {
+     // my_pages_lock_.release();
+      return true;
+    }
+    else
+    {
+      // my_pages_lock_.release();
+      debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
+      assert(false && "Sleep flag was neither sleeping nor awake?\n");
+    }
+//    debug(X_THREADSTACK, "schedulable finished!\n");
+  }
+  return false;
+}
+
+
+
+
 void UserThread::setCancelState(int state){
   myflags_.cancelable = state;
   if(state == PTHREAD_CANCEL_DISABLE)
-    myflags_.knotcancelable.test_and_set();
-  else
-    myflags_.knotcancelable.clear();
+    myflags_.knotcancelable = true;
   return;
 }
 void UserThread::setCancelType(int type) {
   myflags_.deferred = type;
   if (type == PTHREAD_CANCEL_ASYNCHRONOUS)
-    myflags_.kasynchronous.test_and_set();
-  else
-    myflags_.kasynchronous.clear();
+    myflags_.kasynchronous = true;
   return;
 }
 void UserThread::sendCancelRequest(){
   myflags_.cancelreq = true;
-  myflags_.kcancelreq.test_and_set();
+  myflags_.kcancelreq = true;
   return;
   }
 
