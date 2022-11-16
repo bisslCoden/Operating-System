@@ -63,7 +63,7 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset, size_t* returnto);
     
     /**
      * @brief Construct a new User Thread object for pthread_create()
@@ -72,7 +72,7 @@ class UserThread : public Thread
      * @param page_offset offset for stack location
      * @param terminal_number the terminal to run in (default 0)
      */
-    UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number = 0);
 
     /**
      * @brief Construct a new User Thread object for fork()
@@ -80,7 +80,7 @@ class UserThread : public Thread
      * @param child the UserProcess of this new thread
      * @param parent_thread the thread of the parent_thread that called fork()
      */
-    UserThread(UserProcess* child, UserThread* parent_thread);
+    UserThread(UserProcess* child, UserThread* parent_thread, size_t* returnto);
 
     /**
      * @brief Destroy the User Thread object and check if(isLast()) { destroy parent_; } 

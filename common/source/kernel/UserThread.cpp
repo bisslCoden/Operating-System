@@ -14,7 +14,7 @@
 #include "offsets.h"
 
 // first thread
-UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset) :
+UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset, size_t* returnto) :
   Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
   process_(process),
   flag_mutex_{"thread::flag_mutex_"},
@@ -46,7 +46,9 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
+  *returnto = 0;
   switch_to_userspace_ = 1;
+  return;
 }
 
 void UserThread::reDirectToDeath(){
@@ -122,7 +124,7 @@ bool UserThread::schedulable(){
 
 
 // pthread_create
-UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number) :
+UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number) :
   Thread(currentUserThread->working_dir_, currentUserThread->name_, 
           USER_THREAD, ProcessRegistry::instance()->createID()),
   process_(currentUserThread->process_), flag_mutex_{"thread::flag_mutex_"},
@@ -157,10 +159,12 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
+  *returnto = 0;
+  return;
 }
 
 // fork
-UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
+UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* returnto) :
   Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
   process_(child),flag_mutex_{"thread::flag_mutex_"}, join_cond_{&child->returnvalue_lock_,
   "Thread::join_cond"}, my_pages_lock_{"thread::my_pages_lock_"}, exec_wait_{&child->waiting_exec_lock_, "Thread::exec_wait_"}
@@ -203,7 +207,9 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
 
   //ArchThreads::printThreadRegisters(this);
   debug(X_USERTHREAD, "Fork constructor successful for new thread...\n");
-
+  Scheduler::instance()->addNewThread((Thread*)this);
+  *returnto = 0;
+  return;
 }
 
 UserThread::~UserThread()

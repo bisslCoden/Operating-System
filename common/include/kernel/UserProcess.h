@@ -34,13 +34,13 @@ class UserProcess
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info, uint32 terminal_number = 0);
+    UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info,  size_t* returnto, uint32 terminal_number = 0);
     /**
      * Constructor
      * @param parent parent process that shall be forked
      *
      */
-    UserProcess(UserProcess* parent);
+    UserProcess(UserProcess* parent, size_t* returnto);
 
      /**
      * CopyConstructor
@@ -133,8 +133,6 @@ class UserProcess
 
     void waitPIDSem(){ waitpid_sem_.wait(); }
     void postPIDSem(){ waitpid_sem_.post(); }
-    void lockWaiter() { waiter_lock_.acquire();}
-    void unlockWaiter() { waiter_lock_.release();}
     UserProcess* checkWaiter(){ return waiter_; }
     void setWaiter(UserProcess* waiter){ waiter_ = waiter; };  
 
@@ -263,7 +261,6 @@ class UserProcess
     
     KernelSemaphore waitpid_sem_;
     Mutex clock_lock_;
-    Mutex waiter_lock_;
     UserProcess* waiter_ = 0;
 };
 
