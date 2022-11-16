@@ -62,6 +62,15 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = process_->getLoader();
+  process_->threads_lock_.acquire();
+  if (process_-> KILLED_)
+  {
+    process_->threads_lock_.release();
+    *returnto = 9;
+    return;
+  }
+  
+  process_->threads_lock_.release();
   mystack_.page_offset_ = page_offset;
 
   Userthread = true;
@@ -104,8 +113,14 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   //cant we somehow just write a new setupstack... this makes me uncomfortable as we have 3 different constructors where we
   // play around with stacks
 
-  StackInfo parent_stack = parent_thread->getStackInfo();
-  mystack_ = parent_stack;
+  mystack_.guardpage_back_nr_ = parent_thread->mystack_.guardpage_back_nr_;
+  size_t* UserMut = parent_thread->mystack_.UserMutex;
+  mystack_.UserMutex = UserMut; 
+  mystack_.page_offset_ = parent_thread->mystack_.page_offset_;
+  mystack_.guardpage_front_nr_ = parent_thread->mystack_.guardpage_front_nr_;
+  mystack_.userstack_end_ = parent_thread->mystack_.userstack_end_;
+  mystack_.userstack_start_ = parent_thread->mystack_.userstack_start_;
+
 
   my_pages_lock_.acquire();
   my_pages_ = parent_thread->my_pages_;
@@ -185,16 +200,16 @@ bool UserThread::schedulable(){
     }
 
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (mystack_.UserMutex != USERMUTEX_INVALID)
+    if (mystack_.UserMutex == USERMUTEX_INVALID)
     {
       return true;
     }
     
-    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
+    size_t sleepy = *mystack_.UserMutex;
     if(sleepy == SLEEPING_KS)
     {
       //get the right flag back
-      __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+     // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
      // my_pages_lock_.release();
       return false;
     }
@@ -338,16 +353,16 @@ bool UserThread::setupStack()
   return true;
 }
 
-bool UserThread::reuseStack(StackInfo old_stackinfo)
+bool UserThread::reuseStack(StackInfo* old_stackinfo)
 {
   size_t ppn = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo.userstack_start_, old_stackinfo.userstack_start_ / PAGE_SIZE);
-  if(!loader_->arch_memory_.mapPage(old_stackinfo.userstack_start_ / PAGE_SIZE, ppn, 1))
+  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
+  if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
     return false;
   
   my_pages_lock_.acquire();
   my_pages_.clear();
-  my_pages_.push_back(old_stackinfo.userstack_start_ / PAGE_SIZE);
+  my_pages_.push_back(old_stackinfo->userstack_start_ / PAGE_SIZE);
   my_pages_lock_.release();
 
   process_->offsetlist_lock_.acquire();
@@ -355,11 +370,11 @@ bool UserThread::reuseStack(StackInfo old_stackinfo)
   process_->offsetlist_lock_.release();
 
   mystack_.UserMutex = USERMUTEX_INVALID;
-  mystack_.guardpage_back_nr_ = old_stackinfo.guardpage_back_nr_;
-  mystack_.guardpage_front_nr_ = old_stackinfo.guardpage_front_nr_;
-  mystack_.page_offset_ = old_stackinfo.page_offset_;
-  mystack_.userstack_start_ = old_stackinfo.userstack_start_;
-  mystack_.userstack_end_ = old_stackinfo.userstack_end_;
+  mystack_.guardpage_back_nr_ = old_stackinfo->guardpage_back_nr_;
+  mystack_.guardpage_front_nr_ = old_stackinfo->guardpage_front_nr_;
+  mystack_.page_offset_ = old_stackinfo->page_offset_;
+  mystack_.userstack_start_ = old_stackinfo->userstack_start_;
+  mystack_.userstack_end_ = old_stackinfo->userstack_end_;
 
   size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn);
   location += PAGE_SIZE - sizeof(size_t);
@@ -438,7 +453,7 @@ int UserThread::execv(char* const argv[], size_t argc)
 
   // setup stack and set registers
   //mystack_.page_offset_ = process_->getRandomPageOffset();
-  assert(reuseStack(mystack_));
+  assert(reuseStack(&mystack_));
 
   user_registers_->rsp = (size_t) mystack_.userstack_start_;
   user_registers_->rip = (size_t)loader_->getEntryFunction();
@@ -453,7 +468,7 @@ int UserThread::execv()
   // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
   name_ = process_->getName();
   freeMyPagesAndDie(false);
-  assert(reuseStack(mystack_));
+  assert(reuseStack(&mystack_));
 
   loader_ = process_->getLoader();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),

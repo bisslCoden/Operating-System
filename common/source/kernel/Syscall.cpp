@@ -366,7 +366,7 @@ void Syscall::pthread_exit(void* value)
     
     currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
     currentUserThread->getParentProcess()->unLockThreadMutex();
-    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo().page_offset_);
+    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
     //experimentaaal: free my pages on my own!
     currentUserThread->freeMyPagesAndDie(true);
     //currentThread->kill();
@@ -553,7 +553,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 //this should never be called when holding any locks
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
-  *stackaddr = (size_t*)currentUserThread->getStackInfo().userstack_start_;
+  *stackaddr = (size_t*)currentUserThread->getStackInfo()->userstack_start_;
   *stacksize = STACK_SIZE_IN_PAGES * PAGE_SIZE;
   return 0;
 }

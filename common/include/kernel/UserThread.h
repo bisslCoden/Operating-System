@@ -50,7 +50,7 @@ typedef struct StackInfo
   size_t page_offset_ = 0;
   size_t guardpage_front_nr_ = 0;
   size_t guardpage_back_nr_ = 0;
-  size_t* UserMutex;
+  ustl::atomic<size_t*> UserMutex;
 } StackInfo;
 
 
@@ -103,7 +103,7 @@ class UserThread : public Thread
      * @return false stack not setup.
      */
     bool setupStack();
-    bool reuseStack(StackInfo old_stackinfo);
+    bool reuseStack(StackInfo* old_stackinfo);
 
 
     /**
@@ -150,7 +150,7 @@ class UserThread : public Thread
     size_t getPageOffset()            {return mystack_.page_offset_;}
 
 
-    StackInfo getStackInfo()          { return mystack_; }
+    StackInfo* getStackInfo()          { return &mystack_; }
 
     // tells if thread is the last thread of its process
     // return process of thread

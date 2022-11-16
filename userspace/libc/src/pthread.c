@@ -507,6 +507,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
     *waiting_on = (size_t) mutex;
     pthread_spin_unlock(&mutex->sleeperslist_lock_);
     assert(atomic_exchange_sleep((size_t*) setsleep) == AWAKE_US && "tried to sleep but was alreafy?\n");
+    printf("sleeping now\n");
     //printf("going to sleep now...\n");
     sched_yield();
     *waiting_on = NO_LOCK_US;
@@ -545,7 +546,7 @@ int pthread_mutex_unlock(pthread_mutex_t *mutex)
   pthread_spin_lock(&mutex->sleeperslist_lock_);
   if(mutex->firstsleeper_ != 0)
   {
-    //printf("first sleeper ist %p\n", mutex->firstsleeper_);
+    printf("first sleeper ist %p lets wake him\n", mutex->firstsleeper_);
     size_t setwake = findStackStackStart((size_t) mutex->firstsleeper_);
     assert(atomic_exchange_wake((size_t*) setwake) == SLEEPING_US && "tried to wake but was alreay woke?\n");
     mutex->firstsleeper_ = (size_t*) *mutex->firstsleeper_;

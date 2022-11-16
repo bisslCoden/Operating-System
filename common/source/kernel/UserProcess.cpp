@@ -109,7 +109,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 4;
     return;
   }
-  offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
+  offsets_.push_back(currentUserThread->getStackInfo()->page_offset_);
   setChildStatus(1);
 
   if (!threads_lock_.isHeldBy(currentThread))
@@ -254,11 +254,15 @@ void UserProcess::removeFromOffsetList(size_t NR){
 
 //locks threadlock internally!
 UserThread* UserProcess::checkStackAdress(size_t address){
-  threads_lock_.acquire();
+  if (!threads_lock_.isHeldBy(currentThread))
+  {
+    threads_lock_.acquire();
+  }
+  
   ustl::map<size_t, UserThread*>::iterator it;
   for (it = threads_.begin(); it != threads_.end(); it++)
   {
-    if (address <= it->second->getStackInfo().userstack_start_ && address > it->second->getStackInfo().userstack_end_)
+    if (address <= it->second->getStackInfo()->userstack_start_ && address > it->second->getStackInfo()->userstack_end_)
     {
       threads_lock_.release();
       return it->second;
