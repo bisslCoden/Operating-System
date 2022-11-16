@@ -83,6 +83,12 @@ bool UserThread::schedulable(){
         getflags()->knotcancelable.clear();
 
     
+    
+    if(DYING_)
+    {
+      return true;
+    }
+
     size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
 
@@ -101,10 +107,6 @@ bool UserThread::schedulable(){
     else if (sleepy == AWAKE_KS)
     {
      // my_pages_lock_.release();
-      return true;
-    }
-    else if(DYING_)
-    {
       return true;
     }
     else
@@ -250,6 +252,7 @@ void UserThread::getNewStackPage(size_t adress){
     return;
   my_pages_lock_.acquire();
   size_t new_page = PageManager::instance()->allocPPN();
+  debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
   if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
   {
     //might need change in the future
