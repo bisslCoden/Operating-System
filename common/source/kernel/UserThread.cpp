@@ -43,6 +43,7 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
+  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -58,10 +59,10 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-if(was_scheduled_ == 1)
-{
-  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-}
+  if(was_scheduled_ == 1)
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  }
   if (getState() == Running)
   {
     //testsystem
@@ -297,6 +298,7 @@ void UserThread::freeMyPagesAndDie(){
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
   //state_ = ToBeDestroyed;
+  
   my_pages_lock_.release();
   this->kill();
   //Scheduler::instance()->yield();

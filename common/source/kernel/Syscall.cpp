@@ -647,12 +647,6 @@ int Syscall::get_pid()
 
   return 0;
 }
-// rdtsc now - rdtsc at program start
-// but thread can sleep or yield, so then it doesn't count
-// we need to increment the ticks variable for every thread of the process
-// then use the number of ticks to get the seconds
-// we know how many clocks(cycles i think) happen per second
-// we get the number of cycles
 
 //duaration is in cycles
 //(avg_cycle_per_tick/54925) = number of cycles per mikrosec
@@ -666,7 +660,7 @@ size_t Syscall::clock()
   //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
   
-  debug(CLOCK, "duaration_2 %ld\n", duaration_2/cyc_per_microsec);
+  debug(CLOCK, "duaration_2 in micro seconds: %ld\n", duaration_2/cyc_per_microsec);
  // duaration += duaration_2;
   
   debug(CLOCK, "duaration before divide %ld\n", duaration_2);
