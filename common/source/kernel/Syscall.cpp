@@ -642,7 +642,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
 //duaration/ number_of_cyc_per_microsec = microseconds
 size_t Syscall::clock()
 {
-  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
+  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/;
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
   debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
@@ -652,7 +652,7 @@ size_t Syscall::clock()
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
   duaration = (duaration/cyc_per_microsec);
   debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration * 10;
+  return duaration;
 }
 
 
