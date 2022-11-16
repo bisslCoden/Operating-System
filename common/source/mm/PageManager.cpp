@@ -362,6 +362,7 @@ size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow_del)
 //LOCK ARCHMEM OUTSIDE!!
 bool PageManager::checkForCow(size_t address)
 {
+  debug(X_PAGEFAULT, "checkForCow(%lx) entered. will now checkAddressValid()\n", address);
   // setup archmem and checkAddressValid()
   UserProcess* current_proc = currentUserThread->getProcess();
   ArchMemory* current_archmem = &current_proc->getLoader()->arch_memory_;
@@ -404,7 +405,7 @@ bool PageManager::checkForCow(size_t address)
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
   int ret = deleteRef(ppn, current_proc, true);
-  bool dbg_gave = false;
+  //bool dbg_gave = false;
   if (ret == -1)
   {
     unlockCowCnt();
@@ -422,7 +423,7 @@ bool PageManager::checkForCow(size_t address)
   {
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
-    dbg_gave = true;
+    //dbg_gave = true;
   }
   else if (ret == 0)
   {
@@ -452,8 +453,7 @@ bool PageManager::checkForCow(size_t address)
     
   
 
-  debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), 
-  pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
+  // debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
   
   unlockCowCnt();
   current_archmem->unlockArchMemory();

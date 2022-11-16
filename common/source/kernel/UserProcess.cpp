@@ -139,6 +139,7 @@ UserProcess::~UserProcess()
   }
   
   loader_ = 0;
+    
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -286,11 +287,11 @@ size_t UserProcess::getRandomPageOffset()
   } while (page_offset == 0 || checkInOffsetList(page_offset));
   offsets_.push_back(page_offset);
   offsetlist_lock_.release();
-  debug(X_USERPROCESS, "[%ld] read %ld from tsc and MAX STACKS btw is %lld offset is %ld!!\n", getPID(), rand, MAX_STACKS, page_offset);
+  debug(X_USERPROCESS, "[%ld] read %ld from tsc and MAX STACKS btw is %lld offset is %lx!!\n", getPID(), rand, MAX_STACKS, page_offset);
   
   offsetlist_lock_.acquire();
   for(size_t i = 0; i < offsets_.size(); i++)
-    debug(X_USERPROCESS, "[%ld] getRandomPageOffset(): UserProcess::offsets_.at(%ld) = %ld\n", getPID(), i, offsets_.at(i));
+    debug(X_USERPROCESS, "[%ld] getRandomPageOffset(): UserProcess::offsets_.at(%ld) = %lx\n", getPID(), i, offsets_.at(i));
   offsetlist_lock_.release();
 
 
@@ -310,6 +311,7 @@ bool UserProcess::checkInOffsetList(size_t NR)
 
 Thread* UserProcess::findInThreadList(size_t tid)
 {
+  assert(testThreadMutex(currentThread) && "PLEASE LOCK BEFORE UserProcess::findInThreadList()");
   if(threads_.find(tid) == threads_.end())
     return (Thread*) 0x00;
   return threads_[tid];
@@ -331,7 +333,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   threads_lock_.acquire();
   if (!KILLED_)
     thread = new UserThread(wrapper, getRandomPageOffset(), &return_to);
-  if (KILLED_)
+  if (KILLED_ && return_to == 0)
   {
     assert(false && "this is baaad... created thread even though i should be dead1\n");
   }

@@ -330,10 +330,10 @@ bool UserThread::setupStack()
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
   
-  debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %ld) and ends at %lx (VPN %ld) flag is at %lx"
-  "and guardpages are at %ld and %ld\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
-  mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
-  mystack_.guardpage_back_nr_);
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %lx) and ends at %lx (VPN %lx) flag is at %lx"
+    "and guardpages are at %lx and %lx\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
+    mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
+    mystack_.guardpage_back_nr_);
 
 
   return true;
@@ -345,34 +345,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   for(size_t i = 0; i < argc; i++)
     debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
 
-  /*
-  // vaddr... virtual address for old archmemory
-  size_t vpn = USER_BREAK / PAGE_SIZE - 1;
-  size_t vaddr_end = vpn * PAGE_SIZE;
-  size_t vaddr_start = vaddr_end + sizeof(size_t) * argc + sizeof(size_t);
-  debug(X_USERTHREAD, "execv() here: vpn = %lx, vaddr_start = %lx, vaddr_end = %lx)\n", vpn, vaddr_start, vaddr_end);
-  // ident... identMapping of freshly allocated PPN
-  size_t ppn = PageManager::instance()->allocPPN();
-  size_t ident_end = ArchMemory::getIdentAddressOfPPN(ppn);
-  size_t ident_start = ident_end + sizeof(size_t) * argc + sizeof(size_t);
-  debug(X_USERTHREAD, "execv() here: ppn = %lx, ident_start = %lx, ident_end = %lx)\n", vpn, ident_start, ident_end);
-  // map vpn to ppn (this is still the old loader_->arch_memory_)
-  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "UserThread::execv() mapPage() failed");
-  // iterate and copy from old archmem to ident
-  debug(X_USERTHREAD, "mapped vpn and ppn. copying from old archmem to ident:\n");
-  size_t vaddr_i = vaddr_start;
-  size_t ident_i = ident_start;
-  for(size_t i = 0; (i < argc) && (ident_i != ident_end); i++)
-  {
-    // copy pointer to char ptr to ident address
-    *((size_t*)ident_i) = vaddr_i;
-    memcpy((void*)ident_i, (void*)argv[i], strlen(argv[i]));
-    //
-    ident_i += sizeof(size_t);
-    vaddr_i += sizeof(char)*strlen(argv[i]) + 1;
-    ident_i += sizeof(char)*strlen(argv[i]) + 1;
-  }
-  */
 
   // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
   name_ = process_->getName();
@@ -423,9 +395,7 @@ int UserThread::execv(char* const argv[], size_t argc)
     delete[] here[i];
   }
   
-
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
-
 
   for (size_t i = 0; i < argc; i++)
   {

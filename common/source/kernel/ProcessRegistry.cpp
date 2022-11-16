@@ -218,16 +218,17 @@ void ProcessRegistry::createProcess(const char* path)
 int ProcessRegistry::execv(const char* path, char *const argv[])
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
-  // check if path is okay (no NULL-ptr & terminated with '\0')
   int argc = areExecArgsValid(path, argv);
-  if(argc == -1)
-    return argc;
-  return 0;
+  if(argc > 0)
+    return currentUserThread->getProcess()->execv(path, argv, argc);
+
+  return argc;
 }
 
 int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
 {
   debug(X_PROCESS_REG, "areExecArgsValid()?\n");
+  
   // here we already know that path is okay and argv != NULL -> check if 
   if((size_t)argv >= USER_BREAK || (size_t)argv[0] >= USER_BREAK)
     return -1;

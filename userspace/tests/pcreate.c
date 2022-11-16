@@ -1,6 +1,8 @@
 #include "pthread.h"
 #include <stdio.h>
 
+#define ITERATIONS 10000
+
 void simple_routine()
 {
   printf("2 - PTHREAD: FUNCTION CALL WORKES\n");

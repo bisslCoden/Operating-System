@@ -154,21 +154,20 @@ class UserProcess
      */
     void exit(size_t exit_code, bool kill_currentThread = true);
 
-
-    void lockRetVal() { returnvalue_lock_.acquire();}
-    void unlockRetVal(){ returnvalue_lock_.release();}
-    bool checkRetVal(Thread* thread){ return returnvalue_lock_.isHeldBy(thread);}
-
+    void lockRetVal()                     { returnvalue_lock_.acquire();}
+    void unlockRetVal()                   { returnvalue_lock_.release();}
+    bool checkRetValLock(Thread* thread)  { return returnvalue_lock_.isHeldBy(thread);}
 
 
-    void lockThreadMutex(){threads_lock_.acquire();}
-    void unLockThreadMutex(){threads_lock_.release();}
+    void lockThreadMutex()                {threads_lock_.acquire();}
+    void unLockThreadMutex()              {threads_lock_.release();}
+    bool testThreadMutex(Thread* thread)  { return threads_lock_.isHeldBy(thread); }
 
     // getters
-    size_t getPID()                 { return pid_; }
-    Loader* getLoader()             { return loader_; }
-    FileSystemInfo* getWorkingDir() { return working_dir_; }
-    ustl::string getName()          { return name_; }
+    size_t getPID()                       { return pid_; }
+    Loader* getLoader()                   { return loader_; }
+    FileSystemInfo* getWorkingDir()       { return working_dir_; }
+    ustl::string getName()                { return name_; }
       /**
      * @brief a retval is REMOVED from the retvallist and given to the joining thread
      * 

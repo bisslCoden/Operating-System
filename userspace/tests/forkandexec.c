@@ -14,7 +14,7 @@ int main(void) {
   if (pid == 0) {
     printf("Hello from Child!\n");
     int ret_exec = execv(path, args);
-    printf("[FAIL] If this is being printed, something is wrong.\n");
+    printf("[FAIL] If this is being printed, something is wrong. ret_exec: %d\n", ret_exec);
     assert(0 && "Execv failed\n");
   }
   else {
