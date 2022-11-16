@@ -418,6 +418,7 @@ bool PageManager::checkForCow(size_t address)
   {
     debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... time to change ident\n");
     mutexflag = *currentUserThread->getStackInfo().UserMutex;
+    currentUserThread->setUserMutex(USERMUTEX_INVALID);
   }
   if (ret == (int)WAS_LAST)
   {

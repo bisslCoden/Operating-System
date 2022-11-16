@@ -421,6 +421,7 @@ bool UserProcess::getRetVal(size_t tid, void** value)
 
 int UserProcess::execv(const char* path)
 {
+
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
@@ -433,44 +434,70 @@ int UserProcess::execv(const char* path)
     return -1;
   }
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  if(!removeOldProcessInformation())
+  {
+  //  VfsSyscall::close(new_fd);
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
+  }
   name_ = path;
 
   // exec
   debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
-  removeOldProcessInformation();
+  threads_lock_.acquire();
+  KILLED_ = false;
+  threads_lock_.release();
+
   currentUserThread->execv();
 
   VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
-  debug(X_USERPROCESS, "closed old_fd and deleted old_loader\n");
+  waiting_exec_lock_.acquire();
+  waiting_exec_ = 0;
+  waiting_exec_lock_.release();
+  
+  debug(X_USERPROCESS, "[%ld] execv() fd and loader setup finished successfully exiting exec\n", getPID());
   return 0;
 }
 
 int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
-  debug(X_USERPROCESS, "[%ld] execv() called. opening fd of %s and setting up loader\n", getPID(), path);
-  // 
+  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
   if(!setupLoader(new_fd))
   {
-    debug(USERPROCESS, "[%ld] execv() ERREOR with fd or Loader\n", getPID());
+    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
     fd_ = old_fd;
     VfsSyscall::close(new_fd);
     return -1;
   }
-  debug(X_USERPROCESS, "[%ld] execv() fd and loader setup finished successfully\n", getPID());
-
-  // exec 
-  debug(X_USERPROCESS, "[%ld] execv(path = %s, argv = %lx) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", getPID(), path, (size_t)argv);
-  removeOldProcessInformation();
+  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
+  if(!removeOldProcessInformation())
+  {
+  //  VfsSyscall::close(new_fd);
+    fd_ = old_fd;
+    VfsSyscall::close(new_fd);
+    return -1;
+  }
   name_ = path;
+
+  threads_lock_.acquire();
+  KILLED_ = false;
+  threads_lock_.release();
+  
   currentUserThread->execv(argv, argc);
 
   VfsSyscall::close(old_fd);
   delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
-  debug(X_USERPROCESS, "[%ld] closed old_fd and deleted old_loader\n", getPID());
+  
+  waiting_exec_lock_.acquire();
+  waiting_exec_ = 0;
+  waiting_exec_lock_.release();
+  
+  debug(X_USERPROCESS, "[%ld] execv() fd and loader setup finished successfully exiting exec\n", getPID());
   return 0;
 }
 
@@ -498,7 +525,6 @@ bool UserProcess::setupLoader(ssize_t fd)
 bool UserProcess::removeOldProcessInformation()
 {
   debug(X_USERPROCESS, "[%ld] removingOldProcessInformation() entered\n", getPID());
-  exit(13579, false);
 
   threads_lock_.acquire();
   if (threads_.size() < 2)
@@ -509,13 +535,18 @@ bool UserProcess::removeOldProcessInformation()
   threads_lock_.release();
 
   waiting_exec_lock_.acquire();
-  assert(waiting_exec_ && "exec called 2 times in one process is not possiblee!!!\n");
   if (waiting_exec_ == 0)
   {
     waiting_exec_ = currentUserThread;
+    exit(13579, false);
     currentUserThread->waitExec();
   }
-
+  else
+  {
+    waiting_exec_lock_.release();
+    debug(X_USERTHREAD, "Somebody was faster than me... well I m dying goodbye!\n");
+    return false;
+  }
   waiting_exec_lock_.release();
 
 done:

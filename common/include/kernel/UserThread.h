@@ -11,6 +11,7 @@
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
 #define NO_LOCK_KS 0x92246879
+#define USERMUTEX_INVALID ((size_t*)0x35436343)
 
 class UserProcess;
 
@@ -102,6 +103,8 @@ class UserThread : public Thread
      * @return false stack not setup.
      */
     bool setupStack();
+    bool reuseStack(StackInfo old_stackinfo);
+
 
     /**
      * @brief UserThread-part of constructor. sets few members, creates stack in new archemory and 
@@ -135,7 +138,7 @@ class UserThread : public Thread
     int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
-    void freeMyPagesAndDie();
+    void freeMyPagesAndDie(bool actually_die);
 
     //acquie retvallock before!
     void setJoiner(UserThread* thread){join_waiter_ = thread;}

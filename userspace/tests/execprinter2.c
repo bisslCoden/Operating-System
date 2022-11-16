@@ -19,21 +19,21 @@ void simple_routine()
   for(int i = 0; i < MAX_LOOPS; i++)
   {
     value *= i;
-    printf("lalalala\n");
+    //printf("lalalala\n");
   }
 }
 
 int main(int argc, const char *argv[])
 {
-	int ret_pthread[MAX_THREADS];
+	//int ret_pthread[MAX_THREADS];
   //int retvals[MAX_THREADS];
   pthread_t tids[MAX_THREADS]; 
   for(size_t i = 0; i < MAX_THREADS; ++i)
-    ret_pthread[i] = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
+    assert(pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL) == 0);
   // exec should be called after threads are destroyed.
   sched_yield();
-  if((size_t)ret_pthread > 3)
-    printf("ahelo\n");
+  // if((size_t)ret_pthread > 3)
+  //   printf("ahelo\n");
  
   // hardcoded args :( - MAX_ARGS
   char* const path = "/usr/printuntilnull.sweb";

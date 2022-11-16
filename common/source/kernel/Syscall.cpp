@@ -368,7 +368,7 @@ void Syscall::pthread_exit(void* value)
     currentUserThread->getParentProcess()->unLockThreadMutex();
     currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo().page_offset_);
     //experimentaaal: free my pages on my own!
-    currentUserThread->freeMyPagesAndDie();
+    currentUserThread->freeMyPagesAndDie(true);
     //currentThread->kill();
   }
   else
@@ -606,6 +606,7 @@ bool Syscall::isExecPathValid(const char* path)
   debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
   return true;
 }
+
 size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
   UserThread* callingthread = (UserThread*)currentThread;

@@ -178,19 +178,23 @@ bool UserThread::schedulable(){
     {
       return true;
     }
+    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
+    {
+     // my_pages_lock_.release();
+      return false;
+    }
 
-    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-
+    if (mystack_.UserMutex != USERMUTEX_INVALID)
+    {
+      return true;
+    }
+    
+    size_t sleepy = __atomic_exchange_n(mystack_.UserMutex, AWAKE_KS, ustl::memory_order_seq_cst);
     if(sleepy == SLEEPING_KS)
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
-     // my_pages_lock_.release();
-      return false;
-    }
-    else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
-    {
      // my_pages_lock_.release();
       return false;
     }
@@ -248,7 +252,7 @@ void UserThread::getNewStackPage(size_t adress){
   return;
 }
 
-void UserThread::freeMyPagesAndDie(){
+void UserThread::freeMyPagesAndDie(bool actually_die){
   // if (loader_ == 0)
   //   return;
   // process_->lockKill();
@@ -258,7 +262,7 @@ void UserThread::freeMyPagesAndDie(){
   //   return;
   // } 
   // process_->unlockKill();
-  if (process_->checkKill())
+  if (process_->checkKill() && actually_die)
   {
     this->kill();
   }
@@ -273,7 +277,10 @@ void UserThread::freeMyPagesAndDie(){
   }
   //state_ = ToBeDestroyed;
   my_pages_lock_.release();
-  this->kill();
+  if(actually_die)
+    this->kill();
+  else
+    DYING_ = false;
   //Scheduler::instance()->yield();
 }
 
@@ -292,16 +299,6 @@ bool UserThread::setupStack()
   size_t stackend = stack_start_ptr - PAGE_SIZE * STACK_SIZE_IN_PAGES;
   size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
-  
-  // just act like everythings allright i ll die anywayys 
-  // process_->lockKill();
-  // if(process_->checkKill())
-  // {
-  //   process_->unlockKill();
-  //   return true;
-  // } 
-  // process_->unlockKill();
-  // check stack vpn and ppn + mapPage()
  
   size_t ppn_for_stack = PageManager::instance()->allocPPN();
   assert(vpn_for_stack && ppn_for_stack);
@@ -339,6 +336,39 @@ bool UserThread::setupStack()
   return true;
 }
 
+bool UserThread::reuseStack(StackInfo old_stackinfo)
+{
+  size_t ppn = PageManager::instance()->allocPPN();
+  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo.userstack_start_, old_stackinfo.userstack_start_ / PAGE_SIZE);
+  if(!loader_->arch_memory_.mapPage(old_stackinfo.userstack_start_ / PAGE_SIZE, ppn, 1))
+    return false;
+  
+  my_pages_lock_.acquire();
+  my_pages_.clear();
+  my_pages_.push_back(old_stackinfo.userstack_start_ / PAGE_SIZE);
+  my_pages_lock_.release();
+
+  process_->offsetlist_lock_.acquire();
+  process_->offsets_.push_back(mystack_.page_offset_);
+  process_->offsetlist_lock_.release();
+
+  mystack_.UserMutex = USERMUTEX_INVALID;
+  mystack_.guardpage_back_nr_ = old_stackinfo.guardpage_back_nr_;
+  mystack_.guardpage_front_nr_ = old_stackinfo.guardpage_front_nr_;
+  mystack_.page_offset_ = old_stackinfo.page_offset_;
+  mystack_.userstack_start_ = old_stackinfo.userstack_start_;
+  mystack_.userstack_end_ = old_stackinfo.userstack_end_;
+
+  size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(ppn);
+  location += PAGE_SIZE - sizeof(size_t);
+  mystack_.UserMutex = (size_t*) location;
+  *mystack_.UserMutex = AWAKE_KS;
+  size_t* userlock_wait = (size_t*)(location - sizeof(size_t));
+  *userlock_wait = NO_LOCK_KS;
+  return true;
+}
+
+
 int UserThread::execv(char* const argv[], size_t argc)
 {
   debug(X_USERTHREAD, "argc = %ld\n", argc);
@@ -360,7 +390,8 @@ int UserThread::execv(char* const argv[], size_t argc)
     debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to here[%ld] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(here + i));
   }
   debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
-    
+  
+  freeMyPagesAndDie(false);
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
@@ -404,15 +435,40 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): copied from here[] to new location\n");
 
   // setup stack and set registers
-  mystack_.page_offset_ = process_->getRandomPageOffset();
-  setupStack();
-  user_registers_->rsp = (size_t)getUserstackStart();
+  //mystack_.page_offset_ = process_->getRandomPageOffset();
+  assert(reuseStack(mystack_));
+
+  user_registers_->rsp = (size_t) mystack_.userstack_start_;
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   user_registers_->rdi = argc; 
   user_registers_->rsi = new_argv; 
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
+
+int UserThread::execv()
+{
+  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
+  name_ = process_->getName();
+  freeMyPagesAndDie(false);
+  assert(reuseStack(mystack_));
+
+  loader_ = process_->getLoader();
+  ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
+                                   (void*) mystack_.userstack_start_,
+                                   getKernelStackStartPointer());
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
+
+  // passing new virtual memory to userspace
+  user_registers_->rsp = mystack_.userstack_start_;
+  user_registers_->rip = (size_t)loader_->getEntryFunction();
+  // user_registers_->rdi = (size_t)argv;
+  // user_registers_->rsi = argc;
+  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
+  return 0;
+}
+
 
 bool UserThread::detectCircularJoin(UserThread* to_be_joined){
   if (join_waiter_ == 0)
@@ -439,28 +495,4 @@ bool UserThread::detectCircularJoin(UserThread* to_be_joined){
     }
   }
   return false;
-}
-
-
-
-int UserThread::execv()
-{
-  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
-  name_ = process_->getName();
-  loader_ = process_->getLoader();
-  ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   (void*) mystack_.userstack_start_,
-                                   getKernelStackStartPointer());
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  mystack_.page_offset_ = process_->getRandomPageOffset();
-  setupStack();
-  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
-
-  // passing new virtual memory to userspace
-  user_registers_->rsp = (size_t)getUserstackStart();
-  user_registers_->rip = (size_t)loader_->getEntryFunction();
-  // user_registers_->rdi = (size_t)argv;
-  // user_registers_->rsi = argc;
-  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
-  return 0;
 }
