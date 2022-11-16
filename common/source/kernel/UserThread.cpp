@@ -58,6 +58,10 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
+if(was_scheduled_ == 1)
+{
+getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+}
   if (getState() == Running)
   {
     //testsystem
@@ -72,6 +76,7 @@ bool UserThread::schedulable(){
           {
             //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
             setLastStart(Scheduler::instance()->getRDTSC());
+            was_scheduled_ = 1;
             return true;
           }
           else
@@ -92,11 +97,13 @@ bool UserThread::schedulable(){
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
      // my_pages_lock_.release();
+     was_scheduled_ = 0;
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
      // my_pages_lock_.release();
+     was_scheduled_ = 0;
       return false;
     }
     else if (sleepy == AWAKE_KS)
@@ -104,11 +111,13 @@ bool UserThread::schedulable(){
       //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
      // my_pages_lock_.release();
+      was_scheduled_ = 1;
       return true;
     }
     else if(DYING_)
     {
       setLastStart(Scheduler::instance()->getRDTSC());
+      was_scheduled_ = 1;
       return true;
     }
     else
@@ -119,6 +128,7 @@ bool UserThread::schedulable(){
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
+  was_scheduled_ = 0;
   return false;
 }
 

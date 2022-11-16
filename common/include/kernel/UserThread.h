@@ -203,12 +203,12 @@ class UserThread : public Thread
     Mutex my_pages_lock_;
     Condition exec_wait_;
     ustl::atomic<bool> DYING_;
-    
+
     // only true if removeFromThreadList() detects last thread to delete process
 
     //clock
     size_t last_start_;
-
+    bool was_scheduled_ = 0;
     //sleep
     size_t time_to_wake_ = 0;
 };
