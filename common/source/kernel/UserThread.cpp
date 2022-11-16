@@ -43,7 +43,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 
   // add Thread to process to scheduler
   process_->addToThreadList(this);
-  last_start_ = Scheduler::instance()->getRDTSC();
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
@@ -57,7 +56,6 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-
   if (getState() == Running)
   {
     //testsystem
@@ -65,10 +63,13 @@ bool UserThread::schedulable(){
     //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!getflags()->knotcancelable.test_and_set())
       {
+        
         if (getflags()->kasynchronous.test_and_set())
         {
           if (getflags()->kcancelreq.test_and_set())
           {
+            //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+            setLastStart(Scheduler::instance()->getRDTSC());
             return true;
           }
           else
@@ -98,11 +99,14 @@ bool UserThread::schedulable(){
     }
     else if (sleepy == AWAKE_KS)
     {
+      //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+      setLastStart(Scheduler::instance()->getRDTSC());
      // my_pages_lock_.release();
       return true;
     }
     else if(DYING_)
     {
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else

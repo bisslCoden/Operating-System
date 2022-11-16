@@ -4,6 +4,11 @@
 #include "pthread.h"
 #include <unistd.h>
 
+//////////////////////////////////////////////////
+// TEST WAS MADE WITH A MODIFIED SLEEP FUNCTION //
+// WHERE SLEEPING THREAD CYCLES ARE COUNTED     //
+//////////////////////////////////////////////////
+
 pthread_t tid;
 
 int fastroutine()
@@ -18,23 +23,27 @@ int fastroutine()
 
 int main(int argc, char *argv[]) {
   clock_t time_1 = clock();
-  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1));
+  printf("SYSCALL CLOCK has been started and  the return value is: %d\n", (time_1) / CLOCKS_PER_SEC);
   int ret;
   int returner;
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  sleep(1);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  sleep(1);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  sleep(1);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
   pthread_create(&tid, NULL, (void* (*)(void*))&fastroutine, NULL);
+  sleep(1);
   returner =  pthread_join(tid, (void**)&ret);
   printf("join returned: %d got val %d\n",returner, ret);
   clock_t time_2 = clock();
-  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2));
-  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2 - time_1)));
+  printf("SYSCALL CLOCK has been called and the return value is: %d\n", (time_2)/ CLOCKS_PER_SEC);
+  printf("CLOCK TEST has been finished and the difference is: %d\n", ((time_2/ CLOCKS_PER_SEC) - (time_1/CLOCKS_PER_SEC)));
   return 0;
 }

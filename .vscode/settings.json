@@ -9,7 +9,7 @@
         "string": "cpp",
         "array": "cpp",
         "string_view": "cpp",
-        "initializer_list": "cpp",
-        "utility": "cpp"
-    }
+        "initializer_list": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

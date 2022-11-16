@@ -623,12 +623,13 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
-  //currentUserThread->getParentProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  //currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   //currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
+
+
   return 0;
 }
-
 // rdtsc now - rdtsc at program start
 // but thread can sleep or yield, so then it doesn't count
 // we need to increment the ticks variable for every thread of the process
@@ -637,21 +638,22 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // we get the number of cycles
 
 //duaration is in cycles
-//duaration/avg_cycle_per_tick = number of ticks
-//tick = 54 milisecond
-//divide by 54 to get the number of miliseconds 
-// 54 * 1000 = 54 000 micro seconds
+//(avg_cycle_per_tick/54925) = number of cycles per mikrosec
+//duaration/ number_of_cyc_per_microsec = microseconds
 size_t Syscall::clock()
 {
-  //size_t avg_per_sec = (182 * Scheduler::instance()->getDiffAvg());
+  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
   size_t duaration = currentUserThread->getParentProcess()->getClockSum();
-  debug(CLOCK, "clock sum %ld\n", duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10));
+  debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
-  debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
+  debug(CLOCK, "duaration_2 %ld\n", duaration_2/cyc_per_microsec);
   duaration += duaration_2;
-  duaration = duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10);
-  //duaration = duaration * 54;
-  duaration = duaration;
+  debug(CLOCK, "duaration before divide %ld\n", duaration);
+  debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
+  duaration = (duaration/cyc_per_microsec);
   debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration * CLOCKS_PER_SEC;
+  return duaration;
 }
+
+
+// clock 8 - good result

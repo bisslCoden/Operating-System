@@ -67,15 +67,13 @@ void Thread::kill()
                  getTID(), (size_t)this, getName().c_str()); */
 
   debug(THREAD, "kill called by currentThread-> TID: [%ld]. killing TID: [%ld]\n", getTID(), currentThread->getTID());
-//((UserThread*)currentThread)->getParentProcess()->incDuaration(
-   // Scheduler::instance()->getRDTSC() - currentThread->getLastStart());
+  currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   setState(ToBeDestroyed); // vvv Code below this line may not be executed vvv
 
   if (currentThread == this)
   {
     ArchInterrupts::enableInterrupts();
     debug(THREAD, "THREAD TID: [%ld], KILLING HIMSELF NOW\n", getTID());
-    //((UserThread*)currentThread)->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentThread->getLastStart()); 
     Scheduler::instance()->yield();
   }
 }
