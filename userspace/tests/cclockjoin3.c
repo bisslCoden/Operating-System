@@ -19,14 +19,14 @@ int fastroutine()
     printf("graceful exit!\n");
     for(int i_ = 10000; i_ > 0; i_--)
     {
-      for(int k_ = 10000; k_ > 0; k_--)
+      for(int k_ = 100000; k_ > 0; k_--)
       {
         int l_ = 1 + l_;
       }
     }
     for(int i_ = 10000; i_ > 0; i_--)
     {
-      for(int k_ = 10000; k_ > 0; k_--)
+      for(int k_ = 100000; k_ > 0; k_--)
       {
         int l_ = 1 + l_;
       }

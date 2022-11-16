@@ -638,7 +638,7 @@ int Syscall::get_pid()
 
   debug(SLEEP, "avg:    %ld\n", Scheduler::instance()->getDiffAvg());
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
-  //currentUserThread->setTimeToWake(time_to_wake);
+  currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
   //currentUserThread->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - currentUserThread->getLastStart());
   //currentUserThread->setLastStart(time_to_wake);
@@ -675,7 +675,7 @@ size_t Syscall::clock()
   duaration_2 = (duaration_2/cyc_per_microsec);
   
   debug(CLOCK, "result    %ld\n", (duaration_2));
-  return 0;
+  return duaration_2;
 }
 
 
