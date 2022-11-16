@@ -562,7 +562,13 @@ int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
-  return ProcessRegistry::instance()->processFork();
+  
+  currentUserThread->switch_to_userspace_ = 0;
+  int ret = ProcessRegistry::instance()->processFork();
+  debug(X_USERTHREAD, "[%ld]switching to US now... my locks: %s\n", currentUserThread->getTID(),
+  (currentThread->holding_lock_list_ == 0) ? "none" : currentThread->holding_lock_list_->getName());
+  currentUserThread->switch_to_userspace_ = 1;
+  return ret;
 }
 
 int Syscall::execv(const char * path, char *const argv[])

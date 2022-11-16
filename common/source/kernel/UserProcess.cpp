@@ -130,9 +130,14 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
 UserProcess::~UserProcess()
 {
 
-  debug(X_USERPROCESS, "PID [%ld]: destructor called\n", pid_);
-  assert(Scheduler::instance()->isCurrentlyCleaningUp());
-  delete loader_;
+  debug(X_USERPROCESS, "PID [%ld]: destructor called by [%ld]\n", pid_, currentThread->getTID());
+  if(Scheduler::instance()->isCurrentlyCleaningUp())
+    Scheduler::instance()->yield();
+  if (loader_ != 0)
+  {
+    delete loader_;
+  }
+  
   loader_ = 0;
   if (fd_ > 0)
     VfsSyscall::close(fd_);
@@ -141,7 +146,7 @@ UserProcess::~UserProcess()
   working_dir_ = 0;
 
   ProcessRegistry::instance()->processExit(this);
-  debug(X_USERPROCESS, "PID [%ld]: destructor done\n", pid_);
+  debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
 }
 
 bool UserProcess::addToThreadList(UserThread* thread)
