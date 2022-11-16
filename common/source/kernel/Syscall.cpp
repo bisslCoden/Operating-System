@@ -672,7 +672,7 @@ size_t Syscall::clock()
   debug(CLOCK, "duaration before divide %ld\n", duaration_2);
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
   
-  duaration_2 = (duaration_2/cyc_per_microsec);
+  duaration_2 = (duaration_2/cyc_per_microsec); 
   
   debug(CLOCK, "result    %ld\n", (duaration_2));
   return duaration_2;
