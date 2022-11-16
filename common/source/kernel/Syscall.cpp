@@ -427,7 +427,7 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
       //  EINVAL Another thread is already waiting to join with this thread.
 
       //  ESRCH  No thread with the ID thread could be found.
-  //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
+      //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
 int Syscall::pthread_detach(size_t thread){
   currentUserThread->getParentProcess()->lockThreadMutex();
   UserThread* to_be_detached = 0x00;
@@ -614,16 +614,16 @@ int Syscall::get_pid()
   return callingthread->getParentProcess()->getPID();
 }
 
-// wake up when getRDTSC == rdtsc_now + (cpu cycles) seconds
+  // wake up when getRDTSC == rdtsc_now + (cpu cycles) seconds
   // while(getRDTSC != rdtsc_to_wake)
   // yield
   //
   // ms = mili second 1s/1000 
   // 54 ms = 0.054 s happens a tick
   // CLOCKS_PER_SECOND = 1000000
-
   // frequency is needed, with that we multiply clock_per_sec
-unsigned int Syscall::sleep(unsigned int seconds)
+
+  unsigned int Syscall::sleep(unsigned int seconds)
 {
   if(seconds == 0)
     return 0;
@@ -632,11 +632,10 @@ unsigned int Syscall::sleep(unsigned int seconds)
   uint64_t time_to_wake = seconds * (182 * Scheduler::instance()->getDiffAvg()) + rdtsc_now;
   debug(SLEEP, "rdtsc_now:    %ld\n", rdtsc_now);
   debug(SLEEP, "time_to_wake: %ld\n", time_to_wake);
-  //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
-  
-  // see diff between avg and getdiffpertick
 
-  //
+  //debug(SLEEP, "time_to_wake: %ld, the getRDTSC: %ld, and the Frequency: %ld\n", time_to_wake, Scheduler::instance()->getRDTSC()/(CLOCKS_PER_SEC * 20 ), Scheduler::instance()->getFrequency());
+  //see diff between avg and getdiffpertick
+
   debug(SLEEP, "avg:    %ld\n", Scheduler::instance()->getDiffAvg());
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);

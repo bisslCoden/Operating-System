@@ -527,7 +527,7 @@ size_t UserProcess::getClockSum()
     {
       debug(CLOCK, "RDTSC - last start %d\n", Scheduler::instance()->getRDTSC() - i->second->getLastStart());
       sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
-      debug(CLOCK, "sum: %d\n", sum);
+      debug(CLOCK, "sum: %ld\n", sum);
     }
   }
   clock_lock_.release();
