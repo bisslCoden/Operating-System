@@ -71,7 +71,6 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
-            setLastStart(Scheduler::instance()->getRDTSC());
             if(was_scheduled_ == 0) // variables used in scheduler need to be atomic
             {
                setLastStart(Scheduler::instance()->getRDTSC());
