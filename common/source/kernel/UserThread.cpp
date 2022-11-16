@@ -71,10 +71,11 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
-            if(was_scheduled_ == 0) // variables used in scheduler need to be atomic
-            {
-               setLastStart(Scheduler::instance()->getRDTSC());
-            }
+            if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+             {
+                getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+             }
+            setLastStart(Scheduler::instance()->getRDTSC());
             was_scheduled_ = 1;
             return true;
           }
@@ -97,9 +98,9 @@ bool UserThread::schedulable(){
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
       // my_pages_lock_.release();
       if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-      {
-        getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-      }
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  }
       was_scheduled_ = 0;
       return false;
     }
@@ -107,29 +108,25 @@ bool UserThread::schedulable(){
     {
       // my_pages_lock_.release();
       if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-      {
-        getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-      }
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  }
       was_scheduled_ = 0;
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
-      if(was_scheduled_ == 0) // variables used in scheduler need to be atomic
-      {
-         setLastStart(Scheduler::instance()->getRDTSC());
-      }
+      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  }
+      setLastStart(Scheduler::instance()->getRDTSC());
       // my_pages_lock_.release();
       was_scheduled_ = 1;
       return true;
     }
     else if(DYING_)
     {
-      if(was_scheduled_ == 0) // variables used in scheduler need to be atomic
-      {
-         setLastStart(Scheduler::instance()->getRDTSC());
-      }
-      was_scheduled_ = 1;
       return true;
     }
     else
