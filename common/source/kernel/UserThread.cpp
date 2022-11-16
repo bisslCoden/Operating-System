@@ -63,7 +63,7 @@ bool UserThread::schedulable(){
     //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!getflags()->knotcancelable.test_and_set())
       {
-        
+
         if (getflags()->kasynchronous.test_and_set())
         {
           if (getflags()->kcancelreq.test_and_set())
@@ -267,13 +267,13 @@ void UserThread::freeMyPagesAndDie(){
   // {
   //   process_->unlockKill();
   //   return;
-  // } 
+  // }
   // process_->unlockKill();
   if (process_->checkKill())
   {
     this->kill();
   }
-  
+
   DYING_ = true;
   my_pages_lock_.acquire();
   for (size_t i = 0; i < my_pages_.size(); i++)
@@ -303,17 +303,17 @@ bool UserThread::setupStack()
   size_t stackend = stack_start_ptr - PAGE_SIZE * STACK_SIZE_IN_PAGES;
   size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
-  
-  // just act like everythings allright i ll die anywayys 
+
+  // just act like everythings allright i ll die anywayys
   // process_->lockKill();
   // if(process_->checkKill())
   // {
   //   process_->unlockKill();
   //   return true;
-  // } 
+  // }
   // process_->unlockKill();
   // check stack vpn and ppn + mapPage()
- 
+
   size_t ppn_for_stack = PageManager::instance()->allocPPN();
   assert(vpn_for_stack && ppn_for_stack);
   if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
@@ -343,7 +343,7 @@ bool UserThread::setupStack()
   
   debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %lx) and ends at %lx (VPN %lx) flag is at %lx"
     "and guardpages are at %lx and %lx\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
-    mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
+    mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_,
     mystack_.guardpage_back_nr_);
 
 
@@ -405,7 +405,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   {
     delete[] here[i];
   }
-  
+
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
 
   for (size_t i = 0; i < argc; i++)
