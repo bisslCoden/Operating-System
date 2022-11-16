@@ -639,8 +639,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
 
 //duaration is in cycles
 //(avg_cycle_per_tick/54925) = number of cycles per mikrosec
-//duaration/ number_of_cyc_per_sec = microseconds
-//that all times 10⁶(CLOCKS_PER_SEC) = micro seconds
+//duaration/ number_of_cyc_per_microsec = microseconds
 size_t Syscall::clock()
 {
   size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
@@ -653,7 +652,7 @@ size_t Syscall::clock()
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
   duaration = (duaration/cyc_per_microsec);
   debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration;
+  return duaration * 10;
 }
 
 
