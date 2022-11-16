@@ -96,21 +96,21 @@ getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStar
     {
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
-     // my_pages_lock_.release();
-     was_scheduled_ = 0;
+      // my_pages_lock_.release();
+      was_scheduled_ = 0;
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
-     // my_pages_lock_.release();
-     was_scheduled_ = 0;
+      // my_pages_lock_.release();
+      was_scheduled_ = 0;
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
       //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
-     // my_pages_lock_.release();
+      // my_pages_lock_.release();
       was_scheduled_ = 1;
       return true;
     }
