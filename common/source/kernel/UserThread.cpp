@@ -269,12 +269,14 @@ void UserThread::freeMyPagesAndDie(bool actually_die){
   
   DYING_ = true;
   my_pages_lock_.acquire();
+  loader_->arch_memory_.lockArchMemory();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     //might delete the assert later
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
+  loader_->arch_memory_.unlockArchMemory();
   //state_ = ToBeDestroyed;
   my_pages_lock_.release();
   if(actually_die)
