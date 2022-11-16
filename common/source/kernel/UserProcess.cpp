@@ -518,7 +518,7 @@ size_t UserProcess::getClockSum()
   debug(CLOCK, "Number of threads %d\n", getNrOfThreads());
   for (ustl::map<size_t, UserThread*>::iterator i = threads_.begin(); i != threads_.end(); ++i) 
   {
-    if(i->second->getLastStart() < Scheduler::instance()->getRDTSC())
+    if(i->second->schedulable() == true)
     {
       debug(CLOCK, "RDTSC - last start %d\n", Scheduler::instance()->getRDTSC() - i->second->getLastStart());
       sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();

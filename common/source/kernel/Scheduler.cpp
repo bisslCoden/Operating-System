@@ -53,7 +53,7 @@ uint32 Scheduler::schedule()
   {
     if((*it)->schedulable())
     {
-      //debug(CLOCK, "Time in scheduler %ld\n", Scheduler::instance()->getRDTSC());
+      //debug(CLOCK, "Time in scheduler %ld\n", Scheduler::instance()->getRDTSC()/Scheduler::instance()->getDiffAvg());
       currentThread = *it; /// MAYBE SET HERE THE LASTSTART?
       break;
     }

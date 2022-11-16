@@ -56,8 +56,6 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-  //debug(CLOCK, "Time in schedulable %ld\n", Scheduler::instance()->getRDTSC());
-
   if (getState() == Running)
   {
     //testsystem
