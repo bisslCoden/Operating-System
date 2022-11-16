@@ -75,7 +75,6 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
-            //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
             setLastStart(Scheduler::instance()->getRDTSC());
             was_scheduled_ = 1;
             return true;
@@ -109,7 +108,6 @@ bool UserThread::schedulable(){
     }
     else if (sleepy == AWAKE_KS)
     {
-      //getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
       setLastStart(Scheduler::instance()->getRDTSC());
       // my_pages_lock_.release();
       was_scheduled_ = 1;

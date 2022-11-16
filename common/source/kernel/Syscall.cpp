@@ -669,7 +669,7 @@ size_t Syscall::clock()
   duaration_2 = (duaration_2/cyc_per_microsec); 
   
   debug(CLOCK, "result    %ld\n", (duaration_2));
-  return duaration_2;
+  return 0;
 }
 
 
