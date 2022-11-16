@@ -123,6 +123,12 @@ after:
     case sc_pthread_self:
       return_value = pthread_self();
       break;
+    case sc_ks_wait:
+      kernelsem_wait();
+      break;
+    case sc_ks_post:
+      kernelsem_post();
+      break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
@@ -147,6 +153,18 @@ bool checkAdressValid(void* addr)
   }
   return true;
 }
+
+
+void Syscall::kernelsem_wait(){
+  currentUserThread->getProcess()->waitPIDSem();
+  return;
+}
+
+void Syscall::kernelsem_post(){
+  currentUserThread->getProcess()->postPIDSem();
+  return;
+}
+
 
 void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 {

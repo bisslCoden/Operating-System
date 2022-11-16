@@ -230,21 +230,45 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
       debug(WAITPID, "Not found, process %ld\n", arg1);
       return -1; //exit value returned
     }
-    parent_process->setWaitStatus(1);
-    size_t process_state = search_child->second->getProcessState();
-    return_pid = search_child->second->getPID();
-    list_of_processes_lock_.release();
-    while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    //little rc here: if child dies first parent might not be able to set it ... fix!
+    UserProcess* to_be_joined = search_child->second;
+    to_be_joined->lockWaiter();
+    if (to_be_joined->checkWaiter() == 0 && parent_process->checkWaiter() != to_be_joined)
     {
-      Scheduler::instance()->yield();
-      if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
-      {
-        list_of_processes_lock_.acquire();
-        parent_process->setWaitStatus(0);
-        list_of_processes_lock_.release();
-      }
+      to_be_joined->setWaiter(parent_process);  
     }
+    else
+    {
+      list_of_processes_lock_.release();
+      to_be_joined->unlockWaiter();
+      return -1;
+    }
+    
+    return_pid = to_be_joined->getPID();
+    to_be_joined->unlockWaiter();
+    list_of_processes_lock_.release();
+    
+    to_be_joined->lockThreadMutex();
+    if(to_be_joined->checkKill())
+    {
+      to_be_joined->unLockThreadMutex();
+      return return_pid;
+    }
+    to_be_joined->unLockThreadMutex();
+
+    parent_process->waitPIDSem();
+    // while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    // {
+    //   Scheduler::instance()->yield();
+    //   if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+    //   {
+    //     list_of_processes_lock_.acquire();
+    //     parent_process->setWaitStatus(0);
+    //     list_of_processes_lock_.release();
+    //   }
+    // }
   }
+  /*
   else if((long int) arg1 == -1) // any child process.
   {
     debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
@@ -289,6 +313,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     }
     debug(WAITPID, "after while \n");
   }
+  */
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
