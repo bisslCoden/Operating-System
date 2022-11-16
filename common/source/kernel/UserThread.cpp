@@ -59,6 +59,10 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
+  //if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
+  //{
+  //  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+  //}
   if (getState() == Running)
   {
     //testsystem
@@ -71,11 +75,7 @@ bool UserThread::schedulable(){
         {
           if (getflags()->kcancelreq.test_and_set())
           {
-            if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-             {
-                getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-             }
-            setLastStart(Scheduler::instance()->getRDTSC());
+            //setLastStart(Scheduler::instance()->getRDTSC());
             was_scheduled_ = 1;
             return true;
           }
@@ -97,30 +97,18 @@ bool UserThread::schedulable(){
       //get the right flag back
       __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
       // my_pages_lock_.release();
-      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-  }
       was_scheduled_ = 0;
       return false;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
       // my_pages_lock_.release();
-      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-  }
       was_scheduled_ = 0;
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
-      if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
-  }
-      setLastStart(Scheduler::instance()->getRDTSC());
+      //setLastStart(Scheduler::instance()->getRDTSC());
       // my_pages_lock_.release();
       was_scheduled_ = 1;
       return true;
@@ -136,10 +124,6 @@ bool UserThread::schedulable(){
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
-  }
-  if(was_scheduled_ == 1) // variables used in scheduler need to be atomic
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   }
   was_scheduled_ = 0;
   return false;
