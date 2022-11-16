@@ -370,27 +370,6 @@ bool PageManager::checkForCow(size_t address)
   size_t vpn = address/PAGE_SIZE;
   size_t mutexflag = AWAKE_KS;
   
-  UserThread* mut_change = 0;
-  if (address > END_OF_STACKS && address < USER_BREAK)
-  {
-    if((mut_change = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
-    {
-      if(vpn == (mut_change->getStackInfo()->userstack_start_ / PAGE_SIZE))
-      {
-        debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... of [%ld]time to change ident\n", mut_change->getTID());
-        mutexflag = *mut_change->getStackInfo()->UserMutex;
-        debug(X_PAGEMANAGER, "mutexflag is %s\n", (mutexflag == AWAKE_KS) ? "awake" : "zzzz");
-
-       // mut_change->setUserMutex(USERMUTEX_INVALID);
-      }
-      else
-        mut_change = 0;
-    }
-    else
-      mut_change = 0;
-      //assert(false && "whaaaat? how the hell did a thread which is not in this Process get a PF on THIS PROCESS?\n");
-  }
-
   if (!current_archmem->checkArchMemory(currentThread))
     current_archmem->lockArchMemory();
   
@@ -436,7 +415,26 @@ bool PageManager::checkForCow(size_t address)
     return false;
   }
 
-  
+  UserThread* mut_change = 0;
+  if (address > END_OF_STACKS && address < USER_BREAK)
+  {
+    if((mut_change = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
+    {
+      if(vpn == (mut_change->getStackInfo()->userstack_start_ / PAGE_SIZE))
+      {
+        debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... of [%ld]time to change ident\n", mut_change->getTID());
+        mutexflag = *mut_change->getStackInfo()->UserMutex;
+        debug(X_PAGEMANAGER, "mutexflag is %s\n", (mutexflag == AWAKE_KS) ? "awake" : "zzzz");
+
+       // mut_change->setUserMutex(USERMUTEX_INVALID);
+      }
+      else
+        mut_change = 0;
+    }
+    else
+      mut_change = 0;
+      //assert(false && "whaaaat? how the hell did a thread which is not in this Process get a PF on THIS PROCESS?\n");
+  }
 
   if (ret == (int)WAS_LAST)
   {
@@ -456,6 +454,7 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].writeable = 1;
     pt_ident[m.pti].present = 1;
   }
+
 
   if (mut_change)
   {

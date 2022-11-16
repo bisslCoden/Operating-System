@@ -62,15 +62,15 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 {
   //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
   loader_ = process_->getLoader();
-  process_->threads_lock_.acquire();
-  if (process_-> KILLED_)
-  {
-    process_->threads_lock_.release();
-    *returnto = 9;
-    return;
-  }
+  // process_->threads_lock_.acquire();
+  // if (process_-> KILLED_)
+  // {
+  //   process_->threads_lock_.release();
+  //   *returnto = 9;
+  //   return;
+  // }
   
-  process_->threads_lock_.release();
+  // process_->threads_lock_.release();
   mystack_.page_offset_ = page_offset;
 
   Userthread = true;
