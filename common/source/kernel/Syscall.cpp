@@ -660,17 +660,13 @@ size_t Syscall::clock()
   //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
   
-  debug(CLOCK, "duaration_2 in micro seconds: %ld\n", duaration_2/cyc_per_microsec);
- // duaration += duaration_2;
-  
   debug(CLOCK, "duaration before divide %ld\n", duaration_2);
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
-  
+  debug(CLOCK, "duaration_2 in micro seconds: %ld\n", duaration_2/cyc_per_microsec);
+
   duaration_2 = (duaration_2/cyc_per_microsec); 
   
   debug(CLOCK, "result    %ld\n", (duaration_2));
-  return 0;
+  return duaration_2;
 }
 
-
-// clock 8 - good result
