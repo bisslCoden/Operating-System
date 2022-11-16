@@ -14,40 +14,52 @@
 #include "Scheduler.h"
 
 // standard process creation
-UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, uint32 terminal_number) :
+UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t* returnto, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
-    fd_(VfsSyscall::open(filename, O_RDONLY)), 
+    fd_(VfsSyscall::open(filename.c_str(), O_RDONLY)), 
     fs_info_(fs_info),
     working_dir_(fs_info),
-    name_(filename.c_str()),
+    name_(filename),
     threads_lock_("UserProcess::threads_lock_"),
     returnvalue_lock_("UserProcess::retvallock"),
     offsetlist_lock_("UserProcess::offsets"),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
     waitpid_sem_("Userprocess::waitpid_sem_"),
-    clock_lock_("UserProcess::clock_lock_"),
-    waiter_lock_("UserProcess::waiter_lock_")
+    clock_lock_("UserProcess::clock_lock_")
 {
+  *returnto = 5;
   waitpid_sem_.init(0);
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
   ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
   if(!setupLoader(fd_))
+  {
+    *returnto = 1;
     return;
+  }
+  size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setChildStatus(0);
   threads_lock_.acquire();
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset());
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset(), &returnto_th);
   threads_lock_.release();
   assert(first_thread && "UserThread constructor failed");
+  if (returnto_th != 0)
+  {
+    *returnto = 4;
+    return;
+  }
+  
+  *returnto = 0;
+  return;
 }
 
 // User Process Constructor for fork
-UserProcess::UserProcess(UserProcess *parent) :
+UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   pid_(ProcessRegistry::instance()->createID()),
-  fd_(VfsSyscall::open(parent->name_, O_RDONLY)),
+  fd_(VfsSyscall::open(parent->name_.c_str(), O_RDONLY)),
   fs_info_(parent->fs_info_),
   //loader_(new Loader(fd_)),
   working_dir_(new FileSystemInfo(*parent->fs_info_)),
@@ -59,23 +71,28 @@ UserProcess::UserProcess(UserProcess *parent) :
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
   waitpid_sem_("Userprocess::waitpid_sem_"),
-  clock_lock_("UserProcess::clock_lock_"),
-  waiter_lock_("UserProcess::waiter_lock_")
+  clock_lock_("UserProcess::clock_lock_")
 {
+  *returnto = 5;
   waitpid_sem_.init(0);
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
   waiting_exec_lock_.release();
 
-  debug(X_USERPROCESS, "UserProcess() fork PID = [%ld]\n", pid_);
+  debug(X_USERPROCESS, "UserProcess() fork PID = [%ld], parent [%ld]\n", pid_, parent->getPID());
   if(!working_dir_)
   {
     debug(USERPROCESS, "UserProcess() fork: Failed to obtain working directory!\n");
+    *returnto = 2;
     return;
   }
+  
 
   if (!setupLoader(fd_))
+  {
+    *returnto = 1;
     return;
+  }
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
   
   currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
@@ -83,11 +100,13 @@ UserProcess::UserProcess(UserProcess *parent) :
 
   debug(USERPROCESS, "UserProcess() fork: Creating new Thread for Fork\n");
   UserThread* parent_thread = currentUserThread;
-  auto thread = new UserThread(this, parent_thread);
-  if(!thread || thread->getTID()==0)
+  size_t returnto_th = -1;
+  auto thread = new UserThread(this, parent_thread, &returnto_th);
+  if(!thread || thread->getTID()==0 || returnto_th != 0)
   {
     debug(USERPROCESS, "UserProcess() fork: Failed to create Thread for Fork!\n");
     delete thread;
+    *returnto = 4;
     return;
   }
   offsets_.push_back(currentUserThread->getStackInfo().page_offset_);
@@ -103,8 +122,9 @@ UserProcess::UserProcess(UserProcess *parent) :
   ProcessRegistry::instance()->processStart();
   
   //?
-  Scheduler::instance()->addNewThread(thread);
   Scheduler::instance()->printThreadList();
+  *returnto = 0;
+  return;
 }
 
 UserProcess::~UserProcess()
@@ -120,11 +140,7 @@ UserProcess::~UserProcess()
   delete working_dir_;
   working_dir_ = 0;
 
-  lockWaiter();
-  if (waiter_ != 0)
-    waiter_->postPIDSem();
-  unlockWaiter();
-  ProcessRegistry::instance()->processExit();
+  ProcessRegistry::instance()->processExit(this);
   debug(X_USERPROCESS, "PID [%ld]: destructor done\n", pid_);
 }
 
@@ -306,16 +322,21 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
 {
   // pthread
   UserThread* thread = 0;
-  
+  size_t return_to = 6;
   threads_lock_.acquire();
   if (!KILLED_)
-    thread = new UserThread(wrapper, getRandomPageOffset());
+    thread = new UserThread(wrapper, getRandomPageOffset(), &return_to);
   if (KILLED_)
   {
     assert(false && "this is baaad... created thread even though i should be dead1\n");
   }
   threads_lock_.release();
-  
+  if (return_to != 0)
+  {
+    debug(PROCESS_REG, "Ups, something went wrong creating the Userthread for proc [%ld] [%ld]... assert!\n", pid_, return_to);
+    assert(false);
+  }
+
   /*First Argument: RDI
     Second Argument: RSI
     Third Argument: RDX
@@ -448,13 +469,19 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 
 bool UserProcess::setupLoader(ssize_t fd)
 {
-  if(fd < 0)
-    return false;
 
   fd_ = fd;
+  if(fd_ < 0)
+  {
+    debug(LOADER, "setuploader failed because fd is unreasonable(%ld)\n", fd);
+    return false;
+  }
   Loader* new_loader = new Loader(fd_);
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
+  {
+    debug(LOADER, "setuploader failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
     return false;
+  }
 
   loader_ = new_loader;
   loader_->arch_memory_.setProcess(this);

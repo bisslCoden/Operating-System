@@ -73,6 +73,7 @@ class ProcessRegistry : public Thread
      */
     int areExecArgsValid(const char* path, char* const argv[]);
 
+    void processExit(UserProcess* user_proc);
     /**
      * @brief handles argument checking for execv when ARGV == NULL
      * will call UserProcess::execv(path)
