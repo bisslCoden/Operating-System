@@ -10,7 +10,6 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
-#define NO_LOCK_KS 0x92246879
 #define USERMUTEX_INVALID ((size_t*)0x35436343)
 
 class UserProcess;

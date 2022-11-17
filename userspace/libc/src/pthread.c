@@ -147,6 +147,8 @@ int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wante
   else
   {
     pthread_mutex_t* current_mutex = (pthread_mutex_t*) *firstcheck;
+    assert(*firstcheck < 0x800000000000UL);
+    assert(*firstcheck > 4096);
     while ((size_t)current_mutex != (size_t) NO_LOCK_US)
     {
       if (current_mutex->held_by_ == waiter_identifier)

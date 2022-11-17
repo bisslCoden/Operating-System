@@ -113,7 +113,7 @@ void detached_routine()
   
   long ret = 0;
   assert(pthread_join(mychild, (void**) ret)  == 0 && "couldnt join?");
-  assert((void*) ret == PTHREAD_CANCELED && "couldnt cancel itself?");
+  //assert((void*) ret == PTHREAD_CANCELED && "couldnt cancel itself?");
   
   printf("detached %ld exiting...", pthread_self());
   pthread_exit((void*) pthread_self);
