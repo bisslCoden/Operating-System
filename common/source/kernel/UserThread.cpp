@@ -23,7 +23,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
-  Userthread = true;
   mystack_.page_offset_ = page_offset;
   setupStack();
 
@@ -86,8 +85,6 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 
   
   // process_->threads_lock_.release();
-
-  Userthread = true;
 
   // set up user registers and adressspace
 
@@ -156,7 +153,6 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  Userthread = true;
   last_start_ = Scheduler::instance()->getRDTSC();
 
 
@@ -386,7 +382,7 @@ bool UserThread::setupStack()
 bool UserThread::reuseStack(StackInfo* old_stackinfo)
 {
   size_t ppn = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
+  debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %lx)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
   if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
     return false;
   
@@ -427,7 +423,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   name_ = process_->getName();
   debug(X_USERTHREAD, "execv(): %s. argc = %ld\n", name_.c_str(), argc);
 
-  //MEMLEAK
   char* here[argc];
   for (size_t i = 0; i < argc; i++)
   {
@@ -438,7 +433,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   }
   debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
   
-  //freeMyPagesAndDie(false);
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
@@ -451,7 +445,9 @@ int UserThread::execv(char* const argv[], size_t argc)
 
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;
-  size_t str_offset = argc * sizeof(char*);
+  // + sizeof(size_t) for null termination
+  size_t str_offset = argc * sizeof(char*) + sizeof(size_t);
+
   // copy from here[] into fresh archmem
   for(size_t i = 0; i < argc; i++)
   {
@@ -460,13 +456,14 @@ int UserThread::execv(char* const argv[], size_t argc)
       return -1;
     
     memcpy((void*)(new_argv + str_offset), (void*) here[i], str_len);
-    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from here[%ld] to (argv_arr + str_offset) = %lx\n", here[i], (size_t)(here + i), (size_t)(new_argv + str_offset));
+    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from here[%lx] to (argv_arr + str_offset) = %lx\n", here[i], (size_t)(here + i), (size_t)(new_argv + str_offset));
     
     argv_arr[i] = (char*)(new_argv + str_offset);
     debug(X_USERTHREAD, "execv(): memcpy() memcpy(argv_arr[%lx] = (%lx)\n", (size_t)argv_arr[i], new_argv + str_offset);
 
     str_offset += str_len;
   }
+  argv_arr[argc] = NULL;
 
   for (size_t i = 0; i < argc; i++)
   {
@@ -482,7 +479,6 @@ int UserThread::execv(char* const argv[], size_t argc)
   debug(X_USERTHREAD, "execv(): copied from here[] to new location\n");
 
   // setup stack and set registers
-  //mystack_.page_offset_ = process_->getRandomPageOffset();
   mystack_.UserMutex = USERMUTEX_INVALID;
   assert(reuseStack(&mystack_));
 

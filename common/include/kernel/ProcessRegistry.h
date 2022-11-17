@@ -6,7 +6,7 @@
 #include "UserProcess.h"
 #include "types.h"
 
-#define EXECV_MAX_ARG_LEN 1234
+#define EXECV_MAX_ARG_LEN 100
 
 class ProcessRegistry : public Thread
 {
