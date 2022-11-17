@@ -17,6 +17,7 @@ int main(int argc, char* const argv[])
            "|----finished printing your arguments----\n"
            "|----------------------------------------\n");
 
-  int ret_exec = execv("usr/printuntilnull.sweb", argv);
+  int ret_exec = execv("usr/printuntiliisargc.sweb", argv);
+  printf("execv failed with return value %d!\n", ret_exec);
   return 0;
 }
