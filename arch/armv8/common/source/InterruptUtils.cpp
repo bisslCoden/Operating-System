@@ -46,8 +46,9 @@ void timer_irq_handler()
   const char* clock = "/-\\|";
   ((FrameBufferConsole*)main_console)->consoleSetCharacter(0,0,clock[heart_beat_value],Console::GREEN);
   heart_beat_value = (heart_beat_value + 1) % 4;
-  getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
+
   Scheduler::instance()->incTicks();
+  ((UserThread*)currentThread)->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   Scheduler::instance()->schedule();
 }
 
