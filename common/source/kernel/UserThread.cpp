@@ -23,7 +23,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
-  Userthread = true;
   //  size_t sleepflag = 1;
   // size_t res = __atomic_exchange_n(&sleepflag, 0, ustl::memory_order_seq_cst);
   // debug(X_THREADSTACK, "jst checking exchange: sleep = %ld and check = %ld\n", sleepflag, res);
@@ -129,8 +128,6 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_num
   loader_ = process_->getLoader();
   mystack_.page_offset_ = page_offset;
 
-  Userthread = true;
-
   // set up user registers and adressspace
   setupStack();
 
@@ -190,7 +187,6 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread) :
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  Userthread = true;
   last_start_ = Scheduler::instance()->getRDTSC();
 
 
