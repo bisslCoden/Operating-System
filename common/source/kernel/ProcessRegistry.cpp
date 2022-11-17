@@ -86,6 +86,38 @@ void ProcessRegistry::processExit()
   counter_lock_.release();
 }
 
+void ProcessRegistry::processExit(UserProcess* user_proc)
+{
+  list_of_processes_lock_.acquire();
+  if (list_of_processes_.find(user_proc->getPID()) != list_of_processes_.end())
+  {
+    list_of_processes_.erase(user_proc->getPID());
+    UserProcess* waiter = 0;
+    if ((waiter = user_proc->checkWaiter()) != 0)
+    {
+      debug(X_USERPROCESS, "Process [%ld] now dying and posting for [%ld]\n", user_proc->getPID(), waiter->getPID());
+      waiter->postPIDSem();
+    }
+    else
+      debug(X_USERPROCESS, "Process [%ld] now dying and posting for nobody :(\n", user_proc->getPID());
+  }
+  else
+  {
+    list_of_processes_lock_.release();
+    return;
+  }
+  list_of_processes_lock_.release();
+
+    //assert(false && "how did that process get removed already?");
+  counter_lock_.acquire();
+
+  if (--progs_running_ == 0)
+    all_processes_killed_.signal();
+
+  counter_lock_.release();
+}
+
+
 void ProcessRegistry::processStart()
 {
   counter_lock_.acquire();
@@ -109,6 +141,7 @@ size_t ProcessRegistry::createID()
 size_t ProcessRegistry::processFork()
 {
   debug(PROCESS_REG, "processFork() called starting process creation\n");
+  size_t return_to = 6;
   auto parent = currentUserThread->getProcess();
   
   if (parent->checkKill())
@@ -117,15 +150,26 @@ size_t ProcessRegistry::processFork()
   }
   
   //debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent);
+  debug(X_USERTHREAD, "[%ld] is creating the proc\n", currentThread->getTID());
+  UserProcess* process = 0;
+  process = new UserProcess(parent, &return_to);
 
-  debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID() == 0)
+  if (return_to != 0)
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork[%ld]... dont assert!\n", return_to);
+    debug(X_USERTHREAD, "[%ld] is deleting the proc\n", currentThread->getTID());
     delete process;
     return -1;
+    //assert(false);
   }
+  
+  debug(PROCESS_REG, "After new UserProcess\n");
+  // if (!process || process->getPID() == 0)
+  // {
+  //   debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
+  //   delete process;
+  //   return -1;
+  // }
 
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
@@ -144,18 +188,24 @@ ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "createProcess(path = %s)\n", path);
+  size_t returnto = 6;
   FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
   if(!fs_info)
   {
     debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
     return;
   }
-  UserProcess* process = new UserProcess(path, fs_info);
-  if(!process || process->getPID() == 0)
+  UserProcess* process = new UserProcess(path, fs_info, &returnto);
+  if (returnto != 0)
   {
-    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
-    return;
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess[%ld]: [%ld]... assert!\n",process->getPID(), returnto);
+    assert(false);
   }
+  // if(!process || process->getPID() == 0)
+  // {
+  //   debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
+  //   return;
+  // }
 
   debug(X_PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
@@ -222,29 +272,40 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   {
     debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
     list_of_processes_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
-    auto search_child = list.find(arg1);
-    if (search_child == list.end())
+    auto search_child = list_of_processes_.find(arg1);
+    if (search_child == list_of_processes_.end())
     {
       list_of_processes_lock_.release();
       debug(WAITPID, "Not found, process %ld\n", arg1);
       return -1; //exit value returned
     }
-    parent_process->setWaitStatus(1);
-    size_t process_state = search_child->second->getProcessState();
-    return_pid = search_child->second->getPID();
-    list_of_processes_lock_.release();
-    while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    UserProcess* to_be_joined = search_child->second;
+    if (to_be_joined->checkWaiter() == 0 && parent_process->checkWaiter() != to_be_joined)
     {
-      Scheduler::instance()->yield();
-      if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
-      {
-        list_of_processes_lock_.acquire();
-        parent_process->setWaitStatus(0);
-        list_of_processes_lock_.release();
-      }
+      to_be_joined->setWaiter(parent_process);  
     }
+    else
+    {
+      list_of_processes_lock_.release();
+      return -1;
+    }
+    
+    return_pid = to_be_joined->getPID();
+    list_of_processes_lock_.release();
+    debug(X_USERPROCESS, "Process [%ld] now waiting for [%ld]\n", parent_process->getPID(), to_be_joined->getPID());
+    parent_process->waitPIDSem();
+    // while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
+    // {
+    //   Scheduler::instance()->yield();
+    //   if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
+    //   {
+    //     list_of_processes_lock_.acquire();
+    //     parent_process->setWaitStatus(0);
+    //     list_of_processes_lock_.release();
+    //   }
+    // }
   }
+  /*
   else if((long int) arg1 == -1) // any child process.
   {
     debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
@@ -289,6 +350,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     }
     debug(WAITPID, "after while \n");
   }
+  */
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups

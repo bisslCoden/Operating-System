@@ -23,6 +23,10 @@ class Syscall
   static size_t open(size_t path, size_t flags);
   static void pseudols(const char *pathname, char *buffer, size_t size);
 
+
+static void kernelsem_wait();
+static void kernelsem_post();
+
   static size_t createprocess(size_t path, size_t sleep);
   static void trace();
   static int fork();

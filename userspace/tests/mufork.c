@@ -1,13 +1,17 @@
 #include "pthread.h"
 #include "stdio.h"
+#include "unistd.h"
 #include "assert.h"
 #include "sched.h"
+#include "wait.h"
+#include "getpid.h"
 
-#define NUM_THREADS 15
+#define NUM_THREADS 2
 
 pthread_mutex_t mutex;
 pthread_t tids[NUM_THREADS]; 
 
+int counter = 0;
 int never_false = 1;
 
 
@@ -18,7 +22,9 @@ int simple_routine()
   printf("hi i ll try to get the mutex!\n");
   mutret = pthread_mutex_lock(&mutex);
   printf("lock returned %d.\n", mutret);
-  assert(never_false == 1 && "never false aint 1? whaat?\n");
+  pid_t pid = fork();
+  printf("%s, [%d]\n", (pid == 0)? "i am child" : "i am parent", getpid());
+  assert(never_false == 1  && "never false aint 1? whaat? - PARENT\n");
   never_false = 0;
   sched_yield();
   never_false = 1;
@@ -31,6 +37,7 @@ int simple_routine()
   // }
   mutret = pthread_mutex_unlock(&mutex);
   printf("mutex UNLOCK returned me %d!\n", mutret);
+  //fork();
 
 //  printf("unlocked it!\n");
   return 0;
@@ -38,19 +45,21 @@ int simple_routine()
 
 int main()
 {
-  int ret;
-  int rets;
-  printf("Hello!\n");
+  //pid_t pid = fork();
+  printf("[main] Hello!\n");
   pthread_mutex_init(&mutex, NULL);
   for (size_t i = 0; i < NUM_THREADS; i++)
   {
-    assert(pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL) == 0 && "couldnt create thread!");
+    assert(pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL) == 0);
   }
-  sched_yield();
    for (size_t i = 0; i < NUM_THREADS; i++)
   {
-    ret = pthread_join(tids[i], (void**) &rets);
+    assert(pthread_join(tids[i], NULL) == 0);
   }
-  printf("%d %d joined all threads successfully and exiting as i should?\n",ret, rets);
+//   if (pid != 0)
+//   {
+//     waitpid(pid, 0 , 0);
+//   }
+  printf("[main] exit...\n");
   return 0;
 }

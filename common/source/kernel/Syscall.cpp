@@ -123,6 +123,12 @@ after:
     case sc_pthread_self:
       return_value = pthread_self();
       break;
+    case sc_ks_wait:
+      kernelsem_wait();
+      break;
+    case sc_ks_post:
+      kernelsem_post();
+      break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
@@ -147,6 +153,18 @@ bool checkAdressValid(void* addr)
   }
   return true;
 }
+
+
+void Syscall::kernelsem_wait(){
+  currentUserThread->getProcess()->waitPIDSem();
+  return;
+}
+
+void Syscall::kernelsem_post(){
+  currentUserThread->getProcess()->postPIDSem();
+  return;
+}
+
 
 void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 {
@@ -348,15 +366,16 @@ void Syscall::pthread_exit(void* value)
     
     currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
     currentUserThread->getParentProcess()->unLockThreadMutex();
-    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo().page_offset_);
+    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
     //experimentaaal: free my pages on my own!
-    currentUserThread->freeMyPagesAndDie();
+    currentUserThread->freeMyPagesAndDie(true);
     //currentThread->kill();
   }
   else
   {
     debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
     currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserThread->kill();
   }
   debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", currentUserThread->getTID());
   return;
@@ -535,7 +554,7 @@ int32 Syscall::pthread_cancel(size_t thread)
 //this should never be called when holding any locks
 int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 {
-  *stackaddr = (size_t*)currentUserThread->getStackInfo().userstack_start_;
+  *stackaddr = (size_t*)currentUserThread->getStackInfo()->userstack_start_;
   *stacksize = STACK_SIZE_IN_PAGES * PAGE_SIZE;
   return 0;
 }
@@ -544,7 +563,13 @@ int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
-  return ProcessRegistry::instance()->processFork();
+  
+  //currentUserThread->switch_to_userspace_ = 0;
+  int ret = ProcessRegistry::instance()->processFork();
+  //debug(X_USERTHREAD, "[%ld]switching to US now... my locks: %s\n", currentUserThread->getTID(),
+  //(currentThread->holding_lock_list_ == 0) ? "none" : currentThread->holding_lock_list_->getName());
+  //currentUserThread->switch_to_userspace_ = 1;
+  return ret;
 }
 
 int Syscall::execv(const char * path, char *const argv[])
@@ -582,6 +607,7 @@ bool Syscall::isExecPathValid(const char* path)
   debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
   return true;
 }
+
 size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
   UserThread* callingthread = (UserThread*)currentThread;

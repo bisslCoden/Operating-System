@@ -10,7 +10,7 @@
 
 #define PTHREAD_CANCELED ((void *) -1)
 #define STACK_SIZE_IN_PAGES 16ULL
-#define NO_LOCK_KS 0x92246879
+#define USERMUTEX_INVALID ((size_t*)0x35436343)
 
 class UserProcess;
 
@@ -36,9 +36,9 @@ typedef struct Threadflags
   //TODO joinable
   bool cancelreq = false;
   int joinable = PTHREAD_CREATE_JOINABLE;
-  ustl::atomic_flag kcancelreq;
-  ustl::atomic_flag knotcancelable;
-  ustl::atomic_flag kasynchronous;
+  ustl::atomic<bool> kcancelreq = false;
+  ustl::atomic<bool> knotcancelable = false;
+  ustl::atomic<bool> kasynchronous = false;
 }Threadflags;
 
 class Semaphore;
@@ -49,7 +49,7 @@ typedef struct StackInfo
   size_t page_offset_ = 0;
   size_t guardpage_front_nr_ = 0;
   size_t guardpage_back_nr_ = 0;
-  size_t* UserMutex;
+  ustl::atomic<size_t*> UserMutex;
 } StackInfo;
 
 
@@ -63,7 +63,7 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset, size_t* returnto);
     
     /**
      * @brief Construct a new User Thread object for pthread_create()
@@ -72,7 +72,7 @@ class UserThread : public Thread
      * @param page_offset offset for stack location
      * @param terminal_number the terminal to run in (default 0)
      */
-    UserThread(size_t wrapper, size_t page_offset, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number = 0);
 
     /**
      * @brief Construct a new User Thread object for fork()
@@ -80,7 +80,7 @@ class UserThread : public Thread
      * @param child the UserProcess of this new thread
      * @param parent_thread the thread of the parent_thread that called fork()
      */
-    UserThread(UserProcess* child, UserThread* parent_thread);
+    UserThread(UserProcess* child, UserThread* parent_thread, size_t* returnto);
 
     /**
      * @brief Destroy the User Thread object and check if(isLast()) { destroy parent_; } 
@@ -102,6 +102,8 @@ class UserThread : public Thread
      * @return false stack not setup.
      */
     bool setupStack();
+    bool reuseStack(StackInfo* old_stackinfo);
+
 
     /**
      * @brief UserThread-part of constructor. sets few members, creates stack in new archemory and 
@@ -135,7 +137,7 @@ class UserThread : public Thread
     int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
-    void freeMyPagesAndDie();
+    void freeMyPagesAndDie(bool actually_die);
 
     //acquie retvallock before!
     void setJoiner(UserThread* thread){join_waiter_ = thread;}
@@ -147,7 +149,7 @@ class UserThread : public Thread
     size_t getPageOffset()            {return mystack_.page_offset_;}
 
 
-    StackInfo getStackInfo()          { return mystack_; }
+    StackInfo* getStackInfo()          { return &mystack_; }
 
     // tells if thread is the last thread of its process
     // return process of thread
@@ -174,6 +176,7 @@ class UserThread : public Thread
     UserProcess*  getProcess()        { return process_; }
     bool          isLast()            { return last_; }        // tells if thread is the last thread of its process (important: on thread destuction, the process is destroyed if set!)
   private:
+    friend class Scheduler;
     // the process that contains this thread
     UserProcess* process_;
 

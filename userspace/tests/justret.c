@@ -1,20 +1,17 @@
 #include "pthread.h"
 #include "stdio.h"
 #include "assert.h"
+#include "unistd.h"
 
 #define NUM_THREADS 15000
 #define ARR_SIZE 4500
 
 pthread_t tids[NUM_THREADS];
 
-int PageRoutine()
+void PageRoutine()
 {
-    int arr[ARR_SIZE];
-    for (size_t i = 0; i < ARR_SIZE; i++)
-    {
-        arr[i]  = 90;
-    }
-    return arr[ARR_SIZE];   
+    sleep(1000000000);
+    return; 
 }
 
 int main()

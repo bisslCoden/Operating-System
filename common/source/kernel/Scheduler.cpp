@@ -80,13 +80,11 @@ uint32 Scheduler::schedule()
   if (currentThread->switch_to_userspace_)
   {
      UserThread* current = (UserThread*) currentThread;
-
+    debug(X_USERTHREAD, "%ld sched \n", currentThread->getTID());
     //do atomic checks
-    if (!current->getflags()->knotcancelable.test_and_set())
-    {
-      if (current->getflags()->kasynchronous.test_and_set())
-      {
-        if (current->getflags()->kcancelreq.test_and_set())
+    if (!current->myflags_.knotcancelable)
+      if (current->myflags_.kasynchronous)
+        if (current->myflags_.kcancelreq)
         {
           currentThreadRegisters = currentThread->kernel_registers_;
           ret = 0;
@@ -94,16 +92,7 @@ uint32 Scheduler::schedule()
           currentThread->switch_to_userspace_ = 0;
           ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
         }
-        else
-          current->getflags()->kcancelreq.clear();
-      }
-      else
-        current->getflags()->kasynchronous.clear();
-    }
-    else 
-      current->getflags()->knotcancelable.clear();
   }
-
   return ret;
 }
 
@@ -168,6 +157,7 @@ void Scheduler::cleanupDeadThreads()
     if (tmp->getState() == ToBeDestroyed)
     {
       destroy_list[thread_count++] = tmp;
+      debug(X_USERTHREAD, "erasing [%ld]!\n", tmp->getTID());
       threads_.erase(threads_.begin() + i); // Note: erase will not realloc!
       --i;
     }
