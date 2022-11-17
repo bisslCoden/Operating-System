@@ -231,8 +231,8 @@ bool UserThread::schedulable(){
     else if (sleepy == AWAKE_KS)
     {
       debug(X_USERTHREAD, "%ld awake in userspace...\n", tid_);
-     // my_pages_lock_.release();
       return true;
+     // my_pages_lock_.release();
     }
     else
     {
