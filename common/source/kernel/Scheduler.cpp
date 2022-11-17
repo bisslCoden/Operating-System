@@ -47,7 +47,7 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-  //debug(SCHEDULER, "schedule called!\n");
+  //copied from Daniel, lol, no plagiate
   deschedule_time = getRDTSC();
   auto uit = threads_.begin();
   for(; uit != threads_.end(); ++uit)
@@ -56,7 +56,6 @@ uint32 Scheduler::schedule()
     {
       if(((UserThread*)(*uit))->was_scheduled_ == 1)
       {
-        //((UserThread*)(*uit))->was_added = 1;
         ((UserThread*)(*uit))->getParentProcess()->incDuaration(Scheduler::instance()->getDescheduleTime() - ((UserThread*)(*uit))->getLastStart());
         break;
       }
