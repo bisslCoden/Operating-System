@@ -680,7 +680,7 @@ size_t Syscall::clock()
   debug(CLOCK, "time needed for clock: %ld\n", (time_to_add));
 
   return duaration_2 + time_to_add;
-
+  //return duaration;
   //sum, time from this function thread 
 
   // 
