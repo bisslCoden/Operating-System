@@ -61,6 +61,14 @@ uint32 Scheduler::schedule()
       }
     }
   }
+  uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      ((UserThread*)(*uit))->was_scheduled_ = 0;
+    }
+  }
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
