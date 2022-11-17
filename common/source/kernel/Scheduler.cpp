@@ -104,7 +104,6 @@ uint32 Scheduler::schedule()
     else 
       current->getflags()->knotcancelable.clear();
   }
-
   return ret;
 }
 

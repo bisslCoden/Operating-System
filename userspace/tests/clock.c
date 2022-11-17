@@ -1,19 +1,13 @@
 #include "stdio.h"
 #include "time.h"
 
-
-//////////////////////////////////////////////////
-// TEST WAS MADE WITH A MODIFIED SLEEP FUNCTION //
-// WHERE SLEEPING THREAD CYCLES ARE COUNTED     //
-//////////////////////////////////////////////////
-
 int main(int argc, char *argv[]) {
   int pid = fork();
   if(pid == 0)
   {
     clock_t time_1 = clock();
-    printf("[CHILD] CLOCK has been started and the return value is: %d\n", time_1/CLOCKS_PER_SEC);
-    printf("[CHILD] CLOCK has been started and in micro sec:        %d\n", time_1);
+    printf("[CHILD] CLOCK has been started and the return value is in sec: %d\n", time_1/CLOCKS_PER_SEC);
+    printf("[CHILD] CLOCK has been started and in micro sec:               %d\n", time_1);
 
     sleep(10);
     clock_t time_2 = clock();
@@ -23,8 +17,8 @@ int main(int argc, char *argv[]) {
   if(pid != 0)
   {
     clock_t time_1 = clock();
-    printf("[PARENT] CLOCK has been started and the return value is: %d\n", time_1/CLOCKS_PER_SEC);
-    printf("[PARENT] CLOCK has been started and in micro sec:        %d\n", time_1);
+    printf("[PARENT] CLOCK has been started and the return value is in sec: %d\n", time_1/CLOCKS_PER_SEC);
+    printf("[PARENT] CLOCK has been started and in micro sec:               %d\n", time_1);
 
     sleep(10);
     clock_t time_2 = clock();

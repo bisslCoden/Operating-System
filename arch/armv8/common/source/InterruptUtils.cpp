@@ -48,7 +48,6 @@ void timer_irq_handler()
   heart_beat_value = (heart_beat_value + 1) % 4;
 
   Scheduler::instance()->incTicks();
-  ((UserThread*)currentThread)->getParentProcess()->incDuaration(Scheduler::instance()->getRDTSC() - getLastStart());
   Scheduler::instance()->schedule();
 }
 
