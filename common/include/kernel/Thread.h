@@ -56,7 +56,7 @@ class Thread
 
     void* getKernelStackStartPointer();
 
-    bool isUserThread(){return Userthread;}
+    bool isUserThread(){return type_ == TYPE::USER_THREAD;}
 
     bool isStackCanaryOK();
 
@@ -146,8 +146,5 @@ class Thread
     FileSystemInfo* working_dir_;
 
     ustl::string name_;
-    bool Userthread = false;
-
-
 };
 

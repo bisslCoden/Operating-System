@@ -244,6 +244,7 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
     for(int i = 0; argv[argc][i]; i++)
       if(unlikely(i > EXECV_MAX_ARG_LEN))
         return -1;
+    debug(X_PROCESS_REG, "argv[%d] is %s\n", argc, argv[argc]);
     argc++;
   }
 

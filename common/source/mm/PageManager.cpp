@@ -469,7 +469,7 @@ bool PageManager::checkForCow(size_t address)
     *mut_change->getStackInfo()->UserMutex = mutexflag;
   }
   else
-    debug(X_USERTHREAD, "seems like page %lx is not a first stackpage..\n", pt_ident[m.pti].page_ppn);
+    debug(X_USERTHREAD, "seems like page %x is not a first stackpage..\n", pt_ident[m.pti].page_ppn);
     
   // debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
   
