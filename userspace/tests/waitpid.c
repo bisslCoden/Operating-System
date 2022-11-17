@@ -17,6 +17,12 @@ int main(int argc, char** argv)
     pid = fork();
 
     printf("pid : %d, and mine process id: %d\n", pid, getpid());
+    if (pid == -1)
+    {
+      printf("ERROR WITH FORK\n");
+      return 0;
+    }
+    
     if(pid != 0)
     {
       printf("pid before waitpid: %d\n", pid);

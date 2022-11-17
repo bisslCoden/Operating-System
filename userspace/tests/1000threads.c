@@ -2,7 +2,7 @@
 #include "stdio.h"
 #include "assert.h"
 
-#define NUM_THREADS 1500
+#define NUM_THREADS 15000
 #define ARR_SIZE 4500
 
 pthread_t tids[NUM_THREADS];

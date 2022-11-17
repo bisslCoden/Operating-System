@@ -41,8 +41,7 @@ bool ArchMemory::checkAndRemove(pointer map_ptr, uint64 index)
 bool ArchMemory::unmapPage(uint64 virtual_page)
 {
   PageManager* pm = PageManager::instance();
-  lockArchMemory();
-  pm->lockCowCnt();
+  //lockArchMemory();
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
@@ -50,16 +49,22 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   // free if counter not in map or after descresing counter = 0.
   size_t ppn = m.pt[m.pti].page_ppn;
+  
+  pm->lockCowCnt();
   if(pm->deleteRef(ppn, my_proc, false) == 0)
   {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     pt_ident[m.pti].present = 0;
     PageManager::instance()->freePPN(ppn);
+    pm->unlockCowCnt();
   }
   else
+  {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
+    pm->unlockCowCnt();
+  }
+  
   //pm->unlockCowCnt();
-  pm->unlockCowCnt();
 
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
   bool empty = checkAndRemove<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti);
@@ -81,7 +86,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
     debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pdpt_ppn = %zx)\n", virtual_page, m.pdpt_ppn);
     PageManager::instance()->freePPN(m.pdpt_ppn);
   }
-  unlockArchMemory();
+  //unlockArchMemory();
   return true;
 }
 

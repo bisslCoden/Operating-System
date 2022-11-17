@@ -100,13 +100,15 @@ void ProcessRegistry::processExit(UserProcess* user_proc)
     }
     else
       debug(X_USERPROCESS, "Process [%ld] now dying and posting for nobody :(\n", user_proc->getPID());
-
   }
   else
-    assert(false && "how did that process get removed already?");
+  {
+    list_of_processes_lock_.release();
+    return;
+  }
   list_of_processes_lock_.release();
-  
 
+    //assert(false && "how did that process get removed already?");
   counter_lock_.acquire();
 
   if (--progs_running_ == 0)
@@ -148,13 +150,17 @@ size_t ProcessRegistry::processFork()
   }
   
   //debug(PROCESS_REG, "After parent read %p\n", parent);
+  debug(X_USERTHREAD, "[%ld] is creating the proc\n", currentThread->getTID());
   UserProcess* process = 0;
   process = new UserProcess(parent, &return_to);
 
   if (return_to != 0)
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork[%ld]... assert!\n", return_to);
-    assert(false);
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork[%ld]... dont assert!\n", return_to);
+    debug(X_USERTHREAD, "[%ld] is deleting the proc\n", currentThread->getTID());
+    delete process;
+    return -1;
+    //assert(false);
   }
   
   debug(PROCESS_REG, "After new UserProcess\n");
