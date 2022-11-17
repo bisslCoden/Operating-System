@@ -192,20 +192,22 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-  if(was_scheduled_ == 1)
-  {
-    getParentProcess()->incDuaration(Scheduler::instance()->getDescheduleTime() - getLastStart());
-  }
+  //if(was_scheduled_ == 1)
+ // {
+  //  getParentProcess()->incDuaration(Scheduler::instance()->getDescheduleTime() - getLastStart());
+  //}
   if (getState() == Running)
   {
+    was_added = 0;
     //testsystem
     //checks if exit is called
-    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
+    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());ö-
     if (!myflags_.knotcancelable)
         if (myflags_.kasynchronous)
           if (myflags_.kcancelreq)
           {
             was_scheduled_ = 1;
+            was_added = 0;
             setLastStart(Scheduler::instance()->getRDTSC());
             return true;
           }
@@ -226,6 +228,7 @@ bool UserThread::schedulable(){
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
     if (mystack_.UserMutex == USERMUTEX_INVALID)
     {
+      was_added = 0;
       was_scheduled_ = 1;
       setLastStart(Scheduler::instance()->getRDTSC());
       return true;

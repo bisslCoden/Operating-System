@@ -213,6 +213,7 @@ class UserThread : public Thread
     //clock
     size_t last_start_;
     bool was_scheduled_ = 0;
+    bool was_added = 0;
     //sleep
     size_t time_to_wake_ = 0;
 };

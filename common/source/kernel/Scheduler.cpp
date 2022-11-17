@@ -49,6 +49,19 @@ uint32 Scheduler::schedule()
   }
   //debug(SCHEDULER, "schedule called!\n");
   deschedule_time = getRDTSC();
+  auto uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      if(((UserThread*)(*uit))->was_scheduled_ == 1)
+      {
+        //((UserThread*)(*uit))->was_added = 1;
+        ((UserThread*)(*uit))->getParentProcess()->incDuaration(Scheduler::instance()->getDescheduleTime() - ((UserThread*)(*uit))->getLastStart());
+        break;
+      }
+    }
+  }
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
