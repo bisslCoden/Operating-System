@@ -175,7 +175,7 @@ extern "C" void arch_contextSwitch()
   }
   if (currentThread->switch_to_userspace_)
   {
-    debug(X_USERTHREAD,"[%ld]\n", currentThread->getTID());
+   // debug(X_USERTHREAD,"[%ld]\n", currentThread->getTID());
     assert(currentThread->holding_lock_list_ == 0 && "Never switch to userspace when holding a lock! Never!");
     assert(currentThread->lock_waiting_on_ == 0 && "How did you even manage to execute code while waiting for a lock?");
   }

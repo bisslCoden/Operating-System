@@ -94,11 +94,11 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    (void*) mystack_.userstack_start_, getKernelStackStartPointer());
 
- // debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n",
- //   getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
+  debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n",
+    getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
- // debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
+  debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
   // set terminal
   if (main_console->getTerminal(terminal_number))
@@ -222,32 +222,24 @@ bool UserThread::schedulable(){
     size_t sleepy = *mystack_.UserMutex;
     if(sleepy == SLEEPING_KS)
     {
-      debug(X_USERTHREAD, "%ld sleeping on usermutex...\n", tid_);
       //get the right flag back
      // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
      // my_pages_lock_.release();
+     debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
-      debug(X_USERTHREAD, "%ld awake in userspace...\n", tid_);
-      return true;
      // my_pages_lock_.release();
+     debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
+      return true;
     }
     else
     {
       // my_pages_lock_.release();
-      debug(X_USERTHREAD, "thread: [%ld]\n", tid_);
+      debug(X_USERTHREAD, "thread: [%ld] sleepy : %ld\n", tid_, sleepy);
       assert(false && "Sleep flag was neither sleeping nor awake?\n");
     }
-    // else if(sleepy == ONE_MORE_TIME_KS)
-    // {
-    //   //lets just hope the cow page was copied before
-    //   debug(X_USERTHREAD, "%ld will be scheduled once more to release the lock!\n", tid_);
-    //   *mystack_.UserMutex = SLEEPING_KS;
-    //   return true;
-    // }
-  
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
   return false;
@@ -329,7 +321,7 @@ void UserThread::freeMyPagesAndDie(bool actually_die){
 
 bool UserThread::setupStack()
 {
- // debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
+  debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
 
   // virtual address
   size_t stack_page_offset = mystack_.page_offset_ * PAGE_SIZE  * (STACK_SIZE_IN_PAGES + 2); 
@@ -350,7 +342,7 @@ bool UserThread::setupStack()
     PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
- // debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
+  debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
 
   my_pages_lock_.acquire();
   my_pages_.push_back(vpn_for_stack);
@@ -368,10 +360,10 @@ bool UserThread::setupStack()
   mystack_.userstack_end_ = stackend;
   mystack_.guardpage_back_nr_ = endguard;
   
-  // debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %lx) and ends at %lx (VPN %lx) flag is at %lx"
-  //   "and guardpages are at %lx and %lx\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
-  //   mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
-  //   mystack_.guardpage_back_nr_);
+  debug(USERTHREAD, "[%ld]: my stack starts at: %lx (VPN %lx) and ends at %lx (VPN %lx) flag is at %lx"
+    "and guardpages are at %lx and %lx\n",tid_, mystack_.userstack_start_, (mystack_.userstack_start_ / PAGE_SIZE),
+    mystack_.userstack_end_, (mystack_.userstack_end_ / PAGE_SIZE),stack_start_ptr, mystack_.guardpage_front_nr_, 
+    mystack_.guardpage_back_nr_);
 
 
   return true;
@@ -393,7 +385,7 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo)
   process_->offsets_.push_back(mystack_.page_offset_);
   process_->offsetlist_lock_.release();
 
-  mystack_.UserMutex = USERMUTEX_INVALID;
+ // mystack_.UserMutex = USERMUTEX_INVALID;
   mystack_.guardpage_back_nr_ = old_stackinfo->guardpage_back_nr_;
   mystack_.guardpage_front_nr_ = old_stackinfo->guardpage_front_nr_;
   mystack_.page_offset_ = old_stackinfo->page_offset_;
@@ -432,7 +424,7 @@ int UserThread::execv(char* const argv[], size_t argc)
   }
   debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
   
-  freeMyPagesAndDie(false);
+  //freeMyPagesAndDie(false);
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
@@ -477,6 +469,7 @@ int UserThread::execv(char* const argv[], size_t argc)
 
   // setup stack and set registers
   //mystack_.page_offset_ = process_->getRandomPageOffset();
+  mystack_.UserMutex = USERMUTEX_INVALID;
   assert(reuseStack(&mystack_));
 
   user_registers_->rsp = (size_t) mystack_.userstack_start_;
@@ -491,14 +484,15 @@ int UserThread::execv()
 {
   // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
   name_ = process_->getName();
-  freeMyPagesAndDie(false);
-  assert(reuseStack(&mystack_));
+  mystack_.UserMutex = USERMUTEX_INVALID;
+  //freeMyPagesAndDie(false);
 
   loader_ = process_->getLoader();
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
                                    (void*) mystack_.userstack_start_,
                                    getKernelStackStartPointer());
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
+  assert(reuseStack(&mystack_));
   debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
 
   // passing new virtual memory to userspace

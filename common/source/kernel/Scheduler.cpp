@@ -157,6 +157,7 @@ void Scheduler::cleanupDeadThreads()
     if (tmp->getState() == ToBeDestroyed)
     {
       destroy_list[thread_count++] = tmp;
+      debug(X_USERTHREAD, "erasing [%ld]!\n", tmp->getTID());
       threads_.erase(threads_.begin() + i); // Note: erase will not realloc!
       --i;
     }

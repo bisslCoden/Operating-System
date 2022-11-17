@@ -509,7 +509,7 @@ int pthread_mutex_lock(pthread_mutex_t *mutex)
     assert(pthread_spin_lock(&mutexlist_lock) == 0);
     if(detectCircularDeadlock(my_identifier, mutex) != 0)
     {
-      assert(pthread_spin_lock(&mutexlist_lock) == 0);
+      assert(pthread_spin_unlock(&mutexlist_lock) == 0);
       assert(pthread_spin_unlock(&mutex->sleeperslist_lock_) == 0);
       return -1;
     }
