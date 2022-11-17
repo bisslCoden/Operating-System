@@ -80,7 +80,7 @@ uint32 Scheduler::schedule()
   if (currentThread->switch_to_userspace_)
   {
      UserThread* current = (UserThread*) currentThread;
-
+    debug(X_USERTHREAD, "%ld sched \n", currentThread->getTID());
     //do atomic checks
     if (!current->myflags_.knotcancelable)
       if (current->myflags_.kasynchronous)
