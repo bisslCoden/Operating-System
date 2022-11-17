@@ -86,7 +86,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 2;
     return;
   }
-  
 
   if (!setupLoader(fd_))
   {
