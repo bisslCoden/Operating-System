@@ -3,7 +3,7 @@
 #include "assert.h"
 #include "sched.h"
 
-#define NUM_THREADS 250
+#define NUM_THREADS 20
 
 sem_t semy;
 pthread_t tids[NUM_THREADS]; 

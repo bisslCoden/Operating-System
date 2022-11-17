@@ -3,12 +3,11 @@
 #include "assert.h"
 #include "sched.h"
 
-#define NUM_THREADS 100
+#define NUM_THREADS 15
 
 pthread_mutex_t mutex;
 pthread_t tids[NUM_THREADS];
 
-int counter = 0;
 int never_false = 1;
 
 
@@ -45,12 +44,13 @@ int main()
   pthread_mutex_init(&mutex, NULL);
   for (size_t i = 0; i < NUM_THREADS; i++)
   {
-    ret = pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL);
+    assert(pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL) == 0 && "couldnt create thread!");
   }
-  for (size_t i = 0; i < NUM_THREADS; i++)
+  sched_yield();
+   for (size_t i = 0; i < NUM_THREADS; i++)
   {
     ret = pthread_join(tids[i], (void**) &rets);
   }
-  printf("%d %d joined all threads successfully and the counter is: %d and lower than 200000000?\n",ret, rets, counter);
+  printf("%d %d joined all threads successfully and exiting as i should?\n",ret, rets);
   return 0;
 }

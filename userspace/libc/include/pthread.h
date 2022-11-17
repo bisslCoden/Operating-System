@@ -15,7 +15,8 @@ typedef size_t pthread_t;
 
 #define SLEEPING_US 0x46334234
 #define AWAKE_US 0x54321432
-#define NO_LOCK_US 0x92246879
+#define NO_LOCK_US 0x12246079
+//#define ONE_MORE_TIME_US 0x87345123
 
 
 enum cancelstate {

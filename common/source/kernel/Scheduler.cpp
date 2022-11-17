@@ -94,7 +94,7 @@ uint32 Scheduler::schedule()
   if (currentThread->switch_to_userspace_)
   {
      UserThread* current = (UserThread*) currentThread;
-
+    debug(X_USERTHREAD, "%ld sched \n", currentThread->getTID());
     //do atomic checks
     if (!current->myflags_.knotcancelable)
       if (current->myflags_.kasynchronous)
@@ -171,6 +171,7 @@ void Scheduler::cleanupDeadThreads()
     if (tmp->getState() == ToBeDestroyed)
     {
       destroy_list[thread_count++] = tmp;
+      debug(X_USERTHREAD, "erasing [%ld]!\n", tmp->getTID());
       threads_.erase(threads_.begin() + i); // Note: erase will not realloc!
       --i;
     }
