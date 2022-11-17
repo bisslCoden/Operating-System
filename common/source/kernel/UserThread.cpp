@@ -192,7 +192,10 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
-
+  if(was_scheduled_ == 1)
+  {
+    getParentProcess()->incDuaration(Scheduler::instance()->getDescheduleTime() - getLastStart());
+  }
   if (getState() == Running)
   {
     //testsystem
@@ -201,21 +204,30 @@ bool UserThread::schedulable(){
     if (!myflags_.knotcancelable)
         if (myflags_.kasynchronous)
           if (myflags_.kcancelreq)
+          {
+            was_scheduled_ = 1;
+            setLastStart(Scheduler::instance()->getRDTSC());
             return true;
+          }
 
     if(DYING_)
     {
+      was_scheduled_ = 1;
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
      // my_pages_lock_.release();
+      was_scheduled_ = 0;
       return false;
     }
 
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
     if (mystack_.UserMutex == USERMUTEX_INVALID)
     {
+      was_scheduled_ = 1;
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     
@@ -225,11 +237,14 @@ bool UserThread::schedulable(){
       //get the right flag back
      // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
      // my_pages_lock_.release();
+      was_scheduled_ = 0;
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
      // my_pages_lock_.release();
+      was_scheduled_ = 1;
+      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else
@@ -240,6 +255,7 @@ bool UserThread::schedulable(){
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
+  was_scheduled_ = 0;
   return false;
 }
 

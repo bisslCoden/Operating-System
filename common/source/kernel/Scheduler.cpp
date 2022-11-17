@@ -48,6 +48,7 @@ uint32 Scheduler::schedule()
     return 0;
   }
   //debug(SCHEDULER, "schedule called!\n");
+  deschedule_time = getRDTSC();
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
