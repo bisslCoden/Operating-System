@@ -38,13 +38,13 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   {
     debug(PAGEFAULT, "You are accessing a kernel address in user-mode.\n");
   }
-  else if(present && !writing)
+  else if(present && writing)
   {
-    debug(PAGEFAULT, "You got a pagefault even though the address is mapped.\n");
+    debug(PAGEFAULT, "You got a pagefault even though the address is mapped. and writable\n");
   }
   else
   {
-    // everything seems to be okay
+    debug(PAGEFAULT, "everything seems to be okay....\n");
     return true;
   }
   debug(PAGEFAULT, "OH NO... pagefault invalid?!?!?\n");
