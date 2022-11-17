@@ -7,8 +7,9 @@
 int main(int argc, const char *argv[])
 {
 	printf("before exec\n");
-  char* const path = "/usr/execforever.sweb";
-	char* const arg1 = "Eijfdlsajflödjslafködjklsajöfljkdlösjaölfjkdsjaläöfjeirowqgjorj3qogöjöorjoerEijfdlsajflödjslafködjklsajöfljkdlösjaölfjkdsjaläöfjeirowqgjorj3qogöjöorjoerEijfdlsajflödjslafködjklsajöfljkdlösjaölfjkdsjaläöfjeirowqgjorj3qogöjöorjoer";
+  char* const path = "/usr/print.sweb";
+  // exactly 102 characters. one too much
+	char* const arg1 = "123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012"; 
 	char* const arg2 = "Mehl";
 	char* const arg3 = "Butter";
 	char* const arg4 = "Salz";
