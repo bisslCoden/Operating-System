@@ -26,7 +26,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
     waitpid_sem_("Userprocess::waitpid_sem_"),
-    clock_lock_("UserProcess::clock_lock_")
+    clock_lock_("UserProcess::clock_lock_"),
+    mutex_local_fd_("mutex_local_fd_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -71,7 +72,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
   waitpid_sem_("Userprocess::waitpid_sem_"),
-  clock_lock_("UserProcess::clock_lock_")
+  clock_lock_("UserProcess::clock_lock_"),
+  mutex_local_fd_("mutex_local_fd_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -86,7 +88,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 2;
     return;
   }
-  
 
   if (!setupLoader(fd_))
   {
@@ -139,7 +140,8 @@ UserProcess::~UserProcess()
   }
   
   loader_ = 0;
-    
+
+
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -525,6 +527,7 @@ bool UserProcess::setupLoader(ssize_t fd)
     debug(LOADER, "setuploader failed because fd is unreasonable(%ld)\n", fd);
     return false;
   }
+
   Loader* new_loader = new Loader(fd_);
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
   {
@@ -610,3 +613,59 @@ size_t UserProcess::getClockSum()
   threads_lock_.release();
   return sum;
 }
+/*
+FileDescriptor* UserProcess::getFileDescriptor(uint32 fd)
+{
+  mutex_local_fd_.acquire();
+
+  for (auto it : local_fd_)
+  {
+    if (it->getFd() == fd)
+    {
+      debug(USERPROCESS, "found the fd\n");
+      mutex_local_fd_.release();
+      return it;
+    }
+  }
+  mutex_local_fd_.release();
+  return 0;
+}
+
+void UserProcess::addFd(uint32 fd)
+{
+  mutex_local_fd_.acquire();
+  debug(USERPROCESS, "AddFd\n");
+
+  auto f = VfsSyscall::getFileDescriptor(fd);
+  local_fd_.add(f);
+  mutex_local_fd_.release();
+}
+
+
+void UserProcess::removeFd(uint32 fd)
+{
+  mutex_local_fd_.acquire();
+  debug(USERPROCESS, "RemoveFD\n");
+
+  auto f = FileDescriptorList::getFileDescriptor(fd);
+
+  debug(USERPROCESS, "found the fd\n");
+
+  local_fd_.remove(it);
+  mutex_local_fd_.release();
+}
+
+// ok
+int UserProcess::closeFd(size_t fd)
+{
+  auto f = getFileDescriptor(fd);
+  // not found
+  if (f == 0)
+  {
+    return -1;
+  }
+  int r = VfsSyscall::closeFd(f);
+  removeFd(0);
+  return r;
+}
+*/
