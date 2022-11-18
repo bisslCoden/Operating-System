@@ -192,7 +192,7 @@ size_t Syscall::write(size_t fd, pointer buffer, size_t size) {
     kprintf("%.*s", (int) size, (char *) buffer);
     num_written = size;
   } else {
-    num_written = VfsSyscall::write(currentUserThread->getProcess()->getFileDescriptor(fd), (char *) buffer, size);
+    num_written = VfsSyscall::write(fd, (char *) buffer, size);
   }
   return num_written;
 }
@@ -209,14 +209,13 @@ size_t Syscall::read(size_t fd, pointer buffer, size_t count) {
     num_read = currentThread->getTerminal()->readLine((char *) buffer, count);
     debug(SYSCALL, "Syscall::read: %.*s\n", (int) num_read, (char *) buffer);
   } else {
-    num_read = VfsSyscall::read(currentUserThread->getProcess()->getFileDescriptor(fd), (char *) buffer, count);
+    num_read = VfsSyscall::read(fd, (char *) buffer, count);
   }
   return num_read;
 }
 
 size_t Syscall::close(size_t fd) {
-  debug(SYSCALL, "Syscall::Close\n");
-  return currentUserThread->getProcess()->closeFd(fd);
+  return VfsSyscall::close(fd);
 }
 
 size_t Syscall::open(size_t path, size_t flags) {
@@ -224,9 +223,7 @@ size_t Syscall::open(size_t path, size_t flags) {
   if (path >= USER_BREAK) {
     return -1U;
   }
-  size_t fd = VfsSyscall::open((char *) path, flags);
-  currentUserThread->getProcess()->addFd(fd);
-  return fd;
+  return VfsSyscall::open((char *) path, flags);
 }
 
 void Syscall::outline(size_t port, pointer text) {

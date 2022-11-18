@@ -204,7 +204,7 @@ class UserProcess
 
     FileDescriptor* getFileDescriptor(uint32 fd);
 
-    FileDescriptorList getFDList() { return local_fd_; };
+    //FileDescriptorList getFDList() { return local_fd_; };
     void addFd(uint32 fd);
 
     void removeFd(uint32 fd);
