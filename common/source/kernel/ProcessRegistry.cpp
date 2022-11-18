@@ -220,7 +220,19 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
   int argc = areExecArgsValid(path, argv);
   if(argc > 0)
-    return currentUserThread->getProcess()->execv(path, argv, argc);
+  {
+    // copy args locally because user's pointers may have wonky behaviour
+    char* here[argc];
+    for (int i = 0; i < argc; i++)
+    {
+      here[i] = new char[strlen(argv[i]) + 1];
+      memcpy(here[i], argv[i], strlen(argv[i]));
+      here[i][strlen(argv[i])] = '\0';
+      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to here[%d] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(here + i));
+    }
+    debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
+    return currentUserThread->getProcess()->execv(path, here, argc);
+  }
 
   return argc;
 }

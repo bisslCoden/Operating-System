@@ -576,6 +576,7 @@ int Syscall::execv(const char * user_path, char *const user_argv[])
 {
   char*  path = (char*)user_path;
   char** argv = (char**)user_argv;
+
   debug(SYSCALL, "execv() checking path.\n");
   if(!isExecPathValid(path))
     return -1;
