@@ -22,8 +22,8 @@ int simple_routine()
   printf("hi i ll try to get the mutex!\n");
   mutret = pthread_mutex_lock(&mutex);
   printf("lock returned %d.\n", mutret);
-  pid_t pid = fork();
-  printf("%s, [%d]\n", (pid == 0)? "i am child" : "i am parent", getpid());
+ // pid_t pid = fork();
+ // printf("%s, [%d]\n", (pid == 0)? "i am child" : "i am parent", getpid());
   assert(never_false == 1  && "never false aint 1? whaat? - PARENT\n");
   never_false = 0;
   sched_yield();
@@ -45,9 +45,9 @@ int simple_routine()
 
 int main()
 {
-  //pid_t pid = fork();
   printf("[main] Hello!\n");
   pthread_mutex_init(&mutex, NULL);
+  pid_t pid = fork();
   for (size_t i = 0; i < NUM_THREADS; i++)
   {
     assert(pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL) == 0);
