@@ -154,7 +154,7 @@ int detectCircularDeadlock(size_t waiter_identifier, pthread_mutex_t* lock_wante
       if (current_mutex->held_by_ == waiter_identifier)
       {
       //  pthread_spin_unlock(&mutexlist_lock);
-        printf("Circular deadlock found! Returning only -1 for now...\n");
+        assert(0 && "Circular deadlock found! Now we assert... goodbye dummy!\n");
         return -1;
       }
       else
