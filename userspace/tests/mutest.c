@@ -6,7 +6,7 @@
 #define NUM_THREADS 200
 
 pthread_mutex_t mutex;
-pthread_t tids[NUM_THREADS];
+pthread_t tids[NUM_THREADS]; 
 
 int never_false = 1;
 
@@ -22,7 +22,7 @@ int simple_routine()
   never_false = 0;
   sched_yield();
   never_false = 1;
-
+ 
   // for (size_t i = 0; i < 4000000; i++)
   // {
   //   int res = (i + i+1) % 365;

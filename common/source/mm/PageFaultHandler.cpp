@@ -24,6 +24,7 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   assert((user == switch_to_us) && "Thread is in user mode even though is should not be.");
   assert(!(address < USER_BREAK && currentThread->loader_ == 0) && "Thread accesses the user space, but has no loader.");
   assert(!(user && currentThread->user_registers_ == 0) && "Thread is in user mode, but has no valid registers.");
+ // assert(address && "addres of pagefault was 0");
 
   if(address < null_reference_check_border_)
   {

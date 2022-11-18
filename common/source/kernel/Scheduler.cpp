@@ -47,29 +47,16 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-  //copied from Daniel, lol, no plagiate
-  deschedule_time = getRDTSC();
-  if(ticks_> 1)
-  {
-    if(currentThread->isUserThread())
-    {
-    if(((UserThread*)(currentThread))->was_scheduled_ == 1)
-    {
-      ((UserThread*)(currentThread))->getParentProcess()->incDuaration(deschedule_time - ((UserThread*)(currentThread))->getLastStart());
-      ((UserThread*)(currentThread))->was_scheduled_  = 0;
-    }
-    }
-  }
+  //debug(SCHEDULER, "schedule called!\n");
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
     if((*it)->schedulable())
     {
-      currentThread = *it; 
+      currentThread = *it;
       break;
     }
   }
-
 
   assert(it != threads_.end() && "No schedulable thread found");
 
@@ -251,13 +238,23 @@ void Scheduler::incTicks()
   rdtsc_value = getRDTSC();
   rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
   rdtsc_diff_sum += rdtsc_diff_per_tick;
-  if(ticks_ % 15 != 0 && ticks_ <= 15)
-    diff_avg = rdtsc_diff_sum / (ticks_ % 15);
+  /*if(ticks_ <= 15)
+  {
+    diff_avg = rdtsc_diff_sum / ticks_;
+  }
+  else
+  {
+    diff_avg = rdtsc_diff_sum / (ticks_ - 15);
+  }*/
+  if(ticks_ % 10 != 0)
+    diff_avg = rdtsc_diff_sum / (ticks_ % 10);
   else
   {
     diff_avg = rdtsc_diff_per_tick;
     rdtsc_diff_sum = 0;
   }
+  //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);
+  //debug(SLEEP,"diff is     %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
 }
 
 

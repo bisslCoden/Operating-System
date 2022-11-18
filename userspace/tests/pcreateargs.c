@@ -1,7 +1,7 @@
 #include "pthread.h"
 #include "stdio.h"
 
-#define PTHREAD_CALLS 100000
+#define PTHREAD_CALLS 15000
   pthread_t tid[PTHREAD_CALLS];
   size_t values[PTHREAD_CALLS];
 
@@ -24,7 +24,7 @@ int main()
   for(size_t i = 0; i < PTHREAD_CALLS; i++)
   {
     printf("directly before pthread call i = %ld\n", i);
-    assert(pthread_create(tid + i, 0,  &subroutine, (values + i)) == 0);
+    tid[i] = pthread_create(tid + i, 0,  &subroutine, (values + i));
   }
 
   return 69;

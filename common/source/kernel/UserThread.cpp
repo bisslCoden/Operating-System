@@ -23,6 +23,7 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
+  Userthread = true;
   mystack_.page_offset_ = page_offset;
   setupStack();
 
@@ -85,6 +86,8 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
 
   
   // process_->threads_lock_.release();
+
+  Userthread = true;
 
   // set up user registers and adressspace
 
@@ -153,6 +156,7 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
+  Userthread = true;
   last_start_ = Scheduler::instance()->getRDTSC();
 
 
@@ -188,39 +192,30 @@ void UserThread::reDirectToDeath(){
 }
 
 bool UserThread::schedulable(){
+
   if (getState() == Running)
   {
     //testsystem
     //checks if exit is called
-    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());ö-
+    //debug(X_THREADSTACK, "schedulable called for thread %ld by thread %ld!\n", getTID(), currentThread->getTID());
     if (!myflags_.knotcancelable)
         if (myflags_.kasynchronous)
           if (myflags_.kcancelreq)
-          {
-            was_scheduled_ = 1;
-            setLastStart(Scheduler::instance()->getRDTSC());
             return true;
-          }
 
     if(DYING_)
     {
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
      // my_pages_lock_.release();
-      was_scheduled_ = 0;
       return false;
     }
 
     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
     if (mystack_.UserMutex == USERMUTEX_INVALID)
     {
-      
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
       return true;
     }
     
@@ -230,15 +225,12 @@ bool UserThread::schedulable(){
       //get the right flag back
      // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
      // my_pages_lock_.release();
-      was_scheduled_ = 0;
      debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
       return false;
     }
     else if (sleepy == AWAKE_KS)
     {
      // my_pages_lock_.release();
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
      debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
       return true;
     }
@@ -250,7 +242,6 @@ bool UserThread::schedulable(){
     }
 //    debug(X_THREADSTACK, "schedulable finished!\n");
   }
-  was_scheduled_ = 0;
   return false;
 }
 
@@ -381,7 +372,7 @@ bool UserThread::setupStack()
 bool UserThread::reuseStack(StackInfo* old_stackinfo)
 {
   size_t ppn = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %lx)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
+  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
   if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
     return false;
   
@@ -422,8 +413,18 @@ int UserThread::execv(char* const argv[], size_t argc)
   name_ = process_->getName();
   debug(X_USERTHREAD, "execv(): %s. argc = %ld\n", name_.c_str(), argc);
 
-
+  //MEMLEAK
+  char* here[argc];
+  for (size_t i = 0; i < argc; i++)
+  {
+    here[i] = new char[strlen(argv[i]) + 1];
+    memcpy(here[i], argv[i], strlen(argv[i]));
+    here[i][strlen(argv[i])] = '\0';
+    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to here[%ld] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(here + i));
+  }
+  debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
   
+  //freeMyPagesAndDie(false);
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
@@ -436,29 +437,26 @@ int UserThread::execv(char* const argv[], size_t argc)
 
   size_t new_argv = USER_BREAK - PAGE_SIZE;
   char** argv_arr = (char**) new_argv;
-  // + sizeof(size_t) for null termination
-  size_t str_offset = argc * sizeof(char*) + sizeof(size_t);
-
-  // copy from argv[] into fresh archmem
+  size_t str_offset = argc * sizeof(char*);
+  // copy from here[] into fresh archmem
   for(size_t i = 0; i < argc; i++)
   {
-    size_t str_len = strlen(argv[i]) + 1;
+    size_t str_len = strlen(here[i]) + 1;
     if(str_offset + str_len >= PAGE_SIZE)
       return -1;
     
-    memcpy((void*)(new_argv + str_offset), (void*) argv[i], str_len);
-    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from argv[%lx] to (argv_arr + str_offset) = %lx\n", argv[i], (size_t)(argv + i), (size_t)(new_argv + str_offset));
+    memcpy((void*)(new_argv + str_offset), (void*) here[i], str_len);
+    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from here[%ld] to (argv_arr + str_offset) = %lx\n", here[i], (size_t)(here + i), (size_t)(new_argv + str_offset));
     
     argv_arr[i] = (char*)(new_argv + str_offset);
     debug(X_USERTHREAD, "execv(): memcpy() memcpy(argv_arr[%lx] = (%lx)\n", (size_t)argv_arr[i], new_argv + str_offset);
 
     str_offset += str_len;
   }
-  argv_arr[argc] = NULL;
 
   for (size_t i = 0; i < argc; i++)
   {
-    delete[] argv[i];
+    delete[] here[i];
   }
   
   debug(X_USERTHREAD, "execv(): after for-loop.\n");
@@ -467,9 +465,10 @@ int UserThread::execv(char* const argv[], size_t argc)
   {
     debug(X_USERTHREAD, "execv(): argv_arr[%ld]: %s\n", i, argv_arr[i]);
   }
-  debug(X_USERTHREAD, "execv(): copied from argv[] to new location\n");
+  debug(X_USERTHREAD, "execv(): copied from here[] to new location\n");
 
   // setup stack and set registers
+  //mystack_.page_offset_ = process_->getRandomPageOffset();
   mystack_.UserMutex = USERMUTEX_INVALID;
   assert(reuseStack(&mystack_));
 

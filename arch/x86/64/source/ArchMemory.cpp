@@ -362,7 +362,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
     lockArchMemory();
   if(!destination.checkArchMemory(currentThread))
     destination.lockArchMemory();
-
+  
   PageMapLevel4Entry *pml4_src  = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
   memcpy((void*) pml4_dest, (void*) pml4_src, PAGE_SIZE);

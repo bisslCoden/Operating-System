@@ -460,9 +460,3 @@ uint32 VfsSyscall::getFileSize(uint32 fd)
 
   return file_descriptor->getFile()->getSize();
 }
-
-
-
-
-
-

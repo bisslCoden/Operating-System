@@ -8,7 +8,6 @@
 #include "uvector.h"
 #include "KernelSemaphore.h"
 #include "Loader.h"
-#include "FileDescriptor.h"
 
 
 
@@ -195,6 +194,9 @@ class UserProcess
     
     void setChildStatus(bool arg);
 
+
+
+
     size_t getDuaration(){ return duaration_; }
     
     void setDuaration(size_t duaration);
@@ -203,16 +205,7 @@ class UserProcess
 
     size_t getClockSum();
 
-    FileDescriptor* getFileDescriptor(uint32 fd);
 
-    //FileDescriptorList getFDList() { return local_fd_; };
-    void addFd(uint32 fd);
-
-    void removeFd(uint32 fd);
-
-    int closeFd(size_t fd);
-
-    int close(FileDescriptor* f);
 
   //set these to protected to children can access aswell
   volatile ProcessState state_;
@@ -270,8 +263,5 @@ class UserProcess
     KernelSemaphore waitpid_sem_;
     Mutex clock_lock_;
     UserProcess* waiter_ = 0;
-
-    FileDescriptorList local_fd_;
-    Mutex mutex_local_fd_;
 };
 
