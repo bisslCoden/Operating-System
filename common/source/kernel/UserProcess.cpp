@@ -25,8 +25,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     offsetlist_lock_("UserProcess::offsets"),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    waitpid_sem_("Userprocess::waitpid_sem_"),
-    clock_lock_("UserProcess::clock_lock_")
+    waitpid_sem_("Userprocess::waitpid_sem_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -70,8 +69,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   offsetlist_lock_("UserProcess::offsets"),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  waitpid_sem_("Userprocess::waitpid_sem_"),
-  clock_lock_("UserProcess::clock_lock_")
+  waitpid_sem_("Userprocess::waitpid_sem_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -86,7 +84,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 2;
     return;
   }
-  
+
 
   if (!setupLoader(fd_))
   {
@@ -139,7 +137,7 @@ UserProcess::~UserProcess()
   }
   
   loader_ = 0;
-    
+
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
