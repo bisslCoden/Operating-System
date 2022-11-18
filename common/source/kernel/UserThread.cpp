@@ -198,7 +198,6 @@ bool UserThread::schedulable(){
           if (myflags_.kcancelreq)
           {
             was_scheduled_ = 1;
-            was_added = 1;
             setLastStart(Scheduler::instance()->getRDTSC());
             return true;
           }
