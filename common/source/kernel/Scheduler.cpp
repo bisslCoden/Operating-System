@@ -264,7 +264,7 @@ void Scheduler::incTicks()
   else
   {
     diff_avg = rdtsc_diff_per_tick;
-    rdtsc_diff_sum = rdtsc_diff_per_tick;
+    rdtsc_diff_sum = 0;
   }
 }
 
