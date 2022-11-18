@@ -261,7 +261,6 @@ class UserProcess
     Mutex waiting_exec_lock_;
     
     KernelSemaphore waitpid_sem_;
-    Mutex clock_lock_;
     UserProcess* waiter_ = 0;
 };
 
