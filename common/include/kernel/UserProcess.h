@@ -25,6 +25,7 @@ class UserThread;
 class Syscall;
 class ArchMemory;
 class Loader;
+class KernelSemaphore;
 class UserProcess
 {
   public:

@@ -35,6 +35,7 @@ int main()
   int ret;  
   int rets;
   printf("Hello!\n");
+  kernelsem_post();
   for (size_t i = 0; i < NUM_THREADS; i++)
   {
     assert((ret = pthread_create(&tids[i], NULL, (void* (*)(void*)) &simple_routine, NULL)) == 0 && 
