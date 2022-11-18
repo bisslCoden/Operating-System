@@ -36,11 +36,11 @@ static void kernelsem_post();
    * (2) if (argv != NULL) execvProces(path, argv);
    * else execvProcess(path);
    * 
-   * @param path the path to the binary. must end with '\0'
-   * @param argv the array of c-strings.
+   * @param user_path the path to the binary. must end with '\0'
+   * @param user_argv the array of c-strings.
    * @return on success this should not return. on fail -1
    */
-  static int execv(const char * path, char *const argv[]);
+  static int execv(const char * user_path, char *const user_argv[]);
   // checks path for exec.
   static bool isExecPathValid(const char* path);
 
