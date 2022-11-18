@@ -6,7 +6,7 @@
 #include "Scheduler.h"
 #include "kprintf.h"
 
-#define EXECV_MAX_PATH_LEN 1234
+#define EXECV_MAX_PATH_LEN 100
 
 
 class Syscall
@@ -40,7 +40,7 @@ static void kernelsem_post();
    * @param argv the array of c-strings.
    * @return on success this should not return. on fail -1
    */
-  static int execv(const char * path, char *const argv[]);
+  static int execv(const char * user_path, char *const user_argv[]);
   // checks path for exec.
   static bool isExecPathValid(const char* path);
 

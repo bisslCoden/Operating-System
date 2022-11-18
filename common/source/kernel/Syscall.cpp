@@ -572,8 +572,10 @@ int Syscall::fork()
   return ret;
 }
 
-int Syscall::execv(const char * path, char *const argv[])
+int Syscall::execv(const char * user_path, char *const user_argv[])
 {
+  char*  path = (char*)user_path;
+  char** argv = (char**)user_argv;
   debug(SYSCALL, "execv() checking path.\n");
   if(!isExecPathValid(path))
     return -1;
@@ -669,15 +671,27 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
-  //size_t avg_per_sec = (182 * Scheduler::instance()->getDiffAvg());
-  size_t duaration = currentUserThread->getParentProcess()->getClockSum();
-  debug(CLOCK, "clock sum %ld\n", duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10));
+  //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserThread->getParentProcess()->getClockSum())/54925;
+  size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
+  //size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+
+  //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
   size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
-  debug(CLOCK, "duaration_2 %ld\n", duaration_2/(Scheduler::instance()->getDiffAvg() * 182 / 10));
-  duaration += duaration_2;
-  duaration = duaration/(Scheduler::instance()->getDiffAvg() * 182 / 10);
-  //duaration = duaration * 54;
-  duaration = duaration;
-  debug(CLOCK, "result    %ld\n", (duaration));
-  return duaration * CLOCKS_PER_SEC;
+
+  debug(CLOCK, "duaration before divide %ld\n", duaration_2);
+  debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
+  debug(CLOCK, "duaration_2 in micro seconds: %ld\n", duaration_2/cyc_per_microsec);
+
+  duaration_2 = (duaration_2/cyc_per_microsec);
+
+  debug(CLOCK, "result    %ld\n", (duaration_2));
+
+  size_t time_to_add = Scheduler::instance()->getRDTSC()/cyc_per_microsec - currentUserThread->getLastStart()/cyc_per_microsec;
+  debug(CLOCK, "time needed for clock: %ld\n", (time_to_add));
+
+  return duaration_2 + time_to_add;
+  //return duaration;
+  //sum, time from this function thread
+
+  //
 }

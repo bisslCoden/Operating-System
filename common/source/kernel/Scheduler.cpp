@@ -47,7 +47,28 @@ uint32 Scheduler::schedule()
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
   }
-  //debug(SCHEDULER, "schedule called!\n");
+  //copied from Daniel, lol, no plagiate
+  auto uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      if(((UserThread*)(*uit))->was_scheduled_ == 1)
+      {
+        ((UserThread*)(*uit))->getParentProcess()->incDuaration(getRDTSC() - ((UserThread*)(*uit))->getLastStart());
+        break;
+      }
+    }
+  }
+  uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      ((UserThread*)(*uit))->was_scheduled_ = 0;
+    }
+  }
+
   auto it = threads_.begin();
   for(; it != threads_.end(); ++it)
   {
