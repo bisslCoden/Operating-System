@@ -355,7 +355,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   {
     debug(USERPROCESS, "Ups, something went wrong creating the Userthread for proc [%ld] [%ld]... assert!\n", pid_, return_to);
     threads_lock_.release();
-    delete thread;
+    thread->kill();
     return 0;
   }
     threads_lock_.release();
