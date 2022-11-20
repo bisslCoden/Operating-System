@@ -117,6 +117,9 @@ class UserThread : public Thread
     // no-args here
     int execv();
 
+    void signalExec()                 { exec_wait_.signal();}
+    void waitExec()                   { exec_wait_.wait();}
+
     //lock retval before!
     bool detectCircularJoin(UserThread* to_be_joined);
     size_t getLastStart() {return last_start_; }
@@ -144,9 +147,9 @@ class UserThread : public Thread
     void waitJoin()                   {join_cond_.wait();}
     void signalJoin()                 {join_cond_.signal();}
     
-    bool checkFlagLock(Thread* caller){return flag_mutex_.isHeldBy(caller);}
+    bool checkFlagLock(Thread* caller){ return flag_mutex_.isHeldBy(caller);}
 
-    size_t getPageOffset()            {return mystack_.page_offset_;}
+    size_t getPageOffset()            { return mystack_.page_offset_;}
 
 
     StackInfo* getStackInfo()          { return &mystack_; }
@@ -157,8 +160,6 @@ class UserThread : public Thread
 
     bool schedulable() override;
 
-    void signalExec()                 {exec_wait_.signal();}
-    void waitExec()                   {exec_wait_.wait();}
 
     void lockFlagMutex()              { flag_mutex_.acquire();}
     void unlockFlagMutex()            { flag_mutex_.release();}
@@ -166,7 +167,7 @@ class UserThread : public Thread
     void setCancelState(int state);
     void setCancelType(int type);
     void sendCancelRequest();
-    void setLast()                    {last_ = true;}    
+    void setLast()                    { last_ = true;}    
     void reDirectToDeath();
 
     // getters

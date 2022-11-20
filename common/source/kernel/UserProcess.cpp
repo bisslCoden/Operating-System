@@ -396,11 +396,12 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
     {
       if (!thread.second->checkFlagLock(currentThread))
         thread.second->lockFlagMutex();
-
       debug(X_USERTHREAD, "[%ld]: send out a cancel to %ld\n", currentThread->getTID(), thread.first);
+
       thread.second->setCancelState(PTHREAD_CANCEL_ENABLE);
       thread.second->setCancelType(PTHREAD_CANCEL_ASYNCHRONOUS);
       thread.second->sendCancelRequest();
+
       thread.second->unlockFlagMutex();
     }
   }
@@ -415,6 +416,7 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
   if(kill_currentThread)
     Syscall::pthread_exit((void*) exit_code);
 }
+
 //unlocks the retvallock
 bool UserProcess::getRetVal(size_t tid, void** value)
 {

@@ -145,11 +145,8 @@ size_t ProcessRegistry::processFork()
   auto parent = currentUserThread->getProcess();
   
   if (parent->checkKill())
-  {
     return -1;
-  }
   
-  //debug(PROCESS_REG, "After parent read %p\n", parent);
   debug(X_USERTHREAD, "[%ld] is creating the proc\n", currentThread->getTID());
   UserProcess* process = 0;
   process = new UserProcess(parent, &return_to);
@@ -160,16 +157,9 @@ size_t ProcessRegistry::processFork()
     debug(X_USERTHREAD, "[%ld] is deleting the proc\n", currentThread->getTID());
     delete process;
     return -1;
-    //assert(false);
   }
   
   debug(PROCESS_REG, "After new UserProcess\n");
-  // if (!process || process->getPID() == 0)
-  // {
-  //   debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork!\n");
-  //   delete process;
-  //   return -1;
-  // }
 
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));

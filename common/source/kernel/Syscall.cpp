@@ -23,19 +23,15 @@ size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2
 {
   size_t return_value = 0;
 
-
   if ((syscall_number != sc_sched_yield) && (syscall_number != sc_outline)) // no debug print because these might occur very often
-  {
     debug(SYSCALL, "Syscall %zd called with arguments %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) by thread [%ld]\n",
           syscall_number, arg1, arg1, arg2, arg2, arg3, arg3, arg4, arg4, arg5, arg5, currentThread->getTID());
-  }
-  //UserProcess::getRandomPageOffset();
+          
   //call exit with phthread cancelled if the thread can be cancelled
   if (syscall_number == sc_pthread_exit)
-  {
     goto after;
-  }
 
+  // if we enter a syscall and we should be cancelled -> call pthread_exit. must be skipped by case sc_pthread_exit.
   currentUserThread->lockFlagMutex();
   if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
   {
@@ -133,6 +129,7 @@ after:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
 
+  // if we leave a syscall and we should be cancelled -> call pthread_exit
   currentUserThread->lockFlagMutex();
   if (currentUserThread->getflags()->cancelreq && (currentUserThread->getflags()->cancelable == PTHREAD_CANCEL_ENABLE))
   {
@@ -295,8 +292,6 @@ void Syscall::trace()
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx, wrapper = %lx) called\n", thread, attr, start_routine, arg, wrapper);
-  // add as much parameter checking as possible and return -1
-
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
 
   // could be dangerous but we have NO locks here...
@@ -318,7 +313,7 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
     {
       newthread->reDirectToDeath();
       return -1;
-    };
+    }
 
     *(size_t*)thread = newthread->getTID();
     return 0;
@@ -339,8 +334,10 @@ void Syscall::pthread_exit(void* value)
     if (!currentUserThread->getProcess()->checkRetValLock(currentThread))
       currentUserThread->getProcess()->lockRetVal();
     
+    // if there is a joiner:
     if (currentUserThread->getJoiner() != 0)
     {
+      // signal join
       UserThread* to_be_signaled;
       if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
       {
@@ -563,12 +560,7 @@ int32 Syscall::pthread_attr_init(size_t** stackaddr, size_t* stacksize)
 int Syscall::fork()
 {
   debug(SYSCALL, "Calling Syscall Fork!\n");
-  
-  //currentUserThread->switch_to_userspace_ = 0;
   int ret = ProcessRegistry::instance()->processFork();
-  //debug(X_USERTHREAD, "[%ld]switching to US now... my locks: %s\n", currentUserThread->getTID(),
-  //(currentThread->holding_lock_list_ == 0) ? "none" : currentThread->holding_lock_list_->getName());
-  //currentUserThread->switch_to_userspace_ = 1;
   return ret;
 }
 
