@@ -141,6 +141,7 @@ after:
   return return_value;
 }
 
+// ???
 bool checkAdressValid(void* addr)
 {
   if ((long long unsigned)addr > USER_BREAK)
@@ -177,7 +178,6 @@ void Syscall::exit(size_t exit_code)
   debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %ld\n", currentThread->getTID(), exit_code);
   currentUserThread->getProcess()->exit(exit_code);
   debug(USERPROCESS, "exit sucessfuly finished!\n");
-  // currentThread->kill();
 }
 
 size_t Syscall::write(size_t fd, pointer buffer, size_t size)
@@ -289,36 +289,47 @@ void Syscall::trace()
   currentThread->printBacktrace();
 }
 
+
+
+// ------------------------------------------------------------------------------------------------ //
+//                                                                                                  //
+//                                  HERE'S WHERE THE FUN STARTS!!!                                  //
+//                                                                                                  //
+// ------------------------------------------------------------------------------------------------ //
+
 size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx, wrapper = %lx) called\n", thread, attr, start_routine, arg, wrapper);
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
-
   // could be dangerous but we have NO locks here...
+
+  // standard joinstate is joinable!
   int joinstate = PTHREAD_CREATE_JOINABLE;
   if(attr >= 0x1000)
   {
+    // but if user wants -> detach
     if (((pthread_attr_t*) attr)->detach_state_ == PTHREAD_CREATE_DETACHED)
       joinstate = PTHREAD_CREATE_DETACHED;
     else if (((pthread_attr_t*) attr)->detach_state_ != PTHREAD_CREATE_JOINABLE)
       return -1;
   }
   
-  UserThread* newthread = currentUserThread->getParentProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
+  // create thread
+  UserThread* newthread = currentUserThread->getProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", newthread->getTID());
 
-  if(newthread != 0)
+  // check thread creation
+  if(newthread == 0)
   {
+    // check if needs to be killed
     if(currentUserThread->getProcess()->checkKill())
-    {
       newthread->reDirectToDeath();
-      return -1;
-    }
-
-    *(size_t*)thread = newthread->getTID();
-    return 0;
+    return -1;
   }
-  return -1;
+
+  // success
+  *(size_t*)thread = newthread->getTID();
+  return 0;
 }
 
 
@@ -358,12 +369,12 @@ void Syscall::pthread_exit(void* value)
     else
     {  
       currentUserThread->unlockFlagMutex();
-      currentUserThread->getParentProcess()->addToRetvalList(currentUserThread->getTID(), value);
+      currentUserThread->getProcess()->addToRetvalList(currentUserThread->getTID(), value);
     } 
     
-    currentUserThread->getParentProcess()->removeFromThreadList(currentUserThread);
-    currentUserThread->getParentProcess()->unLockThreadMutex();
-    currentUserThread->getParentProcess()->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
+    currentUserThread->getProcess()->removeFromThreadList(currentUserThread);
+    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserThread->getProcess()->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
     //experimentaaal: free my pages on my own!
     currentUserThread->freeMyPagesAndDie(true);
     //currentThread->kill();
@@ -427,15 +438,15 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
       //  ESRCH  No thread with the ID thread could be found.
   //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
 int Syscall::pthread_detach(size_t thread){
-  currentUserThread->getParentProcess()->lockThreadMutex();
+  currentUserThread->getProcess()->lockThreadMutex();
   UserThread* to_be_detached = 0x00;
-  if ((to_be_detached = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread)) != 0x00)
+  if ((to_be_detached = (UserThread*) currentUserThread->getProcess()->findInThreadList(thread)) != 0x00)
   {
     currentUserThread->getProcess()->lockRetVal();
     if (to_be_detached->getJoiner() != 0)
     {
       currentUserThread->getProcess()->unlockRetVal();
-      currentUserThread->getParentProcess()->unLockThreadMutex();
+      currentUserThread->getProcess()->unLockThreadMutex();
       return -1;
     }
     currentUserThread->getProcess()->unlockRetVal();
@@ -443,11 +454,11 @@ int Syscall::pthread_detach(size_t thread){
     to_be_detached->lockFlagMutex();
     to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
     to_be_detached->unlockFlagMutex();
-    currentUserThread->getParentProcess()->unLockThreadMutex();
+    currentUserThread->getProcess()->unLockThreadMutex();
   }
   else
   {
-    currentUserThread->getParentProcess()->unLockThreadMutex();
+    currentUserThread->getProcess()->unLockThreadMutex();
     return -1;
   }
   return 0;
@@ -468,13 +479,13 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 
   if (currentUserThread->getProcess()->findInThreadList(thread) != 0x00)
   {
-    UserThread* join_victim = (UserThread*) currentUserThread->getParentProcess()->findInThreadList(thread);
+    UserThread* join_victim = (UserThread*) currentUserThread->getProcess()->findInThreadList(thread);
     
     join_victim->lockFlagMutex();
     if (join_victim->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
       join_victim->unlockFlagMutex();
-      currentUserThread->getParentProcess()->unLockThreadMutex();
+      currentUserThread->getProcess()->unLockThreadMutex();
       return -1;
     }
     join_victim->unlockFlagMutex();
@@ -606,14 +617,14 @@ size_t Syscall::wait_pid(size_t arg1, size_t* arg2, size_t arg3)
 {
   UserThread* callingthread = (UserThread*)currentThread;
   debug(SYSCALL, "Calling Syscall waitpid!\n");
-  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3, callingthread->getParentProcess());
+  return ProcessRegistry::instance()->waitPid(arg1, arg2, arg3, callingthread->getProcess());
 }
 
 int Syscall::get_pid()
 {
   UserThread* callingthread = (UserThread*)currentThread;
   debug(SYSCALL, "Calling Syscall getpid!\n");
-  return callingthread->getParentProcess()->getPID();
+  return callingthread->getProcess()->getPID();
 }
 
 // wake up when getRDTSC == rdtsc_now + (cpu cycles) seconds
@@ -643,7 +654,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
-  //currentUserThread->getParentProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  //currentUserThread->getProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
   //currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
   return 0;
@@ -663,12 +674,12 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
-  //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserThread->getParentProcess()->getClockSum())/54925;
+  //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserThread->getProcess()->getClockSum())/54925;
   size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
-  //size_t duaration = currentUserThread->getParentProcess()->getClockSum();
+  //size_t duaration = currentUserThread->getProcess()->getClockSum();
 
   //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
-  size_t duaration_2 = currentUserThread->getParentProcess()->getDuaration();
+  size_t duaration_2 = currentUserThread->getProcess()->getDuaration();
 
   debug(CLOCK, "duaration before divide %ld\n", duaration_2);
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);

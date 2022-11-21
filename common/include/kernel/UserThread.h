@@ -56,6 +56,7 @@ typedef struct StackInfo
 class UserThread : public Thread
 {
   public:
+    bool schedulable() override;
     /**
      * Constructor for first_thread
      * @param minixfs_filename filename of the file in minixfs to execute
@@ -142,23 +143,19 @@ class UserThread : public Thread
     void getNewStackPage(size_t adress);
     void freeMyPagesAndDie(bool actually_die);
 
-    //acquie retvallock before!
+    // acqurie retvallock before!   join_waiter_ = thread;
     void setJoiner(UserThread* thread){join_waiter_ = thread;}
+    // join_cond_.wait();
     void waitJoin()                   {join_cond_.wait();}
+    // join_cond_.signal();
     void signalJoin()                 {join_cond_.signal();}
-    
+    // flag_mutex_.isHeldBy(caller);
     bool checkFlagLock(Thread* caller){ return flag_mutex_.isHeldBy(caller);}
-
+    // mystack_.page_offset_;
     size_t getPageOffset()            { return mystack_.page_offset_;}
-
-
+    // return &mystack_;
     StackInfo* getStackInfo()          { return &mystack_; }
 
-    // tells if thread is the last thread of its process
-    // return process of thread
-    UserProcess* getParentProcess()   { return process_; }
-
-    bool schedulable() override;
 
 
     void lockFlagMutex()              { flag_mutex_.acquire();}
@@ -168,6 +165,7 @@ class UserThread : public Thread
     void setCancelType(int type);
     void sendCancelRequest();
     void setLast()                    { last_ = true;}    
+    // instruction pointer rip set to pthread_exit()
     void reDirectToDeath();
 
     // getters

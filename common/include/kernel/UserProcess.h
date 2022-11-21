@@ -139,7 +139,7 @@ class UserProcess
 
 
     /**
-     * @brief Create a New Thread object (pthread_create)
+     * @brief Hannes
      * 
      * @param start_routine which thread should execute
      * @return size_t thread ID
@@ -181,7 +181,7 @@ class UserProcess
     
     bool checkInOffsetList(size_t NR);
     void removeFromOffsetList(size_t NR);
-
+    // return KILLED_;
     bool checkKill(){ return (KILLED_) ? true : false; }
 
     UserThread* checkStackAdress(size_t address);

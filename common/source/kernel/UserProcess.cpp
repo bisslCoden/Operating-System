@@ -329,7 +329,6 @@ size_t UserProcess::getNrOfThreads()
 
 UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate = PTHREAD_CREATE_JOINABLE)
 {
-  // pthread
   UserThread* thread = 0;
   size_t return_to = 6;
   threads_lock_.acquire();
@@ -355,15 +354,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
     return 0;
   }
     threads_lock_.release();
-
-
-  /*First Argument: RDI
-    Second Argument: RSI
-    Third Argument: RDX
-    Fourth Argument: RCX
-    Fifth Argument: R8
-    Sixth Argument: R9
-  */
+  
   if (thread)
   {
     if (joinstate != PTHREAD_CREATE_JOINABLE)

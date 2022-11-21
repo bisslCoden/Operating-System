@@ -60,6 +60,6 @@ int main()
 //   {
 //     waitpid(pid, 0 , 0);
 //   }
-  printf("[main] exit...\n");
+  printf("[main] exit...fork ret = %ld\n", pid);
   return 0;
 }

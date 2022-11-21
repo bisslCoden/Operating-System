@@ -23,7 +23,6 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
 {
   debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
   loader_ = process_->getLoader();
-  Userthread = true;
   mystack_.page_offset_ = page_offset;
   setupStack();
 
@@ -82,14 +81,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
     *returnto = 9;
     return;
   }
- // process_->threads_lock_.release();
 
-  
-  // process_->threads_lock_.release();
-
-  Userthread = true;
-
-  // set up user registers and adressspace
 
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
                                    (void*) mystack_.userstack_start_, getKernelStackStartPointer());
@@ -97,6 +89,7 @@ UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uin
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   
+  // set up user registers and adressspace
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
 
@@ -156,7 +149,6 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
 
-  Userthread = true;
   last_start_ = Scheduler::instance()->getRDTSC();
 
 
@@ -385,7 +377,7 @@ bool UserThread::setupStack()
 bool UserThread::reuseStack(StackInfo* old_stackinfo)
 {
   size_t ppn = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "want to map my old stackpage startin at %p (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
+  debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
   if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
     return false;
   

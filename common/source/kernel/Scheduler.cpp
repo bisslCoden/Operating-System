@@ -55,7 +55,7 @@ uint32 Scheduler::schedule()
     {
       if(((UserThread*)(*uit))->was_scheduled_ == 1)
       {
-        ((UserThread*)(*uit))->getParentProcess()->incDuaration(getRDTSC() - ((UserThread*)(*uit))->getLastStart());
+        ((UserThread*)(*uit))->getProcess()->incDuaration(getRDTSC() - ((UserThread*)(*uit))->getLastStart());
         break;
       }
     }
