@@ -15,8 +15,7 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_"),
-    wait_pid_lock_("ProcessRegistry::wait_pid_lock_")
+    list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
   instance_ = this; // instance_ is static! -> Singleton-like behaviour
@@ -74,16 +73,6 @@ void ProcessRegistry::Run()
   Scheduler::instance()->printThreadList();
 
   kill();
-}
-
-void ProcessRegistry::processExit()
-{
-  counter_lock_.acquire();
-
-  if (--progs_running_ == 0)
-    all_processes_killed_.signal();
-
-  counter_lock_.release();
 }
 
 void ProcessRegistry::processExit(UserProcess* user_proc)
@@ -172,6 +161,8 @@ size_t ProcessRegistry::processFork()
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "createProcess(path = %s)\n", path);
+
+  // get FileSystemInfo
   FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
   if(!fs_info)
   {
@@ -204,6 +195,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
   int argc = areExecArgsValid(argv);
+
   if(argc == -1)
   {
     debug(X_PROCESS_REG, "ERROR: execv found no valid args. returning -1\n");
@@ -237,6 +229,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
     debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
     return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
   }
+
   assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");
 }
 

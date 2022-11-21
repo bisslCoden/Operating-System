@@ -25,9 +25,16 @@ class ProcessRegistry : public Thread
     virtual void Run();
 
     /**
-     * Tells us that a userprocess is being destroyed
+     * Tells us how many processes are running
      */
-    void processExit();
+    size_t processCount();
+
+    /**
+     * @brief The instance of the ProcessRegistry. Is a Thread.
+     *
+     * @return ProcessRegistry* to access methods
+     */
+    static ProcessRegistry* instance();
 
     /**
      * Tells us that a userprocess is being created due to a fork or something similar
@@ -35,28 +42,35 @@ class ProcessRegistry : public Thread
     void processStart();
 
     /**
-     * Tells us how many processes are running
+     * @brief create a process + its first thread.
+     * gets fs_info, creates UserProcess, check if success (returnto). add to list_of_processes_
+     * 
+     * @param path the path to the binary.
      */
-    size_t processCount();
+    void createProcess(const char* path);
+
+    /**
+     * Tells us that a userprocess is being destroyed
+     */
+    void processExit(UserProcess* user_proc);
+
+
+    // -------------------------------------------------------------------------
+    //                              OUR STUFF
+    // -------------------------------------------------------------------------
+
+    /**
+     * creates an unique ID for every process OR thread ID
+     *
+     * @return size_t the ID
+     */
+    size_t createID();
+
 
     /**
      * Creates the child process and returns the pid
      */
     size_t processFork();
-
-    /**
-     * Makes the process wait
-     */
-    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process);
-
-
-    /**
-     * @brief The instance of the ProcessRegistry. inherits from Thread
-     *
-     * @return ProcessRegistry* to access membermethods
-     */
-    static ProcessRegistry* instance();
-    void createProcess(const char* path);
 
     /**
      * @brief handles argument checking
@@ -74,14 +88,10 @@ class ProcessRegistry : public Thread
      */
     int areExecArgsValid(char* const argv[]);
 
-    void processExit(UserProcess* user_proc);
-
     /**
-     * creates an unique ID for every process OR thread ID
-     *
-     * @return size_t the ID
+     * Makes the process wait
      */
-    size_t createID();
+    size_t waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process);
 
   private:
     char const **progs_;
@@ -95,6 +105,5 @@ class ProcessRegistry : public Thread
     // keeping track of processes alive
     ustl::map<size_t, UserProcess*> list_of_processes_;
     Mutex list_of_processes_lock_;
-    Mutex wait_pid_lock_;
 };
 

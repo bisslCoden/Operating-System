@@ -17,77 +17,42 @@ class Syscall
   // -----------------------------------------------------------------------------------------------
   //                    already implemented stuff (usually not much changed)
   // -----------------------------------------------------------------------------------------------
+
+  // calls writeLine2Bochs((const char*) text);
+  static void outline(size_t port, pointer text);
+  // prints to shell
+  static size_t write(size_t fd, pointer buffer, size_t size);
+  // reads user character
+  static size_t read(size_t fd, pointer buffer, size_t count);
+  // calls VfsSyscall::close()
+  static size_t close(size_t fd);
+  // calls VfsSyscall::open()
+  static size_t open(size_t path, size_t flags);
+  // if you enter "ls" in console..
+  static void pseudols(const char *pathname, char *buffer, size_t size);
+  // calls Thread::printBacktrace() 
+  static void trace();
+
+  /**
+   * @brief This syscall creates a process (called in shell.c) and its first thread.
+   * 
+   * 
+   * @param path the path to the programm
+   * @param sleep not really implemented. not anywhere used afaik.
+   * @return size_t 
+   */
+  static size_t createprocess(size_t path, size_t sleep);
+
   /**
    * @brief This syscall exits a process. Internally, UserProcess::exit() is called which
    * will set all other threads to PTHREAD_CANCEL_ENABLE and PTHREAD_CANCEL_ASYNCHRONOUS and then
    * a cancellation request is sent.
    * Lastly, pthread exit is called for the currentThread.
    * 
-   * @param exit_code the return value of the main() or another, 
+   * @param exit_code in "normal" process termination: return value of the main(). otherwise some 
+   * random error code tbh.
    */
   static void exit(size_t exit_code);
-  /**
-   * @brief 
-   * 
-   * @param port 
-   * @param text 
-   */
-  static void outline(size_t port, pointer text);
-  /**
-   * @brief 
-   * 
-   * @param fd 
-   * @param buffer 
-   * @param size 
-   * @return size_t 
-   */
-  static size_t write(size_t fd, pointer buffer, size_t size);
-  /**
-   * @brief 
-   * 
-   * @param fd 
-   * @param buffer 
-   * @param count 
-   * @return size_t 
-   */
-  static size_t read(size_t fd, pointer buffer, size_t count);
-  /**
-   * @brief 
-   * 
-   * @param fd 
-   * @return size_t 
-   */
-  static size_t close(size_t fd);
-  /**
-   * @brief 
-   * 
-   * @param path 
-   * @param flags 
-   * @return size_t 
-   */
-  static size_t open(size_t path, size_t flags);
-  /**
-   * @brief 
-   * 
-   * @param pathname 
-   * @param buffer 
-   * @param size 
-   */
-  static void pseudols(const char *pathname, char *buffer, size_t size);
-  // calls Thread::printBacktrace() 
-  static void trace();
-  /**
-   * @brief 
-   * 
-   * @param path 
-   * @param sleep 
-   * @return size_t 
-   */
-  static size_t createprocess(size_t path, size_t sleep);
-
-  // 
-  static void kernelsem_wait();
-  static void kernelsem_post();
 
 
 
@@ -132,6 +97,7 @@ class Syscall
   // -----------------------------------------------------------------------------------------------
   //                                   wait pid, sleep, clock
   // -----------------------------------------------------------------------------------------------
+
   /**
    * @brief 
    * 
@@ -175,6 +141,7 @@ class Syscall
   // -----------------------------------------------------------------------------------------------
   //                                             pthreads
   // -----------------------------------------------------------------------------------------------
+
   /**
    * @brief creates new thread that runs until:
    * (1) pthread_exit() is called explicitely
@@ -182,7 +149,7 @@ class Syscall
    * (3) it is cancelled: see pthread_cancel()
    * (4) the process terminates via Syscall::exit()
    * 
-   * @param thread a pointer 
+   * @param thread a pointer to where the thread id will be stored
    * @param attr initialized with pthread_attr_init(), if NULL -> default values:
    *             (joinstate = PTHREAD_CREATE_JOINABLE,PTHREAD_CANCEL_ENABLE, PTHREAD_CANCEL_DEFERRED)
    * @param start_routine the pointer to the start routine that the thread will start to execute.
@@ -201,5 +168,13 @@ class Syscall
   static int32 pthread_setcancelstate(int32 state, int32* oldstate);
   static int32 pthread_setcanceltype(int32 type, int32* oldtype);
   static int32 pthread_attr_init(size_t** stackaddr, size_t* stacksize);
+
+
+
+
+
+  // lonely kernel semaphores
+  static void kernelsem_wait();
+  static void kernelsem_post();
 };
 
