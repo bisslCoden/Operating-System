@@ -112,7 +112,7 @@ class Syscall
    *                  else execvProcess(path);
    * 
    * @param user_path the path to the binary. must end with '\0'
-   * @param user_argv an array of c-strings. will be 
+   * @param user_argv an array of c-strings
    * @return on success this should not return. on fail -1
    */
   static int execv(const char * user_path, char *const user_argv[]);

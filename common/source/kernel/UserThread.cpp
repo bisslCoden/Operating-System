@@ -422,9 +422,9 @@ int UserThread::execv(char* const argv[], size_t argc)
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "execv(): set new archmemory\n");
 
+  // args: copy from argv[] (kernel_argv) into fresh archmem ONLY IF NECESSARY
   if(argc)
   {
-    // args: copy from argv[] into fresh archmem ONLY IF NECESSARY
     size_t ppn = PageManager::instance()->allocPPN();
     size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE; // the virtual page we use to pass the args
     assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "why tf was this mapped? This is exec place");
@@ -448,7 +448,7 @@ int UserThread::execv(char* const argv[], size_t argc)
     // args: null termination 
     argv_arr[argc] = NULL;
 
-    // args: free kernel_argv
+    // args: free argv which was saved as kernel_argv in kernelspace
     for (size_t i = 0; i < argc; i++)
       delete[] argv[i];
 
@@ -456,17 +456,18 @@ int UserThread::execv(char* const argv[], size_t argc)
     debug(X_USERTHREAD, "execv(): after for-loop.\n");
     for (size_t i = 0; i < argc; i++)
       debug(X_USERTHREAD, "execv(): argv_arr[%ld]: %s\n", i, argv_arr[i]);
-    debug(X_USERTHREAD, "execv(): copied from argv[] to new location\n");
+    debug(X_USERTHREAD, "execv(): copied from argv[] to new location.\n");
 
     // args: set registers for args
     user_registers_->rdi = argc;
     user_registers_->rsi = new_argv;
   }
 
-  // setup stack and set registers for stack and start
-  debug(X_USERTHREAD, "execv(): reuseStack() + setting args.\n");
+  // setup stack 
+  debug(X_USERTHREAD, "execv(): reuseStack() + setting user_registers_.\n");
   assert(reuseStack(&mystack_));
-  mystack_.UserMutex = USERMUTEX_INVALID;
+  mystack_.UserMutex = USERMUTEX_INVALID; // why not place this in reuse stack?
+  // set registers
   user_registers_->rsp = (size_t) mystack_.userstack_start_;
   user_registers_->rip = (size_t)loader_->getEntryFunction();
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);

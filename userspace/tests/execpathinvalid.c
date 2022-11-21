@@ -7,7 +7,7 @@
 int main(int argc, const char *argv[])
 {
 	printf("before exec\n");
-  char* const path = "hallihalloaws";
+  char* const path = "hallihalloaws das ist kein valider path oder wie.c?";
   // exactly 102 characters. one too much
 	char* const arg1 = "Eggs"; 
 	char* const arg2 = "Mehl";

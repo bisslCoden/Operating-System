@@ -60,10 +60,11 @@ class ProcessRegistry : public Thread
 
     /**
      * @brief handles argument checking
-     * will call UserProcess::execv(path, argv, argc)
+     * will call UserProcess::execv(path, kernel_argv, argc)
+     * kernel_argv is the kernel-space argument list that will be free'd later.
      * 
-     * @param path the path to the programm 
-     * @param argv the args as handeled by calling convention
+     * @param path the path to the programm, already copied to kernel-space
+     * @param argv the args of the user.
      * @return int return value, -1 on fail, shouldn't return on success
      */
     int execv(const char* path, char *const argv[]);

@@ -429,40 +429,29 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
 
-  // open fd and new loader - must be closed and freed later
+  // open new_fd and new_loader - old ones must be closed and freed afterwards.
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
-  if(!setupLoader(new_fd))
+  // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
+  bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
+  if(setup_fail)
   {
-    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
+    debug(USERPROCESS, "execv() ERREOR in setup_fail triggered. returning -1.\n");
     fd_ = old_fd;
     VfsSyscall::close(new_fd);
     return -1;
   }
-
-  // mabye that can be put next to setupLoader() because we do the same things.
-  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
-  if(!removeOldProcessInformation())
-  {
-    fd_ = old_fd;
-    VfsSyscall::close(new_fd);
-    return -1;
-  }
-  name_ = path;
-  
-  currentUserThread->execv(argv, argc);
-
-  // open fd and new loader - must be closed and freed later
+  // new_fd and new_loader - old ones must be closed and freed afterwards!
   VfsSyscall::close(old_fd);
   delete old_loader; 
-  
+
   // exec success, we're ready for another exec call!
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
   waiting_exec_lock_.release();
   
-  debug(X_USERPROCESS, "[%ld] execv() fd and loader setup finished successfully exiting exec\n", getPID());
+  debug(X_USERPROCESS, "execv() [%ld]  fd and loader setup finished successfully exiting exec\n", getPID());
   return 0;
 }
 
@@ -471,7 +460,7 @@ bool UserProcess::setupLoader(ssize_t fd)
   // faulty fd
   if(fd < 0)
   {
-    debug(LOADER, "setuploader(%ld) failed because... fd value\n", fd);
+    debug(X_USERPROCESS, "setuploader(%ld) failed because... fd value\n", fd);
     return false;
   }
 

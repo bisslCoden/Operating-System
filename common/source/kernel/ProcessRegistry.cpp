@@ -230,14 +230,14 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
       // because null termination is not copied, we add it manually - don't get confused by off-by-one!
       kernel_argv[i][str_len] = '\0';
 
-      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to kernel_argv[%d] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(kernel_argv + i));
+      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to kernel_argv[%d] which lies at %lx\n", 
+        argv[i], (size_t)(argv + i), i, (size_t)(kernel_argv + i));
     }
 
     debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
     return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
   }
   assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");
-  return argc;
 }
 
 int ProcessRegistry::areExecArgsValid(char* const argv[])

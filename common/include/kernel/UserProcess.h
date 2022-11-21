@@ -9,7 +9,7 @@
 #include "KernelSemaphore.h"
 #include "Loader.h"
 
-
+#define currentUserProcess currentUserThread->getProcess()
 
 enum ProcessState
 {

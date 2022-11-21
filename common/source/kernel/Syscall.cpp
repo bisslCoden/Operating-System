@@ -154,12 +154,12 @@ bool checkAdressValid(void* addr)
 
 
 void Syscall::kernelsem_wait(){
-  currentUserThread->getProcess()->waitPIDSem();
+  currentUserProcess->waitPIDSem();
   return;
 }
 
 void Syscall::kernelsem_post(){
-  currentUserThread->getProcess()->postPIDSem();
+  currentUserProcess->postPIDSem();
   return;
 }
 
@@ -176,7 +176,7 @@ void Syscall::pseudols(const char *pathname, char *buffer, size_t size)
 void Syscall::exit(size_t exit_code)
 {
   debug(SYSCALL, "Syscall::EXIT: called in thread [%ld], exit_code: %ld\n", currentThread->getTID(), exit_code);
-  currentUserThread->getProcess()->exit(exit_code);
+  currentUserProcess->exit(exit_code);
   debug(USERPROCESS, "exit sucessfuly finished!\n");
 }
 
@@ -315,14 +315,14 @@ size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine,
   }
   
   // create thread
-  UserThread* newthread = currentUserThread->getProcess()->createNewThread(start_routine, arg, wrapper, joinstate);
+  UserThread* newthread = currentUserProcess->createNewThread(start_routine, arg, wrapper, joinstate);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", newthread->getTID());
 
   // check thread creation
   if(newthread == 0)
   {
     // check if needs to be killed
-    if(currentUserThread->getProcess()->checkKill())
+    if(currentUserProcess->checkKill())
       newthread->reDirectToDeath();
     return -1;
   }
@@ -338,19 +338,18 @@ void Syscall::pthread_exit(void* value)
   debug(X_USERTHREAD, "entering p-exit for thread [%ld]\n", currentUserThread->getTID());
   size_t my_tid = currentUserThread->getTID();
   
-  currentUserThread->getProcess()->lockThreadMutex();
-  
-  if (currentUserThread->getProcess()->findInThreadList(my_tid) != 0x00)
+  currentUserProcess->lockThreadMutex();
+  if (currentUserProcess->findInThreadList(my_tid) != 0x00)
   {
-    if (!currentUserThread->getProcess()->checkRetValLock(currentThread))
-      currentUserThread->getProcess()->lockRetVal();
+    if (!currentUserProcess->checkRetValLock(currentThread))
+      currentUserProcess->lockRetVal();
     
     // if there is a joiner:
     if (currentUserThread->getJoiner() != 0)
     {
       // signal join
       UserThread* to_be_signaled;
-      if((to_be_signaled = (UserThread*)currentUserThread->getProcess()->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
+      if((to_be_signaled = (UserThread*)currentUserProcess->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
       {
         to_be_signaled->signalJoin();
       }
@@ -364,17 +363,17 @@ void Syscall::pthread_exit(void* value)
     if (currentUserThread->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
       currentUserThread->unlockFlagMutex();
-      currentUserThread->getProcess()->unlockRetVal();
+      currentUserProcess->unlockRetVal();
     }
     else
     {  
       currentUserThread->unlockFlagMutex();
-      currentUserThread->getProcess()->addToRetvalList(currentUserThread->getTID(), value);
+      currentUserProcess->addToRetvalList(currentUserThread->getTID(), value);
     } 
     
-    currentUserThread->getProcess()->removeFromThreadList(currentUserThread);
-    currentUserThread->getProcess()->unLockThreadMutex();
-    currentUserThread->getProcess()->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
+    currentUserProcess->removeFromThreadList(currentUserThread);
+    currentUserProcess->unLockThreadMutex();
+    currentUserProcess->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
     //experimentaaal: free my pages on my own!
     currentUserThread->freeMyPagesAndDie(true);
     //currentThread->kill();
@@ -382,7 +381,7 @@ void Syscall::pthread_exit(void* value)
   else
   {
     debug(X_USERTHREAD, "[%ld]: Hmm... was already killed\n", my_tid);
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
     currentUserThread->kill();
   }
   debug(X_USERTHREAD, "finishing p-exit for thread [%ld]\n", currentUserThread->getTID());
@@ -438,27 +437,27 @@ int32 Syscall::pthread_setcanceltype(int32 type, int32 *oldtype){
       //  ESRCH  No thread with the ID thread could be found.
   //reminder how to fix existing bug with dying threads: make cond var in Userprocess not in the corresponding threadd!!!!!!
 int Syscall::pthread_detach(size_t thread){
-  currentUserThread->getProcess()->lockThreadMutex();
+  currentUserProcess->lockThreadMutex();
   UserThread* to_be_detached = 0x00;
-  if ((to_be_detached = (UserThread*) currentUserThread->getProcess()->findInThreadList(thread)) != 0x00)
+  if ((to_be_detached = (UserThread*) currentUserProcess->findInThreadList(thread)) != 0x00)
   {
-    currentUserThread->getProcess()->lockRetVal();
+    currentUserProcess->lockRetVal();
     if (to_be_detached->getJoiner() != 0)
     {
-      currentUserThread->getProcess()->unlockRetVal();
-      currentUserThread->getProcess()->unLockThreadMutex();
+      currentUserProcess->unlockRetVal();
+      currentUserProcess->unLockThreadMutex();
       return -1;
     }
-    currentUserThread->getProcess()->unlockRetVal();
+    currentUserProcess->unlockRetVal();
 
     to_be_detached->lockFlagMutex();
     to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
     to_be_detached->unlockFlagMutex();
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
   }
   else
   {
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
     return -1;
   }
   return 0;
@@ -474,54 +473,54 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
   if(thread == currentUserThread->getTID())
     return -1;
 
-  currentUserThread->getProcess()->lockThreadMutex();
+  currentUserProcess->lockThreadMutex();
   debug(X_USERTHREAD, "[%ld]trying to join [%ld]; before join and retval\n", currentUserThread->getTID(), thread);
 
-  if (currentUserThread->getProcess()->findInThreadList(thread) != 0x00)
+  if (currentUserProcess->findInThreadList(thread) != 0x00)
   {
-    UserThread* join_victim = (UserThread*) currentUserThread->getProcess()->findInThreadList(thread);
+    UserThread* join_victim = (UserThread*) currentUserProcess->findInThreadList(thread);
     
     join_victim->lockFlagMutex();
     if (join_victim->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
       join_victim->unlockFlagMutex();
-      currentUserThread->getProcess()->unLockThreadMutex();
+      currentUserProcess->unLockThreadMutex();
       return -1;
     }
     join_victim->unlockFlagMutex();
     
-    currentUserThread->getProcess()->lockRetVal();
+    currentUserProcess->lockRetVal();
     if (join_victim->getJoiner() != 0 || join_victim->getJoiner() == currentUserThread || currentUserThread->detectCircularJoin(join_victim))
     {
       debug(X_USERTHREAD, "Deadlock in join detected! either thread [%ld] is already joined by another or tries to join each "
       "other with thread [%ld] OR there is a Circular Deadjoin :D!\n",
        thread, currentUserThread->getTID());
-      currentUserThread->getProcess()->unlockRetVal();
-      currentUserThread->getProcess()->unLockThreadMutex();
+      currentUserProcess->unlockRetVal();
+      currentUserProcess->unLockThreadMutex();
       return -1;
     }
     
     join_victim->setJoiner(currentUserThread);
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
 
     //releases retvallock!
     currentUserThread->waitJoin();
     
     //getretval unlocks retvallock :D
     debug(X_USERTHREAD, "woke up to look for [%ld]s retval\n", thread);
-    assert(currentUserThread->getProcess()->getRetVal(thread, &retval) && 
+    assert(currentUserProcess->getRetVal(thread, &retval) && 
     "Waited for thread to finish and didnt find any retval??? this should never happen.\n");
   }
-  else if (!currentUserThread->getProcess()->getRetVal(thread, &retval))
+  else if (!currentUserProcess->getRetVal(thread, &retval))
   {
     debug(X_USERTHREAD, "[%ld]trying to join [%ld]; after retvallock AND thread didnt exist or was joined alreafy\n", currentUserThread->getTID(), thread);
     //join_victim->unlockJoin();
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
     return -1;
   }
   else
   {
-    currentUserThread->getProcess()->unLockThreadMutex();
+    currentUserProcess->unLockThreadMutex();
   }
 
   debug(X_USERTHREAD, "[%ld]MANAGED to join [%ld]\n", currentUserThread->getTID(), thread);
@@ -605,7 +604,7 @@ bool Syscall::isExecPathValid(const char* path)
       return false;
   }
 
-  debug(SYSCALL, "execv(): isPathValid(): path seems fine: %s\n", path);
+  debug(SYSCALL, "execv(): %s -> isPathValid(): is not null, inside userspace and < EXECV_MAX_PATH_LEN\n", path);
   return true;
 }
 
@@ -650,7 +649,7 @@ unsigned int Syscall::sleep(unsigned int seconds)
   debug(SLEEP, "dif:    %ld\n", Scheduler::instance()->getRDTSCdiff());
   currentUserThread->setTimeToWake(time_to_wake);
   debug(SLEEP, "thread time to wake up: %ld\n", currentUserThread->getTimeToWake());
-  //currentUserThread->getProcess()->incDuaration(rdtsc_now - currentUserThread->getLastStart());
+  //currentUserProcess->incDuaration(rdtsc_now - currentUserThread->getLastStart());
   //currentUserThread->setLastStart(time_to_wake);
   Scheduler::instance()->yield();
   return 0;
@@ -670,12 +669,12 @@ unsigned int Syscall::sleep(unsigned int seconds)
 // 54 * 1000 = 54 000 micro seconds
 size_t Syscall::clock()
 {
-  //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserThread->getProcess()->getClockSum())/54925;
+  //size_t duaration = (Scheduler::instance()->getRDTSC()-currentUserProcess->getClockSum())/54925;
   size_t cyc_per_microsec = Scheduler::instance()->getDiffAvg()/54925;
-  //size_t duaration = currentUserThread->getProcess()->getClockSum();
+  //size_t duaration = currentUserProcess->getClockSum();
 
   //debug(CLOCK, "clock sum %ld\n", duaration/cyc_per_microsec);
-  size_t duaration_2 = currentUserThread->getProcess()->getDuaration();
+  size_t duaration_2 = currentUserProcess->getDuaration();
 
   debug(CLOCK, "duaration before divide %ld\n", duaration_2);
   debug(CLOCK, "number to divide with   %ld\n", cyc_per_microsec);
