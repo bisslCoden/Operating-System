@@ -157,7 +157,16 @@ class Syscall
    * @param wrapper the wrapper that performs the implicite pthread_exit() call.
    * @return size_t -1 on error, 0 on success
    */
-  static size_t pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
+  static int pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper);
+
+  /**
+   * @brief terminates the currentThread and returns a value to retval that can be read
+   * by another thread via pthread_join() - if the thread is joinable.
+   * implicit pthread_exit(): call pthread_exit when a pthread_create()-thread terminates. 
+   * 
+   * 
+   * @param value 
+   */
   static void   pthread_exit(void* value);
   static size_t pthread_join(size_t thread, void** value_ptr);
   static int    pthread_detach(size_t thread);

@@ -13,31 +13,38 @@
 #include "ArchThreads.h"
 #include "offsets.h"
 
+
 // first thread
-UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset, size_t* returnto) :
-  Thread(working_dir, name, USER_THREAD, ProcessRegistry::instance()->createID()), // Thread's constructor
+UserThread::UserThread( UserProcess* process, 
+                        FileSystemInfo* working_dir, 
+                        ustl::string name, 
+                        uint32 terminal_number, 
+                        size_t* returnto) :
+  Thread( working_dir, name, USER_THREAD, 
+          ProcessRegistry::instance()->createID()), 
   process_(process),
   flag_mutex_{"thread::flag_mutex_"},
-  join_cond_{ &process_->returnvalue_lock_, "Thread::join_cond" } , my_pages_lock_{"thread::my_pages_lock_"},
-  exec_wait_{&process->waiting_exec_lock_, "Thread::exec_wait_"}// UserThread's members
+  join_cond_{ &process_->returnvalue_lock_, "Thread::join_cond" }, 
+  my_pages_lock_{"thread::my_pages_lock_"},
+  exec_wait_{&process->waiting_exec_lock_, "Thread::exec_wait_"}
 {
-  debug(USERTHREAD, "TID [%ld]: first thread constructor.\n", getTID());
+  debug(X_USERTHREAD, "UserThread() for createProcess() started for TID [%ld]\n", getTID());
+
+  // loader and stack setup
   loader_ = process_->getLoader();
-  mystack_.page_offset_ = page_offset;
+  mystack_.page_offset_ = process_->getRandomPageOffset();
   setupStack();
 
-  process_->threads_lock_.acquire();
+  // check if process already got killed
+  process_->lockThreadMutex();
   if (process_-> KILLED_)
   {
-    process_->threads_lock_.release();
+    process_->unLockThreadMutex();
     *returnto = 9;
     return;
   }
 
-  //  size_t sleepflag = 1;
-  // size_t res = __atomic_exchange_n(&sleepflag, 0, ustl::memory_order_seq_cst);
-  // debug(X_THREADSTACK, "jst checking exchange: sleep = %ld and check = %ld\n", sleepflag, res);
-  // setup stack, UserRegisters and address space
+  // user_registers_ + set AddressSpace
   ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
                                    (void*) mystack_.userstack_start_,
                                    getKernelStackStartPointer());
@@ -45,81 +52,92 @@ UserThread::UserThread(UserProcess* process, FileSystemInfo* working_dir, ustl::
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx, rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, user_registers_->rip);
 
-  // set terminal
+  // set terminal (not very effective at the moment)
   if (main_console->getTerminal(terminal_number))
     setTerminal(main_console->getTerminal(terminal_number));
 
-  // add Thread to process to scheduler
-  process_->addToThreadList(this);
+  // add Thread to process to scheduler and set starttime for clock
   last_start_ = Scheduler::instance()->getRDTSC();
+  process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
   *returnto = 0;
   switch_to_userspace_ = 1;
-  process_->threads_lock_.release();
+  process_->unLockThreadMutex();
+  debug(X_USERTHREAD, "UserThread() for createProcess() finished for TID [%ld]\n", getTID());
   return;
 }
 
+
 // pthread_create
-UserThread::UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number) :
-  Thread(currentUserThread->working_dir_, currentUserThread->name_, 
-          USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(currentUserThread->process_), flag_mutex_{"thread::flag_mutex_"},
-   join_cond_{&process_->returnvalue_lock_, "Thread::join_cond"},my_pages_lock_{"thread::my_pages_lock_"}
-   , exec_wait_{&process_->waiting_exec_lock_, "Thread::exec_wait_"}// UserThread's members
+UserThread::UserThread( size_t wrapper, 
+                        size_t* returnto, 
+                        uint32_t terminal_number) :
+  Thread( currentUserThread->working_dir_, currentUserThread->name_, USER_THREAD, 
+          ProcessRegistry::instance()->createID()),
+  process_(currentUserThread->process_), 
+  flag_mutex_{"thread::flag_mutex_"},
+  join_cond_{&process_->returnvalue_lock_, "Thread::join_cond"},
+  my_pages_lock_{"thread::my_pages_lock_"},
+  exec_wait_{&process_->waiting_exec_lock_, "Thread::exec_wait_"}
 {
-  //debug(USERTHREAD, "TID [%ld]: pthread thread constructor. start_routine = %lx\n", getTID(), start_routine);
+  debug(X_USERTHREAD, "UserThread() for pthread_create() started for TID [%ld]\n", getTID());
+
+  // loader and stack setup
   loader_ = process_->getLoader();
-  mystack_.page_offset_ = page_offset;
+  mystack_.page_offset_ = getProcess()->getRandomPageOffset();
   setupStack();
 
-  process_->threads_lock_.acquire();
+  // check if process already got killed
+  process_->lockThreadMutex();
   if (process_-> KILLED_)
   {
-    process_->threads_lock_.release();
+    process_->unLockThreadMutex();
     *returnto = 9;
     return;
   }
 
-
+  // user_registers_ + setAddressSpace
   ArchThreads::createUserRegisters(user_registers_, (void*)wrapper,
-                                   (void*) mystack_.userstack_start_, getKernelStackStartPointer());
-
+                                   (void*) mystack_.userstack_start_, 
+                                   getKernelStackStartPointer());
+  ArchThreads::setAddressSpace(this, loader_->arch_memory_);;
   debug(X_USERTHREAD, "TID: [%ld], cr3: %lx, rsp: %lx (stackstart %lx), rip: %lx\n",
     getTID(), user_registers_->cr3, user_registers_->rsp, mystack_.userstack_start_, user_registers_->rip);
   
-  // set up user registers and adressspace
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  debug(X_USERTHREAD, "TID [%ld]: Registers and AddressSpace set.\n", getTID());
-
-  // set terminal
+  // set terminal (not very effective at the moment)
   if (main_console->getTerminal(terminal_number))
     setTerminal(main_console->getTerminal(terminal_number));
 
-  // add Thread to process to scheduler
+  // add Thread to process and scheduler
   last_start_ = Scheduler::instance()->getRDTSC();
+  process_->addToThreadList(this);
   Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
   *returnto = 0;
-  process_->addToThreadList(this);
-  process_->threads_lock_.release();
+  process_->unLockThreadMutex();
+  debug(X_USERTHREAD, "UserThread() for pthread_create() finished for TID [%ld]\n", getTID());
   return;
 }
 
+
 // fork
-UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* returnto) :
-  Thread(child->getWorkingDir(), "fork thread", Thread::USER_THREAD, ProcessRegistry::instance()->createID()),
-  process_(child),flag_mutex_{"thread::flag_mutex_"}, join_cond_{&child->returnvalue_lock_,
-  "Thread::join_cond"}, my_pages_lock_{"thread::my_pages_lock_"}, exec_wait_{&child->waiting_exec_lock_, "Thread::exec_wait_"}
+UserThread::UserThread( UserProcess *child, 
+                        UserThread* parent_thread, 
+                        size_t* returnto) :
+  Thread( child->getWorkingDir(), "fork thread", USER_THREAD, 
+          ProcessRegistry::instance()->createID()),
+  process_(child),flag_mutex_{"thread::flag_mutex_"}, 
+  join_cond_{&child->returnvalue_lock_, "Thread::join_cond"}, 
+  my_pages_lock_{"thread::my_pages_lock_"}, 
+  exec_wait_{&child->waiting_exec_lock_, "Thread::exec_wait_"}
 {
-  debug(X_USERTHREAD, "Entering fork constructor for new thread...\n");
+  debug(X_USERTHREAD, "UserThread() for fork() started for TID [%ld]\n", getTID());
   loader_ = child->getLoader();
 
-  //cant we somehow just write a new setupstack... this makes me uncomfortable as we have 3 different constructors where we
-  // play around with stacks
-
+  // hannes' fun
   mystack_.guardpage_back_nr_ = parent_thread->mystack_.guardpage_back_nr_;
   size_t* UserMut = parent_thread->mystack_.UserMutex;
   mystack_.UserMutex = UserMut; 
@@ -128,62 +146,55 @@ UserThread::UserThread(UserProcess *child, UserThread* parent_thread, size_t* re
   mystack_.userstack_end_ = parent_thread->mystack_.userstack_end_;
   mystack_.userstack_start_ = parent_thread->mystack_.userstack_start_;
 
-
   my_pages_lock_.acquire();
   my_pages_ = parent_thread->my_pages_;
   my_pages_lock_.release();
-  //Nedzma said its the users fault :D
-  // ArchMemoryMapping map = loader_->arch_memory_.resolveMapping(mystack_.userstack_start_ / PAGE_SIZE);
-  // size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(map.page_ppn);
-  // location += PAGE_SIZE - sizeof(size_t);
-  // mystack_.UserMutex = (size_t*) location;
-  // *mystack_.UserMutex = *parent_thread->getStackInfo().UserMutex;
 
+  // user_registers_ + setAddressSpace
   ArchThreads::createUserRegisters(user_registers_,
                                    (void*) parent_thread->user_registers_->rip,
                                    (void*) mystack_.userstack_start_,
                                    parent_thread->getKernelStackStartPointer());
-
-
   memcpy(user_registers_, parent_thread->user_registers_, sizeof(ArchThreadRegisters));
   user_registers_->rax = 0;
   user_registers_->rsp0 = (size_t) getKernelStackStartPointer();
-
-  last_start_ = Scheduler::instance()->getRDTSC();
-
-
-
   ArchThreads::setAddressSpace(this, child->getLoader()->arch_memory_);
 
-  //ArchThreads::printThreadRegisters(this);
-  debug(X_USERTHREAD, "Fork constructor successful for new thread...\n");
+  // add Thread to process and scheduler
+  last_start_ = Scheduler::instance()->getRDTSC();
+  getProcess()->lockThreadMutex();
+  getProcess()->addToThreadList(this);
+  getProcess()->unLockThreadMutex();
   Scheduler::instance()->addNewThread((Thread*)this);
+
   *returnto = 0;
+  debug(X_USERTHREAD, "UserThread() for fork() finished for TID [%ld]\n", getTID());
   return;
 }
+
 
 UserThread::~UserThread()
 {
   switch_to_userspace_ = 0;
-  //debug(X_USERTHREAD, "~UserThread called for thread [%ld] in pid: [%ld] called %s . removing from UserProcess::threads_\n", tid_, process_->getPID(), name_.c_str());
-  // freeMyPages();
   debug(X_USERTHREAD, "[%ld] freed my pages now...\n",tid_);
   if(isLast())
   {
     debug(X_USERTHREAD, "Last Thread with TID [%ld] from process [%ld]. Deleting process_\n", getTID(), process_->getPID());
     delete process_;
   }
-  //switch_to_userspace_ = 0;
 }
 
 
-void UserThread::reDirectToDeath(){
+void UserThread::reDirectToDeath()
+{
     switch_to_userspace_ = 0;
     ArchThreads::changeInstructionPointer(kernel_registers_, (void*) Syscall::pthread_exit);
     return;
 }
 
-bool UserThread::schedulable(){
+
+bool UserThread::schedulable()
+{
   if (getState() == Running)
   {
     //testsystem
@@ -251,27 +262,34 @@ bool UserThread::schedulable(){
 }
 
 
-
-
-void UserThread::setCancelState(int state){
+void UserThread::setCancelState(int state)
+{
   myflags_.cancelable = state;
   if(state == PTHREAD_CANCEL_DISABLE)
     myflags_.knotcancelable = true;
   return;
 }
-void UserThread::setCancelType(int type) {
+
+
+void UserThread::setCancelType(int type) 
+{
   myflags_.deferred = type;
   if (type == PTHREAD_CANCEL_ASYNCHRONOUS)
     myflags_.kasynchronous = true;
   return;
 }
-void UserThread::sendCancelRequest(){
+
+
+void UserThread::sendCancelRequest()
+{
   myflags_.cancelreq = true;
   myflags_.kcancelreq = true;
   return;
-  }
+}
 
-void UserThread::getNewStackPage(size_t adress){
+
+void UserThread::getNewStackPage(size_t adress)
+{
   if(process_->checkKill())
     return;
   my_pages_lock_.acquire();
@@ -288,40 +306,31 @@ void UserThread::getNewStackPage(size_t adress){
   return;
 }
 
-void UserThread::freeMyPagesAndDie(bool actually_die){
-  // if (loader_ == 0)
-  //   return;
-  // process_->lockKill();
-  // if(process_->checkKill())
-  // {
-  //   process_->unlockKill();
-  //   return;
-  // } 
-  // process_->unlockKill();
+
+void UserThread::freeMyPagesAndDie(bool actually_die)
+{
+  // kill now if KILLED_ is already true
   if (process_->checkKill() && actually_die)
-  {
     this->kill();
-  }
   
+  // 
   DYING_ = true;
   my_pages_lock_.acquire();
   loader_->arch_memory_.lockArchMemory();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
-    //might delete the assert later
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
   loader_->arch_memory_.unlockArchMemory();
-  //state_ = ToBeDestroyed;
   my_pages_lock_.release();
+
+  // kill now
   if(actually_die)
     this->kill();
   else
     DYING_ = false;
-  //Scheduler::instance()->yield();
 }
-
 
 
 bool UserThread::setupStack()

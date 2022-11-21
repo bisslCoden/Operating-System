@@ -13,6 +13,7 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
+
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t* returnto, uint32 terminal_number) :
     pid_(ProcessRegistry::instance()->createID()), 
@@ -38,12 +39,13 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     *returnto = 1;
     return;
   }
+
   size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setChildStatus(0);
-  //threads_lock_.acquire();
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(),terminal_number, UserProcess::getRandomPageOffset(), &returnto_th);
-  //threads_lock_.release();
+
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th);
+
   assert(first_thread && "UserThread constructor failed");
   if (returnto_th != 0)
   {
@@ -54,6 +56,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   *returnto = 0;
   return;
 }
+
 
 // User Process Constructor for fork
 UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
@@ -85,7 +88,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     return;
   }
 
-
   if (!setupLoader(fd_))
   {
     *returnto = 1;
@@ -109,14 +111,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   }
   offsets_.push_back(currentUserThread->getStackInfo()->page_offset_);
   setChildStatus(1);
-
-  if (!threads_lock_.isHeldBy(currentThread))
-  {
-    threads_lock_.acquire();
-  }
-  
-  addToThreadList(thread);
-  threads_lock_.release();
   ProcessRegistry::instance()->processStart();
   
   //?
@@ -124,6 +118,7 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   *returnto = 0;
   return;
 }
+
 
 UserProcess::~UserProcess()
 {
@@ -148,29 +143,25 @@ UserProcess::~UserProcess()
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
 }
 
+
 bool UserProcess::addToThreadList(UserThread* thread)
 {
-  //threads_lock_.acquire();
+  assert(thread && "WHAT?");
+  assert(threads_lock_.isHeldBy(currentThread) && "threads_lock_ must be aqcuired before!");
+
   size_t tid = thread->getTID();
-
   if(threads_.find(tid) != threads_.end())
-  {
-    debug(USERPROCESS, "SHIT: addToThreadList() already has thread with tid [%ld] in list\n", tid);
-    threads_lock_.release();
-
-    assert(false); // assert or not? - lets leave them in for now :D 
-    return false; 
-  }
+    assert(false && "SHIT: addToThreadList() already has thread with tid [%ld] in list");
 
   threads_.insert(ustl::make_pair(tid, thread));
   debug(X_USERPROCESS, "added TID: [%ld] to UserProcess::threads_\n", tid);
 
-  //threads_lock_.release();
   return true;
 }
 
-//this function locks internally!
-bool UserProcess::addToRetvalList(size_t tid, void* value){
+
+bool UserProcess::addToRetvalList(size_t tid, void* value)
+{
   if(!returnvalue_lock_.isHeldBy(currentUserThread))
     returnvalue_lock_.acquire();
 
@@ -339,7 +330,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   }
   threads_lock_.release();
 
-  thread = new UserThread(wrapper, getRandomPageOffset(), &return_to);
+  thread = new UserThread(wrapper, &return_to);
   
   threads_lock_.acquire();
   if (KILLED_ && return_to == 0)

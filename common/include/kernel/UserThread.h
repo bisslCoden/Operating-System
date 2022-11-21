@@ -15,40 +15,39 @@
 class UserProcess;
 
 enum cancelstate {
-    PTHREAD_CANCEL_ENABLE,
-    PTHREAD_CANCEL_DISABLE
+    PTHREAD_CANCEL_ENABLE,  // thread can be cancelled at cancellation point (before & after switch(syscall_number))
+    PTHREAD_CANCEL_DISABLE  // thread cannot be cancelled until set to ENABLE
 };
 
 enum canceltype {
-    PTHREAD_CANCEL_DEFERRED,
-    PTHREAD_CANCEL_ASYNCHRONOUS
+    PTHREAD_CANCEL_DEFERRED,    // thread can be cancelled only at cancellation points
+    PTHREAD_CANCEL_ASYNCHRONOUS // can be cancelled any time.
 };
 
 enum joinbale {
-    PTHREAD_CREATE_JOINABLE, 
-    PTHREAD_CREATE_DETACHED
+    PTHREAD_CREATE_JOINABLE,  // return value for pthread_join available
+    PTHREAD_CREATE_DETACHED   // return value for pthread_join unavailable
 };
 
 typedef struct Threadflags
 {
-  int cancelable = PTHREAD_CANCEL_ENABLE;
-  int deferred = PTHREAD_CANCEL_DEFERRED;
-  //TODO joinable
-  bool cancelreq = false;
-  int joinable = PTHREAD_CREATE_JOINABLE;
-  ustl::atomic<bool> kcancelreq = false;
+  int  cancelable = PTHREAD_CANCEL_ENABLE;
+  int  deferred   = PTHREAD_CANCEL_DEFERRED;
+  int  joinable   = PTHREAD_CREATE_JOINABLE;
+  bool cancelreq                    = false;
+  ustl::atomic<bool> kcancelreq     = false;
   ustl::atomic<bool> knotcancelable = false;
-  ustl::atomic<bool> kasynchronous = false;
+  ustl::atomic<bool> kasynchronous  = false;
 }Threadflags;
 
 class Semaphore;
 typedef struct StackInfo
 {
-  size_t userstack_start_ = 0;
-  size_t userstack_end_ = 0;
-  size_t page_offset_ = 0;
-  size_t guardpage_front_nr_ = 0;
-  size_t guardpage_back_nr_ = 0;
+  size_t userstack_start_     = 0;
+  size_t userstack_end_       = 0;
+  size_t page_offset_         = 0;
+  size_t guardpage_front_nr_  = 0;
+  size_t guardpage_back_nr_   = 0;
   ustl::atomic<size_t*> UserMutex;
 } StackInfo;
 
@@ -64,7 +63,7 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t page_offset, size_t* returnto);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t* returnto);
     
     /**
      * @brief Construct a new User Thread object for pthread_create()
@@ -73,7 +72,7 @@ class UserThread : public Thread
      * @param page_offset offset for stack location
      * @param terminal_number the terminal to run in (default 0)
      */
-    UserThread(size_t wrapper, size_t page_offset, size_t* returnto, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, size_t* returnto, uint32_t terminal_number = 0);
 
     /**
      * @brief Construct a new User Thread object for fork()
@@ -139,6 +138,13 @@ class UserThread : public Thread
     int getJoinState()                {return myflags_.joinable;}
 
     void getNewStackPage(size_t adress);
+    
+    /**
+     * @brief kills thread immediately if needed.
+     * otherwise unmapPage() before
+     * 
+     * @param actually_die 
+     */
     void freeMyPagesAndDie(bool actually_die);
 
     // acqurie retvallock before!   join_waiter_ = thread;
@@ -163,7 +169,7 @@ class UserThread : public Thread
     void setCancelType(int type);
     void sendCancelRequest();
     void setLast()                    { last_ = true;}    
-    // instruction pointer rip set to pthread_exit()
+    // instruction pointer (rip) set to pthread_exit()
     void reDirectToDeath();
 
     // getters
@@ -181,21 +187,8 @@ class UserThread : public Thread
     Mutex flag_mutex_;
     Condition join_cond_;
 
-    /**
-      int cancelable  = PTHREAD_CANCEL_ENABLE or PTHREAD_CANCEL_DISABLE
-      int deferred    = PTHREAD_CANCEL_DEFERRED or PTHREAD_CANCEL_ASYNCHRONOUS
-      int joinable;
-      bool cancelreq = false;
-      ustl::atomic_flag kcancelreq;
-      ustl::atomic_flag knotcancelable;
-      ustl::atomic_flag kasynchronous;
-     * 
-     */
     Threadflags myflags_;
-    /** userstack_start_
-        size_t userstack_end_
-        size_t page_offset_
-     */
+
     StackInfo mystack_;
     bool last_ = false; 
 

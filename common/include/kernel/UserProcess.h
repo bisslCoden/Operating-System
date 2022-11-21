@@ -29,31 +29,26 @@ class UserProcess
 {
   public:
     /**
-     * Constructor
+     * Constructor for createprocess()
      * @param minixfs_filename filename of the file in minixfs to execute
      * @param fs_info filesysteminfo-object to be used
      * @param terminal_number the terminal to run in (default 0)
      *
      */
     UserProcess(ustl::string minixfs_filename, FileSystemInfo *fs_info,  size_t* returnto, uint32 terminal_number = 0);
+
     /**
-     * Constructor
+     * Constructor for fork()
      * @param parent parent process that shall be forked
      *
      */
     UserProcess(UserProcess* parent, size_t* returnto);
 
-     /**
-     * CopyConstructor
-     * @param parent_process
-     *
-     */
-
-
+    // destructor 
     ~UserProcess();
 
     /**
-     * @brief safely adds a userthread to threads
+     * @brief UNSAFELY adds a userthread to threads
      * 
      * @param thread the userthread
      * @return true if successful
@@ -159,9 +154,11 @@ class UserProcess
     void unlockRetVal()                   { returnvalue_lock_.release();}
     bool checkRetValLock(Thread* thread)  { return returnvalue_lock_.isHeldBy(thread);}
 
-
+    // threads_lock_.acquire();
     void lockThreadMutex()                {threads_lock_.acquire();}
+    // threads_lock_.release();
     void unLockThreadMutex()              {threads_lock_.release();}
+    // true if threads_lock_ was aquired by thread
     bool testThreadMutex(Thread* thread)  { return threads_lock_.isHeldBy(thread); }
 
     // getters

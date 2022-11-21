@@ -141,7 +141,7 @@ after:
   return return_value;
 }
 
-// ???
+// is there no better place to put this? i guess not..
 bool checkAdressValid(void* addr)
 {
   if ((long long unsigned)addr > USER_BREAK)
@@ -180,6 +180,7 @@ void Syscall::exit(size_t exit_code)
   debug(USERPROCESS, "exit sucessfuly finished!\n");
 }
 
+
 size_t Syscall::write(size_t fd, pointer buffer, size_t size)
 {
   //WARNING: this might fail if Kernel PageFaults are not handled
@@ -203,6 +204,7 @@ size_t Syscall::write(size_t fd, pointer buffer, size_t size)
   return num_written;
 }
 
+
 size_t Syscall::read(size_t fd, pointer buffer, size_t count)
 {
   if ((buffer >= USER_BREAK) || (buffer + count > USER_BREAK))
@@ -225,10 +227,12 @@ size_t Syscall::read(size_t fd, pointer buffer, size_t count)
   return num_read;
 }
 
+
 size_t Syscall::close(size_t fd)
 {
   return VfsSyscall::close(fd);
 }
+
 
 size_t Syscall::open(size_t path, size_t flags)
 {
@@ -252,6 +256,7 @@ void Syscall::outline(size_t port, pointer text)
     writeLine2Bochs((const char*) text);
   }
 }
+
 
 size_t Syscall::createprocess(size_t path, size_t sleep)
 {
@@ -290,20 +295,19 @@ void Syscall::trace()
 }
 
 
-
 // ------------------------------------------------------------------------------------------------ //
 //                                                                                                  //
 //                                  HERE'S WHERE THE FUN STARTS!!!                                  //
 //                                                                                                  //
 // ------------------------------------------------------------------------------------------------ //
 
-size_t Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
+int Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, size_t arg, size_t wrapper)
 {
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx, wrapper = %lx) called\n", thread, attr, start_routine, arg, wrapper);
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
   // could be dangerous but we have NO locks here...
 
-  // standard joinstate is joinable!
+  // handle joinstate. standard is joinable
   int joinstate = PTHREAD_CREATE_JOINABLE;
   if(attr >= 0x1000)
   {
@@ -339,18 +343,19 @@ void Syscall::pthread_exit(void* value)
   size_t my_tid = currentUserThread->getTID();
   
   currentUserProcess->lockThreadMutex();
-  if (currentUserProcess->findInThreadList(my_tid) != 0x00)
+  // check if thread in list
+  if (currentUserProcess->findInThreadList(my_tid) != NULL) // if thread in list:
   {
     if (!currentUserProcess->checkRetValLock(currentThread))
       currentUserProcess->lockRetVal();
     
-    // if there is a joiner:
+    // check if there is a joiner:
     if (currentUserThread->getJoiner() != 0)
     {
-      // signal join
       UserThread* to_be_signaled;
-      if((to_be_signaled = (UserThread*)currentUserProcess->findInThreadList(currentUserThread->getJoiner()->getTID()))!= 0x00)
+      if((to_be_signaled = (UserThread*)currentUserProcess->findInThreadList(currentUserThread->getJoiner()->getTID())) != 0x00)
       {
+        // signal join
         to_be_signaled->signalJoin();
       }
       else
@@ -359,24 +364,27 @@ void Syscall::pthread_exit(void* value)
         debug(X_USERTHREAD, "Veeery strange! Joiner is not -1 but also not in my process... I must be a forked thread!\n");
       }
     }
+
     currentUserThread->lockFlagMutex();
     if (currentUserThread->getflags()->joinable == PTHREAD_CREATE_DETACHED)
     {
+      // detached -> no retval
       currentUserThread->unlockFlagMutex();
       currentUserProcess->unlockRetVal();
     }
     else
     {  
+      // joinable -> add retval
       currentUserThread->unlockFlagMutex();
       currentUserProcess->addToRetvalList(currentUserThread->getTID(), value);
     } 
-    
+    // thread termination.
     currentUserProcess->removeFromThreadList(currentUserThread);
     currentUserProcess->unLockThreadMutex();
+    
     currentUserProcess->removeFromOffsetList(currentUserThread->getStackInfo()->page_offset_);
     //experimentaaal: free my pages on my own!
     currentUserThread->freeMyPagesAndDie(true);
-    //currentThread->kill();
   }
   else
   {
