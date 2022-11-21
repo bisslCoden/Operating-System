@@ -62,21 +62,29 @@ class UserProcess
     bool addToThreadList(UserThread* thread);
 
     /**
-     * @brief kills all threads except for one + opens the file +
-     *  creates loader and sets to loader_. old loaders are deleted
+     * @brief UNSAFELY removes userthread from threads_ 
+     * 
+     * @param thread the userthread
+     * @return true if found in list
+     * @return false if not found
+     */
+    bool removeFromThreadList(UserThread* thread);
+
+    /**
+     * @brief opens binary -> fd, setupLoader(), removeOldProcessInformation()
      * 
      * @param path the path to the binary
-     * @param argv the arguments 
+     * @param argv the arguments ARE CREATED WITH NEW, MUST BE DELETED IN UserThread::execv()
      * @param argc the argument count
      */
     int execv(const char* path, char *const argv[], size_t argc);
-    /**
-     * @brief creates a thread that starts the binary of the program
-     * 
-     * @param path the path to the binary
-     */
-    int execv(const char* path);
 
+    /**
+     * @brief call exit(), clear revunvalues_, clear offsets_, KILLED_ = false
+     * 
+     * @return true if success
+     * @return false if waiting_exec_ != 0
+     */
     bool removeOldProcessInformation();
 
     /**
@@ -88,14 +96,6 @@ class UserProcess
      */
     bool setupLoader(ssize_t fd);
 
-    /**
-     * @brief UNSAFELY removes userthread from threads_ 
-     * 
-     * @param thread the userthread
-     * @return true if found in list
-     * @return false if not found
-     */
-    bool removeFromThreadList(UserThread* thread);
 
     /**
      * @brief UNSAFELY searches TID in threads_ LOCK BEFORE AND RELEASE AFTER CALL

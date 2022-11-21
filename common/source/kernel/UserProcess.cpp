@@ -425,51 +425,11 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   return false;
 }
 
-int UserProcess::execv(const char* path)
-{
-
-  debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
-  ssize_t old_fd = fd_;
-  Loader* old_loader = loader_;
-  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
-  if(!setupLoader(new_fd))
-  {
-    debug(USERPROCESS, "execv() ERREOR with fd or Loader\n");
-    fd_ = old_fd;
-    VfsSyscall::close(new_fd);
-    return -1;
-  }
-  debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
-  if(!removeOldProcessInformation())
-  {
-  //  VfsSyscall::close(new_fd);
-    fd_ = old_fd;
-    VfsSyscall::close(new_fd);
-    return -1;
-  }
-  name_ = path;
-
-  // exec
-  debug(X_USERPROCESS, "execv(path = %s) sucessfully opened file + created loader + did loadExecutablea() + killed all threads.\n", path);
-  threads_lock_.acquire();
-  KILLED_ = false;
-  threads_lock_.release();
-
-  currentUserThread->execv();
-
-  VfsSyscall::close(old_fd);
-  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
-  waiting_exec_lock_.acquire();
-  waiting_exec_ = 0;
-  waiting_exec_lock_.release();
-  
-  debug(X_USERPROCESS, "[%ld] execv() fd and loader setup finished successfully exiting exec\n", getPID());
-  return 0;
-}
-
 int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
+
+  // open fd and new loader - must be closed and freed later
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
@@ -480,25 +440,24 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
     VfsSyscall::close(new_fd);
     return -1;
   }
+
+  // mabye that can be put next to setupLoader() because we do the same things.
   debug(X_USERPROCESS, "execv() fd and loader setup finished successfully\n");
   if(!removeOldProcessInformation())
   {
-  //  VfsSyscall::close(new_fd);
     fd_ = old_fd;
     VfsSyscall::close(new_fd);
     return -1;
   }
   name_ = path;
-
-  threads_lock_.acquire();
-  KILLED_ = false;
-  threads_lock_.release();
   
   currentUserThread->execv(argv, argc);
 
+  // open fd and new loader - must be closed and freed later
   VfsSyscall::close(old_fd);
-  delete old_loader; // triggers assert.. i guess i'll just accept the memory leak.
+  delete old_loader; 
   
+  // exec success, we're ready for another exec call!
   waiting_exec_lock_.acquire();
   waiting_exec_ = 0;
   waiting_exec_lock_.release();
@@ -509,63 +468,76 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 
 bool UserProcess::setupLoader(ssize_t fd)
 {
-
-  fd_ = fd;
-  if(fd_ < 0)
+  // faulty fd
+  if(fd < 0)
   {
-    debug(LOADER, "setuploader failed because fd is unreasonable(%ld)\n", fd);
+    debug(LOADER, "setuploader(%ld) failed because... fd value\n", fd);
     return false;
   }
+
+  // set fd_, new_loader -> check new loader, get ready to rumble if possible
+  fd_ = fd;
   Loader* new_loader = new Loader(fd_);
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
   {
-    debug(LOADER, "setuploader failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
+    debug(LOADER, "setuploader() failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
     return false;
   }
 
+  // success
   loader_ = new_loader;
   loader_->arch_memory_.setProcess(this);
+  debug(LOADER, "setuploader() sucess \n");
   return true;
 }
 
 bool UserProcess::removeOldProcessInformation()
 {
-  debug(X_USERPROCESS, "[%ld] removingOldProcessInformation() entered\n", getPID());
+  debug(X_USERPROCESS, "removingOldProcessInformation() entered: PID [%ld] \n", getPID());
 
+  // only 1 lonely thread -> nobody must be killed today.
   threads_lock_.acquire();
   if (threads_.size() < 2)
   {
     threads_lock_.release();
-    goto done;
+    goto killing_done;
   }
   threads_lock_.release();
 
+  // THE KILLING 
   waiting_exec_lock_.acquire();
-  if (waiting_exec_ == 0)
-  {
-    waiting_exec_ = currentUserThread;
-    exit(13579, false);
-    currentUserThread->waitExec();
-  }
-  else
+  if (waiting_exec_ != 0) // somebody already execing! kill myself
   {
     waiting_exec_lock_.release();
     debug(X_USERTHREAD, "Somebody was faster than me... well I m dying goodbye!\n");
     return false;
   }
+  else // nobody else execing. kill everyone!
+  {
+    waiting_exec_ = currentUserThread;
+    exit(13579, false);
+    currentUserThread->waitExec();
+  }
   waiting_exec_lock_.release();
 
-done:
+killing_done:
+  // clear returnvalues_
   if (!returnvalue_lock_.isHeldBy(currentUserThread))
     returnvalue_lock_.acquire();
   returnvalues_.clear();
   returnvalue_lock_.release();
 
+  // clear offsets_
   if (!offsetlist_lock_.isHeldBy(currentUserThread))
     offsetlist_lock_.acquire();
   offsets_.clear();
   offsetlist_lock_.release();
   debug(X_USERPROCESS, "[%ld] removingOldProcessInformation() finished\n", getPID());
+
+  // set KILLED_ to false
+  threads_lock_.acquire();
+  KILLED_ = false;
+  threads_lock_.release();
   return true;
 }
 

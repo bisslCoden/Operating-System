@@ -13,27 +13,16 @@ void* subroutine(void* args)
 
 int main()
 {
-  printf("main(): seawas. will call a fuckload of threads.\n");
-  
-  // size_t values[PTHREAD_CALLS];
-  // for(size_t i = 0; i < PTHREAD_CALLS; i++)
-  //   values[i] = i;
-
-  // // pthread calls
-  // pthread_t tid[PTHREAD_CALLS];
-  // for(size_t i = 0; i < PTHREAD_CALLS; i++)
-  //   tid[i] = pthread_create(tid + i, 0,  &subroutine, (values + i));
- 
   // hardcoded args :(
   char* const path = "/usr/printuntilnull.sweb";
 	char* const arg1 = "Eier";
 	char* const arg2 = "Mehl";
 	char* const arg3 = "Butter";
 	char* const arg4 = "Salz";
-	char* const arg5 = "Mehl";
+	char* const arg5 = "DAS ARGS SOLLTE NIE GEPRINTET WERDEN FUAAQQQQ";
 
 	// exec call
-	char* const args[] = {path, arg1, arg2, arg3, arg4, NULL, arg5, NULL};
+	char* const args[] = {arg1, arg2, arg3, arg4, NULL, arg5, NULL};
 	printf("before exec\n");
 	int ret = execv(path, args);
   printf("execv failed with return value %d!\n", ret);

@@ -409,98 +409,69 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo)
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
-  debug(X_USERTHREAD, "argc = %ld\n", argc);
+  name_ = process_->getName();
+
+  // debugs
+  debug(X_USERTHREAD, "execv(argv = %lx, argc = %ld): name_ = %s\n", (size_t)argv, argc, name_.c_str());
   for(size_t i = 0; i < argc; i++)
     debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
-
-
-  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
-  name_ = process_->getName();
-  debug(X_USERTHREAD, "execv(): %s. argc = %ld\n", name_.c_str(), argc);
-
-
-
+  assert(((argv && argc) || (!argv && !argc)) && "both must be null or both non-null o_O");
+    
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
   debug(X_USERTHREAD, "execv(): set new archmemory\n");
 
-  // setup copy
-  size_t ppn = PageManager::instance()->allocPPN();
-  size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE;
-  assert(loader_->arch_memory_.mapPage(vpn, ppn, 1));
-
-  size_t new_argv = USER_BREAK - PAGE_SIZE;
-  char** argv_arr = (char**) new_argv;
-  // + sizeof(size_t) for null termination
-  size_t str_offset = argc * sizeof(char*) + sizeof(size_t);
-
-  // copy from argv[] into fresh archmem
-  for(size_t i = 0; i < argc; i++)
+  if(argc)
   {
-    size_t str_len = strlen(argv[i]) + 1;
-    if(str_offset + str_len >= PAGE_SIZE)
-      return -1;
+    // args: copy from argv[] into fresh archmem ONLY IF NECESSARY
+    size_t ppn = PageManager::instance()->allocPPN();
+    size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE; // the virtual page we use to pass the args
+    assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "why tf was this mapped? This is exec place");
+    size_t new_argv = USER_BREAK - PAGE_SIZE; // the virtual address
+    char** argv_arr = (char**) new_argv; // the virtual address casted
+    size_t str_offset = argc * sizeof(char*) + sizeof(size_t); // + sizeof(size_t) for null termination
+    for(size_t i = 0; i < argc; i++)
+    {
+      size_t str_len = strlen(argv[i]) + 1;
+      if(str_offset + str_len >= PAGE_SIZE)
+        return -1;
 
-    memcpy((void*)(new_argv + str_offset), (void*) argv[i], str_len);
-    debug(X_USERTHREAD, "execv(): memcpy(): copying %s from argv[%lx] to (argv_arr + str_offset) = %lx\n", argv[i], (size_t)(argv + i), (size_t)(new_argv + str_offset));
+      memcpy((void*)(new_argv + str_offset), (void*) argv[i], str_len);
+      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from argv[%lx] to (argv_arr + str_offset) = %lx\n", argv[i], (size_t)(argv + i), (size_t)(new_argv + str_offset));
 
-    argv_arr[i] = (char*)(new_argv + str_offset);
-    debug(X_USERTHREAD, "execv(): memcpy() memcpy(argv_arr[%lx] = (%lx)\n", (size_t)argv_arr[i], new_argv + str_offset);
+      argv_arr[i] = (char*)(new_argv + str_offset);
+      debug(X_USERTHREAD, "execv(): memcpy() memcpy(argv_arr[%lx] = (%lx)\n", (size_t)argv_arr[i], new_argv + str_offset);
 
-    str_offset += str_len;
+      str_offset += str_len;
+    }
+    // args: null termination 
+    argv_arr[argc] = NULL;
+
+    // args: free kernel_argv
+    for (size_t i = 0; i < argc; i++)
+      delete[] argv[i];
+
+    // args: debugs copy
+    debug(X_USERTHREAD, "execv(): after for-loop.\n");
+    for (size_t i = 0; i < argc; i++)
+      debug(X_USERTHREAD, "execv(): argv_arr[%ld]: %s\n", i, argv_arr[i]);
+    debug(X_USERTHREAD, "execv(): copied from argv[] to new location\n");
+
+    // args: set registers for args
+    user_registers_->rdi = argc;
+    user_registers_->rsi = new_argv;
   }
-  argv_arr[argc] = NULL;
 
-  for (size_t i = 0; i < argc; i++)
-  {
-    delete[] argv[i];
-  }
-
-  debug(X_USERTHREAD, "execv(): after for-loop.\n");
-
-  for (size_t i = 0; i < argc; i++)
-  {
-    debug(X_USERTHREAD, "execv(): argv_arr[%ld]: %s\n", i, argv_arr[i]);
-  }
-  debug(X_USERTHREAD, "execv(): copied from argv[] to new location\n");
-
-  // setup stack and set registers
-  mystack_.UserMutex = USERMUTEX_INVALID;
+  // setup stack and set registers for stack and start
+  debug(X_USERTHREAD, "execv(): reuseStack() + setting args.\n");
   assert(reuseStack(&mystack_));
-
+  mystack_.UserMutex = USERMUTEX_INVALID;
   user_registers_->rsp = (size_t) mystack_.userstack_start_;
   user_registers_->rip = (size_t)loader_->getEntryFunction();
-  user_registers_->rdi = argc;
-  user_registers_->rsi = new_argv;
   debug(X_USERTHREAD, "execv(): rsp = %lx, rip = %lx, rdi = %ld, rsi = %lx\n", user_registers_->rsp, user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
   return 0;
 }
-
-int UserThread::execv()
-{
-  // important: after setAddressSpace the cr3 register of the thread is updated to the new archmemory
-  name_ = process_->getName();
-  mystack_.UserMutex = USERMUTEX_INVALID;
-  //freeMyPagesAndDie(false);
-
-  loader_ = process_->getLoader();
-  ArchThreads::createUserRegisters(user_registers_, loader_->getEntryFunction(),
-                                   (void*) mystack_.userstack_start_,
-                                   getKernelStackStartPointer());
-  ArchThreads::setAddressSpace(this, loader_->arch_memory_);
-  assert(reuseStack(&mystack_));
-  debug(X_USERTHREAD, "execv(): set name_ = %s, loader_ = %lx, setAddressSpace(), mystack_.page_offset_ = %lx\n", name_.c_str(), (size_t)loader_, mystack_.page_offset_);
-
-  // passing new virtual memory to userspace
-  user_registers_->rsp = mystack_.userstack_start_;
-  user_registers_->rip = (size_t)loader_->getEntryFunction();
-  // user_registers_->rdi = (size_t)argv;
-  // user_registers_->rsi = argc;
-  debug(X_USERTHREAD, "execv(): rip = %lx, rdi = %lx, rsi = %lx\n", user_registers_->rip, user_registers_->rdi, user_registers_->rsi);
-  return 0;
-}
-
 
 bool UserThread::detectCircularJoin(UserThread* to_be_joined){
   if (join_waiter_ == 0)

@@ -11,5 +11,5 @@ int main(int argc, const char *argv[])
 	printf("before exec\n");
 	int ret_exec = execv(path, NULL);
   printf("execv failed with return value %d!\n", ret_exec);
-	return 42;
+	return 0;
 }

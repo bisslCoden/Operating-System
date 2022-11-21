@@ -2,21 +2,22 @@
 #include <stdio.h>
 #include "pthread.h"
 
-int main(int argc, const char *argv[])
+#define MAX_ARGS 5
+
+int main()
 {
-  // hardcoded args :( - MAX_ARGS
-  char* const path = "/usr/printuntilnull.sweb";
+  // hardcoded args :(
+  char* const path = "/usr/printargvloop.sweb";
 	char* const arg1 = "Eier";
 	char* const arg2 = "Mehl";
 	char* const arg3 = "Butter";
 	char* const arg4 = "Salz";
-	char* const arg5 = "Mehl";
-
-  printf("calling exec now\n");
+	char* const arg5 = "DAS ARGS SOLLTE NIE GEPRINTET WERDEN FUAAQQQQ";
 
 	// exec call
-	char* const args[] = {arg1, arg2, arg3, arg4, arg5, NULL};
-	int ret_exec = execv(path, args);
-  printf("execv failed with return value %d!\n", ret_exec);
+	char* const args[] = {arg1, arg2, arg3, arg4, NULL, arg5, NULL};
+	printf("before exec\n");
+	int ret = execv(path, args);
+  printf("execv failed with return value %d!\n", ret);
 	return 0;
 }

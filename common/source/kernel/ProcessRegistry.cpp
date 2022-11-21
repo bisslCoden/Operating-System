@@ -169,78 +169,91 @@ size_t ProcessRegistry::processFork()
   return process->getPID();
 }
 
-ustl::map<size_t, UserProcess*> ProcessRegistry::getProcessList()
-{
-  return list_of_processes_;
-}
-
-
 void ProcessRegistry::createProcess(const char* path)
 {
   debug(PROCESS_REG, "createProcess(path = %s)\n", path);
-  size_t returnto = 6;
   FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
   if(!fs_info)
   {
     debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
     return;
   }
+
+  // return_to used as return value for UserProcess(). 0 = success
+  size_t returnto = 6;
   UserProcess* process = new UserProcess(path, fs_info, &returnto);
+
+  // check UserProcess construction
   if (returnto != 0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess[%ld]: [%ld]... assert!\n",process->getPID(), returnto);
     assert(false);
   }
-  // if(!process || process->getPID() == 0)
-  // {
-  //   debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object process\n");
-  //   return;
-  // }
 
-  debug(X_PROCESS_REG, "created process successfully!\n");
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
+  debug(X_PROCESS_REG, "created process successfully!\n");
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
   list_of_processes_lock_.release();
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
+
+
 int ProcessRegistry::execv(const char* path, char *const argv[])
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
-  int argc = areExecArgsValid(path, argv);
-  if(argc > 0)
+  int argc = areExecArgsValid(argv);
+  if(argc == -1)
   {
-    // copy args locally because user's pointers may have wonky behaviour
-    char* here[argc];
+    debug(X_PROCESS_REG, "ERROR: execv found no valid args. returning -1\n");
+    return argc;
+  }
+  else if(argc == 0)
+  {
+    debug(X_PROCESS_REG, "execv() found no arguments. proceeding without args\n");
+    return currentUserThread->getProcess()->execv(path, NULL, 0);
+  }
+  else if(argc > 0)
+  {
+    // copy args locally because user's pointers may lead to wonky behaviour
+    char* kernel_argv[argc];
     for (int i = 0; i < argc; i++)
     {
-      here[i] = new char[strlen(argv[i]) + 1];
-      memcpy(here[i], argv[i], strlen(argv[i]));
-      here[i][strlen(argv[i])] = '\0';
-      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to here[%d] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(here + i));
-    }
-    debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
-    return currentUserThread->getProcess()->execv(path, here, argc);
-  }
+      // strlen does not count null-termination
+      size_t str_len = strlen(argv[i]);
+      // free'd in UserThread::execv() after copying to new archmemory.
+      kernel_argv[i] = new char[str_len + 1];
+  
+      // copy content 
+      memcpy(kernel_argv[i], argv[i], strlen(argv[i]));
+      // because null termination is not copied, we add it manually - don't get confused by off-by-one!
+      kernel_argv[i][str_len] = '\0';
 
+      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to kernel_argv[%d] which lies at %lx\n", argv[i], (size_t)(argv + i), i, (size_t)(kernel_argv + i));
+    }
+
+    debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
+    return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
+  }
+  assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");
   return argc;
 }
 
-int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
+int ProcessRegistry::areExecArgsValid(char* const argv[])
 {
   debug(X_PROCESS_REG, "areExecArgsValid()?\n");
+
+  // argc = 0 if any of those is null.
+  int argc = 0;
+  if(!argv || !argv[0])
+    return argc;
   
-  // here we already know that path is okay and argv != NULL -> check if 
+  // in userspace?
   if((size_t)argv >= USER_BREAK || (size_t)argv[0] >= USER_BREAK)
     return -1;
 
-  // first char* may be null. call exec without args
-  if(!argv[0])
-    return execv(path);
-
-  // increase argc until NULL. also don't accept too long strings.
-  int argc = 0;
+  // increase argc until NULL. error for very long strings to detect missing null-terminatioin of string.
   while(argv[argc])
   {
     for(int i = 0; argv[argc][i]; i++)
@@ -253,15 +266,6 @@ int ProcessRegistry::areExecArgsValid(const char* path, char* const argv[])
   debug(X_PROCESS_REG, "areExecArgsValid(): everything seems fine\n");
   return argc;
 }
-
-int ProcessRegistry::execv(const char* path)
-{
-  debug(X_PROCESS_REG, "execv() said: no args! path = %s\n", path);
-  UserProcess* currentProcess = currentUserThread->getProcess();
-  debug(PROCESS_REG, "execv() for TID [%ld] in PID [%ld]\n", currentThread->getTID(), currentProcess->getPID());
-  return currentProcess->execv(path);
-}
-
 
 
 
@@ -296,63 +300,7 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
     list_of_processes_lock_.release();
     debug(X_USERPROCESS, "Process [%ld] now waiting for [%ld]\n", parent_process->getPID(), to_be_joined->getPID());
     parent_process->waitPIDSem();
-    // while (parent_process->getWaitStatus() && !search_child->second->getWaitStatus() && search_child->second->getProcessState() == 2) 
-    // {
-    //   Scheduler::instance()->yield();
-    //   if(process_state != search_child->second->getProcessState() || search_child->second->getProcessState() == 0)
-    //   {
-    //     list_of_processes_lock_.acquire();
-    //     parent_process->setWaitStatus(0);
-    //     list_of_processes_lock_.release();
-    //   }
-    // }
   }
-  /*
-  else if((long int) arg1 == -1) // any child process.
-  {
-    debug(WAITPID, "arg1 equals -1, process %ld\n", arg1);
-    wait_pid_lock_.acquire();
-    ustl::map<size_t, UserProcess*> list = ProcessRegistry::getProcessList();
-    UserProcess* child = parent_process;
-    wait_pid_lock_.release();
-    for (ustl::map<size_t, UserProcess*>::iterator i = list.begin(); i != list.end(); ++i) 
-    {
-      if((i->second->getChildStatus() == 1) && (parent_process->getPID() != i->second->getPID()) && (child->getWaitStatus() == 0))
-      {
-        wait_pid_lock_.acquire();
-        child = i->second;
-        wait_pid_lock_.release();
-        break;
-      }
-    }
-    if(child->getPID() == parent_process->getPID()){
-      debug(WAITPID, "No child process\n");
-      return -1;
-    }
-    wait_pid_lock_.acquire();
-    parent_process->setWaitStatus(1);
-    size_t process_state = child->getProcessState();
-    return_pid = child->getPID();
-    wait_pid_lock_.release();
-    //maybe the child wait status can be changed to 1 with more waitpids
-    while (parent_process->getWaitStatus() && !child->getWaitStatus() && child->getProcessState() == 2) 
-    {
-      debug(WAITPID, "in while  %ld\nSTATES parent: %d, child %d\nID parent: %ld, child %ld\nCHILD parent: %d, child %d\nWAIT parent: %d, child %d\n",
-      arg1, parent_process->getProcessState(), child->getProcessState(),
-      parent_process->getPID(), child->getPID(), parent_process->getChildStatus(), child->getChildStatus(),
-      parent_process->getWaitStatus(), child->getWaitStatus());
-
-      Scheduler::instance()->yield();
-      if(process_state != child->getProcessState() || child->getProcessState() == 0)
-      {
-        wait_pid_lock_.acquire();
-        parent_process->setWaitStatus(0);
-        wait_pid_lock_.release();
-      }
-    }
-    debug(WAITPID, "after while \n");
-  }
-  */
   else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
   {
     debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups

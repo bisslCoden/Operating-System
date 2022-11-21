@@ -59,8 +59,8 @@ class ProcessRegistry : public Thread
     void createProcess(const char* path);
 
     /**
-     * @brief handles argument checking for execv when ARGV != NULL
-     * will call UserProcess::execv(path, argv[])
+     * @brief handles argument checking
+     * will call UserProcess::execv(path, argv, argc)
      * 
      * @param path the path to the programm 
      * @param argv the args as handeled by calling convention
@@ -68,20 +68,12 @@ class ProcessRegistry : public Thread
      */
     int execv(const char* path, char *const argv[]);
     /**
-     * @brief checks exec args.
+     * @brief checks exec args
      * @return int that holds argc, -1 on error
      */
-    int areExecArgsValid(const char* path, char* const argv[]);
+    int areExecArgsValid(char* const argv[]);
 
     void processExit(UserProcess* user_proc);
-    /**
-     * @brief handles argument checking for execv when ARGV == NULL
-     * will call UserProcess::execv(path)
-     * 
-     * @param path the path to the programm (already checked in Syscall)
-     * @return int return value, -1 on fail, shouldn't return on success
-     */
-    int execv(const char* path);
 
     /**
      * creates an unique ID for every process OR thread ID
@@ -89,13 +81,6 @@ class ProcessRegistry : public Thread
      * @return size_t the ID
      */
     size_t createID();
-    
-    /**
-     * gives the list of processes back
-     *
-     * @ustl::map<size_t, UserProcess*> List with processes
-     */
-    ustl::map<size_t, UserProcess*> getProcessList();
 
   private:
     char const **progs_;

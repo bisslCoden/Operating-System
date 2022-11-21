@@ -5,24 +5,31 @@
 #define MAX_ARGS 5
 #define PTHREAD_CALLS 150
 
-void* subroutine(void* args)
+void* subroutine()
 {
   printf("issa thread\n");
   return 0;
 } 
 
 int main()
-{ 
+{
+  printf("main(): seawas. will call a fuckload of threads.\n");
+  
+  // pthread calls
+  pthread_t tid[PTHREAD_CALLS];
+  for(size_t i = 0; i < PTHREAD_CALLS; i++)
+    tid[i] = pthread_create(tid + i, NULL, &subroutine, NULL);
+ 
   // hardcoded args :(
-  char* const path = "/usr/printuntilnull.sweb";
+  char* const path = "/usr/printuntiliisargc.sweb";
 	char* const arg1 = "Eier";
 	char* const arg2 = "Mehl";
 	char* const arg3 = "Butter";
 	char* const arg4 = "Salz";
-	char* const arg5 = "DAS ARGS SOLLTE NIE GEPRINTET WERDEN FUAAQQQQ";
+	char* const arg5 = "Mehl";
 
 	// exec call
-	char* const args[] = {arg1, arg2, arg3, arg4, NULL, arg5, NULL};
+	char* const args[] = {path, arg1, arg2, arg3, arg4, arg5, NULL};
 	printf("before exec\n");
 	int ret = execv(path, args);
   printf("execv failed with return value %d!\n", ret);

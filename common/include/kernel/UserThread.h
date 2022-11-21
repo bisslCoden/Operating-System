@@ -110,13 +110,11 @@ class UserThread : public Thread
      * @brief UserThread-part of constructor. sets few members, creates stack in new archemory and 
      * copies arguments from userspace via ident mapping to location pointed to by rsi and rdi
      * 
-     * @param argv the userspace arggument vector
-     * @param argc the userspace argument count
+     * @param argv note: this is the kernel_argv that must be free'd here!
+     * @param argc the argument count.
      * @return error return values
      */
     int execv(char* const argv[], size_t argc);
-    // no-args here
-    int execv();
 
     void signalExec()                 { exec_wait_.signal();}
     void waitExec()                   { exec_wait_.wait();}
