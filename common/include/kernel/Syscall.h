@@ -133,12 +133,12 @@ class Syscall
   //                                   wait pid, sleep, clock
   // -----------------------------------------------------------------------------------------------
   /**
-   * @brief 
+   * @brief calls the waitPid function
    * 
-   * @param arg1 
-   * @param arg2 
-   * @param arg3 
-   * @return size_t 
+   * @param arg1 important
+   * @param arg2 not important
+   * @param arg3 not important
+   * @return  waitPid function 
    */
   static size_t wait_pid(size_t arg1, size_t* arg2, size_t arg3);
   /**
