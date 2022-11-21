@@ -45,16 +45,16 @@ class ProcessRegistry : public Thread
     size_t processFork();
 
     /**
-    1st argument is PID for process to wait to, other are not important, just for posix standard
-    tries to find the prcess in the list_of_processes, if not there -1 is returned
-    uses kernel semaphores for waiting
-    is freed after the process to be waited exits
-    * 
-    * @param arg1 PID for process to wait to,
-    * @param arg2 not important
-    * @param arg3 not important
-    * @return on success id of process who terminated, else -1
-    */ 
+     * @brief 1st argument is PID for process to wait to, other are not important, just for posix standard
+     * tries to find the prcess in the list_of_processes, if not there -1 is returned
+     * uses kernel semaphores for waiting
+     * is freed after the process to be waited exits
+     * 
+     * @param arg1 PID for process to wait to,
+     * @param arg2 not important
+     * @param arg3 not important
+     * @return on success id of process who terminated, else -1
+     */ 
 
     size_t waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process);
 

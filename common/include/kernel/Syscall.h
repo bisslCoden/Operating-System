@@ -148,30 +148,30 @@ class Syscall
    */
   static int get_pid();
   /**
-  Takes the number of clock cycles from now and multiplies by 10 bc of no floating numbers allowed
-  Computes the time to wake up: 1st: the given argument(seconds) is multiplied by
-  2nd: 182 bc 18.2 * ~54 ms = 1 s(thats the reason for multiplying rdtsc_now by 10)
-  3rd: average of cycles between 2 ticks(avg is computed every 10 ticks new)
-  the part for not scheduling is in schedulable() in UserThread.cpp(else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10)))
-  at the end yielded
+   * @brief Takes the number of clock cycles from now and multiplies by 10 bc of no floating numbers allowed
+   * Computes the time to wake up: 1st: the given argument(seconds) is multiplied by
+   * 2nd: 182 bc 18.2 * ~54 ms = 1 s(thats the reason for multiplying rdtsc_now by 10)
+   * 3rd: average of cycles between 2 ticks(avg is computed every 10 ticks new)
+   * the part for not scheduling is in schedulable() in UserThread.cpp(else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10)))
+   * at the end yielded
 
-* @param seconds number of seconds to wait
-* @return 0
-*/
-static unsigned int sleep(unsigned int seconds);
-/**
-Avg divided by 54925(~54 ms(even though it looks more like 55 ms, but daniel said ~54 if not mistaken))
-so avg by that is the number of cpu cycles per micro sec.
-getDuaration -> duaration is a member variable of UserProcess that increases before scheduling.
-we get number of microsec by dividing duaration by cyc_per_microsec -> man pages -> (return of clock / 10⁶) should be seconds
-time_to_add -> time that passed between the last schedule till now
-* @return the time of a process, which is the sum of the time were threads of the process have been scheduled
-*/
-static size_t clock();
-/**
-* reads the Time Stamp Counter Register - number of cycles passed since last start of the system
-*/
-static size_t getRDTSC();
+  * @param seconds number of seconds to wait
+  * @return 0
+  */
+  static unsigned int sleep(unsigned int seconds);
+  /**
+   * @brief Avg divided by 54925(~54 ms(even though it looks more like 55 ms, but daniel said ~54 if not mistaken))
+   * so avg by that is the number of cpu cycles per micro sec.
+   * getDuaration -> duaration is a member variable of UserProcess that increases before scheduling.
+   * we get number of microsec by dividing duaration by cyc_per_microsec -> man pages -> (return of clock / 10⁶) should be seconds
+   * time_to_add -> time that passed between the last schedule till now
+   * @return the time of a process, which is the sum of the time were threads of the process have been scheduled
+   */
+  static size_t clock();
+  /**
+  * reads the Time Stamp Counter Register - number of cycles passed since last start of the system
+  */
+  static size_t getRDTSC();
 
 
 
