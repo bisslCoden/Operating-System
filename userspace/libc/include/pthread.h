@@ -88,7 +88,6 @@ typedef struct threadattribute
 
 #define PAGE_SIZE_US 4096
 
-
 extern int pthread_create(pthread_t *thread,
          const pthread_attr_t *attr, void *(*start_routine)(void *),
          void *arg);
@@ -112,8 +111,8 @@ extern int checkAdress(void* adress, int null_ok);
 
 extern pthread_t pthread_self(void);
 
-extern void kernelsem_wait();
-extern void kernelsem_post();
+// extern void kernelsem_wait();
+// extern void kernelsem_post();
 
 
 extern int pthread_cancel(pthread_t thread);
@@ -122,29 +121,83 @@ extern int pthread_join(pthread_t thread, void **value_ptr);
 
 extern int pthread_detach(pthread_t thread);
 
+/**
+ * @brief initializes the mutex and all the locks etc. it needs 
+ * 
+ * @param mutex pointer to mutex in the program
+ * @param attr mutexattribute
+ * 
+ * @return 0 if mutex wasnt init -1 if something went wrong (already init or params trash)
+ */
 extern int pthread_mutex_init(pthread_mutex_t *mutex,
                               const pthread_mutexattr_t *attr);
 
+
+/**
+ * @brief marks mutex as uninitialized
+ * 
+ * @param mutex pointer to mutex in the program
+ * 
+ * @return 0 if mutex was init -1 if something went wrong (not init or params trash)
+ */
 extern int pthread_mutex_destroy(pthread_mutex_t *mutex);
 
+
+/**
+ * @brief locks the mutex and sets calling thread to sleep if mutex is not available. Furthermore provides
+ * a (fairly) advanced deadlock detection
+ * 
+ * @param mutex pointer to mutex in the program
+ * 
+ * @return 0 if mutex could be locked and thread got woken up again -1 in every other case
+ */
 extern int pthread_mutex_lock(pthread_mutex_t *mutex);
 
+/**
+ * @brief unlocks the mutex and waked up next thread from the sleeperslist
+ * 
+ * @param mutex pointer to mutex in the program
+ * 
+ * @return 0 if mutex could be unlocked and thread got woken up again -1 in every other case
+ */
 extern int pthread_mutex_unlock(pthread_mutex_t *mutex);
 
 extern int pthread_attr_init(pthread_attr_t *attr);
 
 extern int pthread_attr_destroy(pthread_attr_t *attr);
 
-
-
+/**
+ * @brief initializes the condition and all the locks etc. it needs 
+ * 
+ * @param cond pointer to condition in the program
+ * @param attr condattribute
+ * 
+ * @return 0 if cond wasnt init -1 if something went wrong (already init or params trash)
+ */
 extern int pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr);
 
+/**
+ * @brief marks the condition as uninit
+ * 
+ * @param cond pointer to condition in the program
+ * 
+ * @return 0 if cond was init -1 if something went wrong (already uninit or params trash)
+ */
 extern int pthread_cond_destroy(pthread_cond_t *cond);
 
 extern int pthread_cond_signal(pthread_cond_t *cond);
 
 extern int pthread_cond_broadcast(pthread_cond_t *cond);
-//com
+
+/**
+ * @brief basically the same function like a mutex except for that we instantly go to sleep without checking anything first and
+ * we release the mutex we currently have
+ * 
+ * @param cond pointer to cond in the program
+ * @param mutex pointer to mutex in the program which shall be released
+ * 
+ * @return 0 if sucess -1 else
+ */
 extern int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 
 #ifdef __cplusplus

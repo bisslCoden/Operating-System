@@ -173,9 +173,22 @@ class Syscall
    * implicit pthread_exit(): call pthread_exit when a pthread_create()-thread terminates. 
    * 
    * 
-   * @param value 
+   * @param value ptr to userspace where the exitvalue is saved
    */
   static void   pthread_exit(void* value);
+
+    /**
+   * @brief waits to join the thread and save returnvalue in value_ptr if it is not null.
+   * Also has advanced "deadlock" detection looking for circles in the joins or threads which 
+   * try to join each other
+   * 
+   * @param thread The TID of the thread which shall be joined
+   * @param value_ptr pointer to userspace where the returnvalue (specified by pthread_exit and stored
+   * in retval list of process) is written into
+   * 
+   * @return -1 if something went wrong (invalid tid, deadlock, thread joining itself...) 0 else 
+   *  
+   */
   static size_t pthread_join(size_t thread, void** value_ptr);
   static int    pthread_detach(size_t thread);
   static size_t pthread_self();
