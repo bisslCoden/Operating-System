@@ -13,6 +13,7 @@
 #include "VfsSyscall.h"
 #include "Scheduler.h"
 
+//syscall alle binary pages printen
 
 // standard process creation
 UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t* returnto, uint32 terminal_number) :
@@ -335,6 +336,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   threads_lock_.acquire();
   if (KILLED_ && return_to == 0)
   {
+
     assert(false && "this is baaad... created thread even though i should be dead1\n");
   }
   if (return_to != 0)
@@ -420,12 +422,16 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
 
+
+
   // open new_fd and new_loader - old ones must be closed and freed afterwards.
   ssize_t old_fd = fd_;
   Loader* old_loader = loader_;
   ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+
   // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
   bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
+
   if(setup_fail)
   {
     debug(USERPROCESS, "execv() ERREOR in setup_fail triggered. returning -1.\n");
@@ -433,6 +439,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
     VfsSyscall::close(new_fd);
     return -1;
   }
+
   // new_fd and new_loader - old ones must be closed and freed afterwards!
   VfsSyscall::close(old_fd);
   delete old_loader; 
@@ -490,6 +497,7 @@ bool UserProcess::removeOldProcessInformation()
   {
     waiting_exec_lock_.release();
     debug(X_USERTHREAD, "Somebody was faster than me... well I m dying goodbye!\n");
+
     return false;
   }
   else // nobody else execing. kill everyone!
