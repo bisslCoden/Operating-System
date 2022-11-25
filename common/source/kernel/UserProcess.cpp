@@ -33,7 +33,6 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   waitpid_sem_.init(0);
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
-  ProcessRegistry::instance()->processStart(); //should also be called if you fork a process
 
   if(!setupLoader(fd_))
   {
@@ -47,14 +46,25 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
 
   UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th);
 
-  assert(first_thread && "UserThread constructor failed");
+  //assert(first_thread && "UserThread constructor failed");
   if (returnto_th != 0)
   {
     *returnto = 4;
     return;
   }
-  
-  *returnto = 0;
+
+  threads_lock_.acquire();
+  if (KILLED_)
+  {
+    *returnto = 5;
+    threads_lock_.release();
+    return;
+  }
+  threads_lock_.release();
+  *returnto = 0; 
+  ProcessRegistry::instance()->addProcToList(this);
+  first_thread_ = first_thread;
+  //Scheduler::instance()->addNewThread(first_thread);
   return;
 }
 
@@ -107,15 +117,18 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   {
     debug(USERPROCESS, "UserProcess() fork: Failed to create Thread for Fork!\n");
     delete thread;
+    first_thread_ = 0;
     *returnto = 4;
     return;
   }
   offsets_.push_back(currentUserThread->getStackInfo()->page_offset_);
   setChildStatus(1);
-  ProcessRegistry::instance()->processStart();
+ // ProcessRegistry::instance()->processStart();
   
   //?
-  Scheduler::instance()->printThreadList();
+ // Scheduler::instance()->printThreadList();
+ first_thread_ = thread;
+ ProcessRegistry::instance()->addProcToList(this);
   *returnto = 0;
   return;
 }
@@ -334,36 +347,25 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   thread = new UserThread(wrapper, &return_to);
   
   threads_lock_.acquire();
-  if (KILLED_ && return_to == 0)
-  {
 
-    assert(false && "this is baaad... created thread even though i should be dead1\n");
-  }
-  if (return_to != 0)
+  if (return_to != 0 || KILLED_)
   {
     debug(USERPROCESS, "Ups, something went wrong creating the Userthread for proc [%ld] [%ld]... assert!\n", pid_, return_to);
+    delete thread;
     threads_lock_.release();
-    thread->kill();
     return 0;
   }
-    threads_lock_.release();
   
-  if (thread)
-  {
-    if (joinstate != PTHREAD_CREATE_JOINABLE)
+  if (joinstate != PTHREAD_CREATE_JOINABLE)
       thread->setJoinState(joinstate);
     
-    thread->user_registers_->rdi = start_routine;
-    thread->user_registers_->rsi = args;
-    
-    return thread;
-  }
-  else
-  {
-    debug(X_USERPROCESS, "something went wrong with threadcreation\n");
-    return 0;
-  }
+  thread->user_registers_->rdi = start_routine;
+  thread->user_registers_->rsi = args;
   
+  addToThreadList(thread);
+  Scheduler::instance()->addNewThread(thread);
+  threads_lock_.release();
+  return thread;
 }
 
 void UserProcess::exit(size_t exit_code, bool kill_currentThread)

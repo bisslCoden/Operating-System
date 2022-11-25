@@ -54,7 +54,6 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   if(pm->deleteRef(ppn, my_proc, false) == 0)
   {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
-    pt_ident[m.pti].present = 0;
     PageManager::instance()->freePPN(ppn);
     pm->unlockCowCnt();
   }
@@ -63,6 +62,8 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     pm->unlockCowCnt();
   }
+  pt_ident[m.pti].present = 0;
+
   
   //pm->unlockCowCnt();
 

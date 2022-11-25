@@ -4,14 +4,26 @@
 #include "sched.h"
 
 #define NUM_THREADS1 10
+#define NUM_THREADS2 10000
 
 
 pthread_mutex_t mutexes [NUM_THREADS1];
 
-pthread_t tids[NUM_THREADS1]; 
+pthread_t tids[NUM_THREADS1 + NUM_THREADS2]; 
 
 int never_false = 1;
 
+
+void normalthread()
+{
+    int result = 1;
+    for (size_t i = 0; i < 100000; i++)
+    {
+        result *= i;
+    }
+    printf("%d\n", result);
+    return;
+}
 
 //
 int chainroutine(int my_index)
@@ -68,9 +80,12 @@ int main()
     // printf("Hello!\n");
 
     assert(ret = pthread_create(&tids[0], NULL, (void* (*)(void*)) &initroutine, NULL) == 0);
+    for (size_t i = NUM_THREADS1; i < NUM_THREADS2 + NUM_THREADS2; i++)
+        assert(ret = pthread_create(&tids[i], NULL, (void* (*)(void*)) &normalthread, NULL) == 0);
+    
     sched_yield();
 
-    for (size_t i = 0; i < NUM_THREADS1; i++)
+    for (size_t i = 0; i < NUM_THREADS1 + NUM_THREADS2; i++)
     {
         assert(ret = pthread_join(tids[i], (void**) &rets) == 0);
     }

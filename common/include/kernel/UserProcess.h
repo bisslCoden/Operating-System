@@ -206,6 +206,7 @@ class UserProcess
 
   //set these to protected to children can access aswell
   volatile ProcessState state_;
+  UserThread* first_thread_ = 0;
 
   private:
     friend class UserThread;

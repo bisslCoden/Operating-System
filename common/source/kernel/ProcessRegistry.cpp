@@ -123,8 +123,8 @@ size_t ProcessRegistry::processCount()
 
 size_t ProcessRegistry::createID()
 {
-  ArchThreads::atomic_add(next_id_,1);
-  return next_id_;
+  size_t id = ArchThreads::atomic_add(next_id_,1);
+  return id;
 }
 
 size_t ProcessRegistry::processFork()
@@ -133,26 +133,39 @@ size_t ProcessRegistry::processFork()
   size_t return_to = 6;
   auto parent = currentUserThread->getProcess();
   
+  parent->lockThreadMutex();
   if (parent->checkKill())
+  {
+    parent->unLockThreadMutex();
     return -1;
+  }
   
   debug(X_USERTHREAD, "[%ld] is creating the proc\n", currentThread->getTID());
   UserProcess* process = 0;
+  parent->unLockThreadMutex();
   process = new UserProcess(parent, &return_to);
-
   if (return_to != 0)
   {
     debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork[%ld]... dont assert!\n", return_to);
     debug(X_USERTHREAD, "[%ld] is deleting the proc\n", currentThread->getTID());
+    if (process->first_thread_)
+      delete process->first_thread_;
     delete process;
     return -1;
   }
-  
-  debug(PROCESS_REG, "After new UserProcess\n");
+  process->lockThreadMutex();
+  if (process->checkKill())
+  {
+    process->unLockThreadMutex();
+    if (process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    return -1;
+  }
+  process->addToThreadList(process->first_thread_);
+  Scheduler::instance()->addNewThread(process->first_thread_);
+  process->unLockThreadMutex();
 
-  list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
-  list_of_processes_lock_.release();
   
   debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
   return process->getPID();
@@ -177,18 +190,35 @@ void ProcessRegistry::createProcess(const char* path)
   // check UserProcess construction
   if (returnto != 0)
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess[%ld]: [%ld]... assert!\n",process->getPID(), returnto);
-    assert(false);
+    if(process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess[%ld]: [%ld]... dont assert!\n",process->getPID(), returnto);
+    return;
   }
+  process->lockThreadMutex();
+  if (process->checkKill())
+  {
+    process->unLockThreadMutex();
+    if (process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    return;
+  }
+  process->addToThreadList(process->first_thread_);
+  Scheduler::instance()->addNewThread(process->first_thread_);
+  process->unLockThreadMutex();
 
   // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
-  debug(X_PROCESS_REG, "created process successfully!\n");
-  list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
-  list_of_processes_lock_.release();
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
+void ProcessRegistry::addProcToList(UserProcess* new_proc){
+  list_of_processes_lock_.acquire();
+  list_of_processes_.insert(ustl::make_pair(new_proc->getPID(), new_proc));
+  processStart(); //should also be called if you fork a process
+  list_of_processes_lock_.release();
+}
 
 
 int ProcessRegistry::execv(const char* path, char *const argv[])

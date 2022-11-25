@@ -711,7 +711,6 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
   if (lock->initialized_ != 1)
     return -1;
   
-  printf("will start spinning\n");
   while (!atomic_exchange_0(&lock->mylock_))
   {
     //not suuper safe but okay for now

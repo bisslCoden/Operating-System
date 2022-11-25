@@ -324,13 +324,17 @@ int Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, si
 
   // check thread creation
   if(newthread == 0)
+    return -1;
+
+  currentUserProcess->lockThreadMutex();
+  if (currentUserProcess->checkKill())
   {
-    // check if needs to be killed
-    if(currentUserProcess->checkKill())
-      newthread->reDirectToDeath();
+    newthread->reDirectToDeath();
+    currentUserProcess->unLockThreadMutex();
     return -1;
   }
-
+  currentUserProcess->unLockThreadMutex();
+  
   // success
   *(size_t*)thread = newthread->getTID();
   return 0;
@@ -509,8 +513,15 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
     }
     
     join_victim->setJoiner(currentUserThread);
+    if (currentUserProcess->checkKill())
+    {
+      currentUserProcess->unlockRetVal();
+      currentUserProcess->unLockThreadMutex();
+      pthread_exit((void*)1);
+      return -1;
+    }
+    
     currentUserProcess->unLockThreadMutex();
-
     //releases retvallock!
     currentUserThread->waitJoin();
     

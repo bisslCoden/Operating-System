@@ -58,8 +58,8 @@ UserThread::UserThread( UserProcess* process,
 
   // add Thread to process to scheduler and set starttime for clock
   last_start_ = Scheduler::instance()->getRDTSC();
-  process_->addToThreadList(this);
-  Scheduler::instance()->addNewThread((Thread*)this);
+  //process_->addToThreadList(this);
+  //Scheduler::instance()->addNewThread((Thread*)this);
 
   //should be threadsafe??
   *returnto = 0;
@@ -112,8 +112,8 @@ UserThread::UserThread( size_t wrapper,
 
   // add Thread to process and scheduler
   last_start_ = Scheduler::instance()->getRDTSC();
-  process_->addToThreadList(this);
-  Scheduler::instance()->addNewThread((Thread*)this);
+  //process_->addToThreadList(this);
+  //Scheduler::instance()->addNewThread((Thread*)this);
 
   switch_to_userspace_ = 1;
   *returnto = 0;
@@ -162,10 +162,7 @@ UserThread::UserThread( UserProcess *child,
 
   // add Thread to process and scheduler
   last_start_ = Scheduler::instance()->getRDTSC();
-  getProcess()->lockThreadMutex();
-  getProcess()->addToThreadList(this);
-  getProcess()->unLockThreadMutex();
-  Scheduler::instance()->addNewThread((Thread*)this);
+ // Scheduler::instance()->addNewThread((Thread*)this);
 
   *returnto = 0;
   debug(X_USERTHREAD, "UserThread() for fork() finished for TID [%ld]\n", getTID());

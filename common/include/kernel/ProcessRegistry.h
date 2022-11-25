@@ -88,6 +88,8 @@ class ProcessRegistry : public Thread
      */
     int areExecArgsValid(char* const argv[]);
 
+    void addProcToList(UserProcess* new_proc);
+
     /** @brief 1st argument is PID for process to wait to, other are not important, just for posix standard
      * tries to find the prcess in the list_of_processes, if not there -1 is returned
      * uses kernel semaphores for waiting
