@@ -257,21 +257,20 @@ void UserProcess::removeFromOffsetList(size_t NR){
 
 //locks threadlock internally!
 UserThread* UserProcess::checkStackAdress(size_t address){
-  if (!threads_lock_.isHeldBy(currentThread))
-  {
-    threads_lock_.acquire();
-  }
-  
+  // if (!threads_lock_.isHeldBy(currentThread))
+  // {
+  //   threads_lock_.acquire();
+  // }
   ustl::map<size_t, UserThread*>::iterator it;
   for (it = threads_.begin(); it != threads_.end(); it++)
   {
     if (address <= it->second->getStackInfo()->userstack_start_ && address > it->second->getStackInfo()->userstack_end_)
     {
-      threads_lock_.release();
+      //threads_lock_.release();
       return it->second;
     }
   }
-  threads_lock_.release();
+  //threads_lock_.release();
   return 0;
 }
 
@@ -391,6 +390,15 @@ void UserProcess::exit(size_t exit_code, bool kill_currentThread)
       thread.second->unlockFlagMutex();
     }
   }
+  lockRetVal();
+  UserThread* joiner = currentUserThread->getJoiner();
+  if (joiner)
+  {
+    joiner->signalJoin();
+    currentUserThread->setJoiner(0);
+  }
+  unlockRetVal();
+  
   KILLED_ = true;
   threads_lock_.release();
   debug(USERPROCESS, "PID: [%ld]: [%ld] called exit for this process!\n", pid_,currentThread->getTID());

@@ -415,27 +415,6 @@ bool PageManager::checkForCow(size_t address)
     return false;
   }
 
-  UserThread* mut_change = 0;
-  if (address > END_OF_STACKS && address < USER_BREAK)
-  {
-    if((mut_change = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
-    {
-      if(vpn == (mut_change->getStackInfo()->userstack_start_ / PAGE_SIZE))
-      {
-        debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... of [%ld]time to change ident\n", mut_change->getTID());
-        mutexflag = *mut_change->getStackInfo()->UserMutex;
-        debug(X_PAGEMANAGER, "mutexflag is %s\n", (mutexflag == AWAKE_KS) ? "awake" : "zzzz");
-
-       // mut_change->setUserMutex(USERMUTEX_INVALID);
-      }
-      else
-        mut_change = 0;
-    }
-    else
-      mut_change = 0;
-      //assert(false && "whaaaat? how the hell did a thread which is not in this Process get a PF on THIS PROCESS?\n");
-  }
-
   if (ret == (int)WAS_LAST)
   {
     pt_ident[m.pti].cow = 0;
@@ -455,23 +434,33 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].present = 1;
   }
 
-
-  if (mut_change)
+  UserThread* mut_change = 0;
+  if (address > END_OF_STACKS && address < USER_BREAK)
   {
-    size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(pt_ident[m.pti].page_ppn);
-    location += PAGE_SIZE - sizeof(size_t);
-    size_t* dbg_flag  = mut_change->getStackInfo()->UserMutex;
-    debug(X_USERTHREAD, "PREV my mutexflag is now at %p\n", dbg_flag);
-    mut_change->setUserMutex((size_t*) location);
-    dbg_flag = mut_change->getStackInfo()->UserMutex;
-    debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", dbg_flag);
-    //debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", currentUserThread->getStackInfo()->UserMutex);
-    *mut_change->getStackInfo()->UserMutex = mutexflag;
+    currentUserProcess->lockThreadMutex();
+    if((mut_change = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
+    {
+      if(vpn == (mut_change->getStackInfo()->userstack_start_ / PAGE_SIZE))
+      {
+        debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... of [%ld]time to change ident\n", mut_change->getTID());
+        mutexflag = *mut_change->getStackInfo()->UserMutex;
+        debug(X_PAGEMANAGER, "mutexflag is %s\n", (mutexflag == AWAKE_KS) ? "awake" : "zzzz");
+        size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(pt_ident[m.pti].page_ppn);
+        location += PAGE_SIZE - sizeof(size_t);
+        size_t* dbg_flag  = mut_change->getStackInfo()->UserMutex;
+        debug(X_USERTHREAD, "PREV my mutexflag is now at %p\n", dbg_flag);
+        mut_change->setUserMutex((size_t*) location);
+        dbg_flag = mut_change->getStackInfo()->UserMutex;
+        debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", dbg_flag);
+        //debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", currentUserThread->getStackInfo()->UserMutex);
+        *mut_change->getStackInfo()->UserMutex = mutexflag;
+       // mut_change->setUserMutex(USERMUTEX_INVALID);
+      }
+      else
+        mut_change = 0;
+    }
+    currentUserProcess->unLockThreadMutex();  
   }
-  else
-    debug(X_USERTHREAD, "seems like page %x is not a first stackpage..\n", pt_ident[m.pti].page_ppn);
-    
-  // debug(X_PAGEMANAGER, "Gave Process [%ld] a page [%lx] %s\n", current_proc->getPID(), pt_ident[m.pti].page_ppn, (dbg_gave ? "which was his own before" : "which was a fresh one"));
   
   unlockCowCnt();
   current_archmem->unlockArchMemory();

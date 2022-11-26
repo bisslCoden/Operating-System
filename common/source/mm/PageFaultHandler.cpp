@@ -72,7 +72,6 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
- 
     if (PageManager::instance()->checkForCow(address))
     {
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
@@ -81,14 +80,17 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");
+      currentUserProcess->lockThreadMutex();
       UserThread* stack_owner = 0;
       if((stack_owner = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
       {
         debug(PAGEFAULT, "seems like our currentthread just wants a new Page for someone!\n");
-        stack_owner->getNewStackPage(address);      
+        stack_owner->getNewStackPage(address);  
+        currentUserProcess->unLockThreadMutex();    
       }
       else
       {
+        currentUserProcess->unLockThreadMutex();
         debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
             // the page-fault seems to be faulty, print out the thread stack traces
         ArchThreads::printThreadRegisters(currentThread, true);
