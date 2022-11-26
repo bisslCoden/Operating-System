@@ -424,34 +424,45 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
 
-
-
-  // open new_fd and new_loader - old ones must be closed and freed afterwards.
-  ssize_t old_fd = fd_;
-  Loader* old_loader = loader_;
-  ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
-
-  // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
-  bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
-
-  if(setup_fail)
+  waiting_exec_lock_.acquire();
+  if (waiting_exec_ == 0)
   {
-    debug(USERPROCESS, "execv() ERREOR in setup_fail triggered. returning -1.\n");
-    fd_ = old_fd;
-    VfsSyscall::close(new_fd);
+    ssize_t old_fd = fd_;
+    Loader* old_loader = loader_;
+    ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
+
+    // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
+    bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
+
+    if(setup_fail)
+    {
+      debug(USERPROCESS, "execv() ERREOR in setup_fail triggered. returning -1.\n");
+      VfsSyscall::close(new_fd);
+      if (loader_)
+        delete loader_;
+      
+      fd_ = old_fd;
+      loader_ = old_loader;
+      waiting_exec_ = 0;
+      waiting_exec_lock_.release();
+      return -1;
+    }
+
+    // new_fd and new_loader - old ones must be closed and freed afterwards!
+    VfsSyscall::close(old_fd);
+    delete old_loader; 
+
+    // exec success, we're ready for another exec call!
+    waiting_exec_ = 0;
+    waiting_exec_lock_.release();
+  }
+  else
+  {
+    waiting_exec_lock_.release();
     return -1;
   }
-
-  // new_fd and new_loader - old ones must be closed and freed afterwards!
-  VfsSyscall::close(old_fd);
-  delete old_loader; 
-
-  // exec success, we're ready for another exec call!
-  waiting_exec_lock_.acquire();
-  waiting_exec_ = 0;
-  waiting_exec_lock_.release();
-  
-  debug(X_USERPROCESS, "execv() [%ld]  fd and loader setup finished successfully exiting exec\n", getPID());
+  // open new_fd and new_loader - old ones must be closed and freed afterwards.
+ // debug(X_USERPROCESS, "execv() [%ld]  fd and loader setup finished successfully exiting exec\n", getPID());
   return 0;
 }
 
@@ -470,6 +481,7 @@ bool UserProcess::setupLoader(ssize_t fd)
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
   {
     debug(LOADER, "setuploader() failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
+    loader_ = 0;
     return false;
   }
 
@@ -488,27 +500,15 @@ bool UserProcess::removeOldProcessInformation()
   threads_lock_.acquire();
   if (threads_.size() < 2)
   {
+    KILLED_ = true;
     threads_lock_.release();
     goto killing_done;
   }
+  waiting_exec_ = currentUserThread;
   threads_lock_.release();
 
-  // THE KILLING 
-  waiting_exec_lock_.acquire();
-  if (waiting_exec_ != 0) // somebody already execing! kill myself
-  {
-    waiting_exec_lock_.release();
-    debug(X_USERTHREAD, "Somebody was faster than me... well I m dying goodbye!\n");
-
-    return false;
-  }
-  else // nobody else execing. kill everyone!
-  {
-    waiting_exec_ = currentUserThread;
-    exit(13579, false);
-    currentUserThread->waitExec();
-  }
-  waiting_exec_lock_.release();
+  exit(13579, false);
+  currentUserThread->waitExec();
 
 killing_done:
   // clear returnvalues_

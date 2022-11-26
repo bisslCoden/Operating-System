@@ -463,9 +463,19 @@ int Syscall::pthread_detach(size_t thread){
     currentUserProcess->unlockRetVal();
 
     to_be_detached->lockFlagMutex();
-    to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
-    to_be_detached->unlockFlagMutex();
+    if (to_be_detached->getflags()->joinable == PTHREAD_CREATE_JOINABLE)
+    {
+      to_be_detached->getflags()->joinable = PTHREAD_CREATE_DETACHED;
+      to_be_detached->unlockFlagMutex();
+    }
+    else
+    {
+      to_be_detached->unlockFlagMutex();
+      currentUserProcess->unLockThreadMutex();
+      return -1;
+    }
     currentUserProcess->unLockThreadMutex();
+    
   }
   else
   {

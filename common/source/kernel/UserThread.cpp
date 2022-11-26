@@ -415,14 +415,17 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo)
 
 int UserThread::execv(char* const argv[], size_t argc)
 {
+  
+  if(!((argv && argc) || (!argv && !argc)))
+    return -1;
+  
   name_ = process_->getName();
 
   // debugs
   debug(X_USERTHREAD, "execv(argv = %lx, argc = %ld): name_ = %s\n", (size_t)argv, argc, name_.c_str());
   for(size_t i = 0; i < argc; i++)
     debug(X_USERTHREAD, "argv[%ld] = %s\n", i, argv[i]);
-  assert(((argv && argc) || (!argv && !argc)) && "both must be null or both non-null o_O");
-    
+
   // set new archmemory to thread
   loader_ = process_->getLoader();
   ArchThreads::setAddressSpace(this, loader_->arch_memory_);
