@@ -403,8 +403,9 @@ bool PageManager::checkForCow(size_t address)
   lockCowCnt();
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
-  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
+  PageTableEntry* pt_ident  = m.pd; 
+  //(PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+  debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx, i am at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn, pt_ident);
   int ret = deleteRef(ppn, current_proc, true);
   //bool dbg_gave = false;
   if (ret == -1)
@@ -433,7 +434,6 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].writeable = 1;
     pt_ident[m.pti].present = 1;
   }
-
   UserThread* mut_change = 0;
   if (address > END_OF_STACKS && address < USER_BREAK)
   {
