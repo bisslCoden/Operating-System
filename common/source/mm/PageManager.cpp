@@ -23,7 +23,7 @@ PageManager* PageManager::instance()
   return instance_;
 }
 
-PageManager::PageManager() : lock_("PageManager::lock_"), cow_cnt_lock_("PageManger::cow_count_lock_")
+PageManager::PageManager() : lock_("PageManager::lock_"), IPT_lock_("PageManger::cow_count_lock_")
 {
   assert(instance_ == 0);
   instance_ = this;
@@ -251,34 +251,34 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
 //----------------------------------------------------------------------------------cow start
 // bool PageManager::isInCowCnt(size_t ppn)
 // { 
-//   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
 //   return cow_cnt_.find(ppn) != cow_cnt_.end(); 
 // }
 
 // size_t PageManager::getNrOfCows(size_t ppn)
 // { 
-//   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
 //   assert(isInCowCnt(ppn) && "if you use this method pls check isInCowCnt(ppn) before");
 //   debug(X_PAGEMANAGER, "getNrOfCows(%lx) found value %ld\n", ppn, cow_cnt_[ppn]);
 //   return cow_cnt_[ppn]; 
 // }
 
-void  PageManager::addRef(size_t ppn, UserProcess* proc)
+void  PageManager::addRef(size_t ppn, UserProcess* proc, size_t vpn)
 {
-  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE Lock IPT()!!!!");
   
-  if (cow_list_.find(ppn) == cow_list_.end())
+  if (IPT_.find(ppn) == IPT_.end())
   {
-    ustl::vector<UserProcess*> ref;
-    cow_list_.insert(ustl::make_pair(ppn, ref));
-    cow_list_[ppn].push_back(proc);
+    ustl::vector<ustl::pair<UserProcess*, size_t>> ref;
+    IPT_.insert(ustl::make_pair(ppn, ref));
+    IPT_[ppn].push_back(ustl::make_pair(proc, vpn));
   }
   else
   {
     //I think this rare edgecase shouldnt happen... lets hope i am right
-    // if (cow_list_[ppn].size() == 1)
+    // if (IPT_[ppn].size() == 1)
     // {
-    //   ArchMemory* dest_archmem = &cow_list_[ppn][0]->getLoader()->arch_memory_;
+    //   ArchMemory* dest_archmem = &IPT_[ppn][0]->getLoader()->arch_memory_;
     //   if(!dest_archmem.checkArchMemory())
     //     dest_archmem.lockArchMemory();
     //   ArchMemoryMapping m = dest_archmem->resolveMapping(vpn);
@@ -288,73 +288,76 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc)
     //   dest_archmem->unlockArchMemory();
     // }
     bool in = false;
-    for (size_t i = 0; i < cow_list_[ppn].size(); i++)
+    for (size_t i = 0; i < IPT_[ppn].size(); i++)
     {
-      if(cow_list_[ppn][i] == proc)
+      if(IPT_[ppn][i].first == proc)
       {
+        //this is just for security... should never happen
+        if (IPT_[ppn][i].second != vpn)
+          assert(false && "Whaat happened here? Tried to add same proc but different vpn for same ppn\n");
+        
         debug(X_USERPROCESS, "Tried to at proc %ld twice?!\n", proc->getPID());
         in = true;
         break;
       }
     }
     if(!in)
-      cow_list_[ppn].push_back(proc);
+      IPT_[ppn].push_back(ustl::make_pair(proc, vpn));
     
-    debug(X_USERPROCESS, "added Proc %ld to page %lx size is then %ld\n",proc->getPID(), ppn, cow_list_[ppn].size());
+    debug(X_USERPROCESS, "added Proc %ld to page %lx size is then %ld\n",proc->getPID(), ppn, IPT_[ppn].size());
   }
   return;
 }
 
-size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow_del)
+size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow)
 {
-  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
 
-  if (cow_list_.find(ppn) == cow_list_.end())
+  if (IPT_.find(ppn) == IPT_.end())
   {
-    //debug(X_USERPROCESS, "Wtf? tried to delete my ref even though the page isnt cow!!!\n");
+    debug(X_USERPROCESS, "Wtf? Tried to free a page which is not in the IPT anymore!!!\n");
     return 0;
   }
   else
   {
-    ustl::vector<UserProcess*>::iterator it;
-    for (it = cow_list_[ppn].begin(); it != cow_list_[ppn].end(); it++)
+    ustl::vector<ustl::pair<UserProcess*, size_t>>::iterator it;
+    for (it = IPT_[ppn].begin(); it != IPT_[ppn].end(); it++)
     {
-      if(*(it) == proc)
+      if((*(it)).first == proc)
         break;
     }
-    if(it != cow_list_[ppn].end())
+    if(it != IPT_[ppn].end())
     {
-      debug(X_USERPROCESS, "[%lx] erasing Proc [%ld] size is then %ld\n", ppn,proc->getPID(), cow_list_[ppn].size() - 1);
-      int cow_if_del = (int)cow_list_[ppn].size() - 1;
+      debug(X_USERPROCESS, "[%lx] erasing Proc [%ld] size is then %ld\n", ppn,proc->getPID(), IPT_[ppn].size() - 1);
+      int cow_if_del = (int)IPT_[ppn].size() - 1;
       if (cow_if_del == 0)
       {
-        if (cow_del)
+        if (cow)
         {
-          cow_list_.erase(ppn);
           return WAS_LAST;
         }
         else
         {
-          cow_list_.erase(ppn);
+          IPT_.erase(ppn);
           return 0;
         }
       }
       else if (cow_if_del == -1)
       {
         assert(false && "just a check that this never happens\n");
-        cow_list_.erase(ppn);
-        return 0;
+        // IPT_.erase(ppn);
+        // return 0;
       }
       else if (cow_if_del >= 1)
       {
-        cow_list_[ppn].erase(it);
-        return cow_list_.size();
+        IPT_[ppn].erase(it);
+        return IPT_.size();
       }
       else
-        assert(false && "really weird!: cow list is in the negatiiives\n");
+        assert(false && "really weird!: cow list is way in the negatiiives\n");
     }
     else
-      debug(X_USERPROCESS, "Wtf? tried to delete my ref even though I dont habe one!!!\n");
+      debug(X_USERPROCESS, "Tried to delete ref even though someone else did already for me\n");
     return -1;
   }
 }
@@ -377,7 +380,7 @@ bool PageManager::checkForCow(size_t address)
   if(!current_archmem->checkAddressValid(address))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
-    //unlockCowCnt();
+    //unlockIPT();
     current_archmem->unlockArchMemory();
     return false;
   }
@@ -389,7 +392,7 @@ bool PageManager::checkForCow(size_t address)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
     current_archmem->unlockArchMemory();
-    //unlockCowCnt();
+    //unlockIPT();
     return false;
   }
 
@@ -397,10 +400,10 @@ bool PageManager::checkForCow(size_t address)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
     current_archmem->unlockArchMemory();
-    //unlockCowCnt();
+    //unlockIPT();
     return false;
   }
-  lockCowCnt();
+  lockIPT();
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
@@ -409,9 +412,9 @@ bool PageManager::checkForCow(size_t address)
   //bool dbg_gave = false;
   if (ret == -1)
   {
-    unlockCowCnt();
+    unlockIPT();
     assert(false && "Something went wrong with deleting my ref!\n");
-    //unlockCowCnt();
+    //unlockIPT();
     return false;
   }
 
@@ -462,7 +465,7 @@ bool PageManager::checkForCow(size_t address)
     currentUserProcess->unLockThreadMutex();  
   }
   
-  unlockCowCnt();
+  unlockIPT();
   current_archmem->unlockArchMemory();
 
   //current_archmem->unlockArchMemory();

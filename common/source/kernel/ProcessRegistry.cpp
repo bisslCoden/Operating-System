@@ -350,3 +350,41 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   return return_pid;
 }
 
+void ProcessRegistry::lockMultArchmem(ustl::vector<UserProcess*> procs)
+{
+  list_of_processes_lock_.acquire();
+  ustl::map<size_t, UserProcess*>::iterator it; 
+  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  {
+    for (size_t i = 0; i < procs.size(); i++)
+    {
+      if (procs[i] == it->second)
+      {
+        if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+          it->second->getLoader()->arch_memory_.lockArchMemory();
+      }
+    }
+    
+  }
+  list_of_processes_lock_.release();
+}
+
+void ProcessRegistry::unlockMultArchmem(ustl::vector<UserProcess*> procs)
+{
+  list_of_processes_lock_.acquire();
+  ustl::map<size_t, UserProcess*>::iterator it; 
+  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  {
+    for (size_t i = 0; i < procs.size(); i++)
+    {
+      if (procs[i] == it->second)
+      {
+        if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+          it->second->getLoader()->arch_memory_.unlockArchMemory();
+      }
+    }
+  }
+  list_of_processes_lock_.release();
+}
+
+

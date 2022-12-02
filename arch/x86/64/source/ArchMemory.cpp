@@ -3,6 +3,7 @@
 #include "kprintf.h"
 #include "assert.h"
 #include "PageManager.h"
+#include "ProcessRegistry.h"
 #include "kstring.h"
 #include "ArchThreads.h"
 #include "Thread.h"
@@ -50,22 +51,22 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   // free if counter not in map or after descresing counter = 0.
   size_t ppn = m.pt[m.pti].page_ppn;
   
-  pm->lockCowCnt();
+  pm->lockIPT();
   if(pm->deleteRef(ppn, my_proc, false) == 0)
   {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     PageManager::instance()->freePPN(ppn);
-    pm->unlockCowCnt();
+    pm->unlockIPT();
   }
   else
   {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
-    pm->unlockCowCnt();
+    pm->unlockIPT();
   }
   pt_ident[m.pti].present = 0;
 
   
-  //pm->unlockCowCnt();
+  //pm->unlockIPT();
 
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
   bool empty = checkAndRemove<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti);
@@ -145,6 +146,9 @@ bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_
   if (m.page_ppn == 0)
   {
     unlockArchMemory();
+    PageManager::instance()->lockIPT();
+    PageManager::instance()->addRef(physical_page, my_proc, virtual_page);
+    PageManager::instance()->unlockIPT();
     return insert<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, physical_page, 0, 0, user_access, 1);
   }
   unlockArchMemory();
@@ -180,7 +184,7 @@ ArchMemory::~ArchMemory()
                 if (pt[pti].present)
                 {
                   PageManager* pm = PageManager::instance();
-                  pm->lockCowCnt();
+                  pm->lockIPT();
                   size_t ppn = pt[pti].page_ppn;
                   if(pm->deleteRef(ppn, my_proc, false) == 0)
                   {
@@ -188,7 +192,7 @@ ArchMemory::~ArchMemory()
                     pm->freePPN(ppn);
                     pt[pti].present = 0;
                   }
-                  pm->unlockCowCnt();
+                  pm->unlockIPT();
                 }
               }
               pd[pdi].pt.present = 0;
@@ -358,11 +362,11 @@ PageMapLevel4Entry* ArchMemory::getRootOfKernelPagingStructure()
 
 void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* child_proc)
 {
-  UserProcess* parent = currentUserThread->getProcess();
-  if(!checkArchMemory(currentThread))
-    lockArchMemory();
-  if(!destination.checkArchMemory(currentThread))
-    destination.lockArchMemory();
+  //UserProcess* parent = currentUserThread->getProcess();
+  ustl::vector<UserProcess*> procs;
+  procs.push_back(my_proc);
+  procs.push_back(child_proc);
+  ProcessRegistry::instance()->lockMultArchmem(procs);
   
   PageMapLevel4Entry *pml4_src  = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   PageMapLevel4Entry *pml4_dest = (PageMapLevel4Entry*) getIdentAddressOfPPN(destination.page_map_level_4_);
@@ -387,6 +391,8 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
           memcpy((void*) pd_dest, (void*) pd_src, PAGE_SIZE);
           for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
           {
+            //0x773e4c892fe8
+            //0x773e4c892000
             if(pd_src[pdi].pt.present)
             {
               pd_dest[pdi].pt.page_ppn = PageManager::instance()->allocPPN();
@@ -396,7 +402,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
               memcpy((void*) pt_dest, (void*) pt_src, PAGE_SIZE);
               for (size_t pti = 0; pti < PAGE_TABLE_ENTRIES; pti++)
               {
-                PageManager::instance()->lockCowCnt();
+                PageManager::instance()->lockIPT();
                 if(pt_src[pti].present)
                 {
                   pt_src[pti].cow = 1;
@@ -406,11 +412,13 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
                   // pt_dest[pti].page_ppn = pt_src[pti].page_ppn;
                   pt_dest[pti] = pt_src[pti];
                   //debug(X_USERPROCESS, "adding proc %ld\n", parent->getPID());
-                  PageManager::instance()->addRef(pt_src[pti].page_ppn, parent);
+                  //PageManager::instance()->addRef(pt_src[pti].page_ppn, parent);
                   //debug(X_USERPROCESS, "adding proc %ld\n", child_proc->getPID());
-                  PageManager::instance()->addRef(pt_dest[pti].page_ppn, child_proc);
+                  size_t vpn = (pml4i << 39) + (pdpti << 30) + (pdi << 21) + (pti << 12);
+                  debug(X_USERPROCESS, "cowing vpn: %lx\n", vpn);
+                  PageManager::instance()->addRef(pt_dest[pti].page_ppn, child_proc, vpn);
                 }
-                PageManager::instance()->unlockCowCnt();
+                PageManager::instance()->unlockIPT();
               }
             }
           }
@@ -418,8 +426,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
       }
     }
   }
-  destination.unlockArchMemory();
-  unlockArchMemory();
+  ProcessRegistry::instance()->unlockMultArchmem(procs);
 }
 
 /*
