@@ -58,6 +58,8 @@ class PageManager
       page_usage_table_->bmprint();
     }
 
+    //lock IPT BEFOREEEEE
+    ustl::vector<ustl::pair<UserProcess*, size_t>> getIPTEntry(size_t ppn){return IPT_[ppn];};
     /**
      * @brief Handles a cow Pagefault and refreshes the cow ist accordingly 
      * IMPORTANT: Locking Policy: 1st aquire Pagemanager::cnt_lock_ and then 
