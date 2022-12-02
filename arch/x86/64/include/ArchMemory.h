@@ -55,7 +55,8 @@ public:
 
 /**
  * removes the mapping to a virtual_page by marking its PTE Entry as non valid
- *
+ *  NOTE: LOCK IPT and ArchMem before using this function
+ * 
  * @param physical_page_directory_page Real Page where the PDE to work on resides
  * @param virtual_page which will be invalidated
  */

@@ -6,10 +6,12 @@
 #include "ArchMemory.h"
 #include "debug_bochs.h"
 #include "kprintf.h"
+#include "kstring.h"
 #include "Scheduler.h"
 #include "ArchInterrupts.h"
 #include "KernelMemoryManager.h"
 #include "assert.h"
+#include "ProcessRegistry.h"
 #include "Bitmap.h"
 
 PageManager pm;
@@ -251,13 +253,13 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
 //----------------------------------------------------------------------------------cow start
 // bool PageManager::isInCowCnt(size_t ppn)
 // { 
-//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
 //   return cow_cnt_.find(ppn) != cow_cnt_.end(); 
 // }
 
 // size_t PageManager::getNrOfCows(size_t ppn)
 // { 
-//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
 //   assert(isInCowCnt(ppn) && "if you use this method pls check isInCowCnt(ppn) before");
 //   debug(X_PAGEMANAGER, "getNrOfCows(%lx) found value %ld\n", ppn, cow_cnt_[ppn]);
 //   return cow_cnt_[ppn]; 
@@ -311,7 +313,7 @@ void  PageManager::addRef(size_t ppn, UserProcess* proc, size_t vpn)
 
 size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow)
 {
-  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
 
   if (IPT_.find(ppn) == IPT_.end())
   {
@@ -373,14 +375,15 @@ bool PageManager::checkForCow(size_t address)
   size_t vpn = address/PAGE_SIZE;
   size_t mutexflag = AWAKE_KS;
   
+  
+  
   if (!current_archmem->checkArchMemory(currentThread))
     current_archmem->lockArchMemory();
-  
-  //lockCowCnt();
+
   if(!current_archmem->checkAddressValid(address))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
-    //unlockIPT();
+  //  unlockIPT();
     current_archmem->unlockArchMemory();
     return false;
   }
@@ -388,22 +391,29 @@ bool PageManager::checkForCow(size_t address)
   // if !present OR !(cow =1 AND writable = 0) -> no cow, that's another problem
   ArchMemoryMapping m = current_archmem->resolveMapping(vpn);
   
+
   if(!m.pt[m.pti].present)
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
+   // unlockIPT();
     current_archmem->unlockArchMemory();
-    //unlockIPT();
     return false;
   }
 
   if(!(m.pt[m.pti].cow && !m.pt[m.pti].writeable))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
+  //  unlockIPT();
     current_archmem->unlockArchMemory();
-    //unlockIPT();
     return false;
   }
-  lockIPT();
+  current_archmem->unlockArchMemory();
+  
+  //this is for keeping correct locking convention
+  if (!checkIPT())
+    lockIPT();
+  current_archmem->lockArchMemory();
+  
   // decrease for this ppn. if cow_cnts_left > 0 copy else take page
   size_t ppn = m.page_ppn;
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
@@ -465,13 +475,114 @@ bool PageManager::checkForCow(size_t address)
     currentUserProcess->unLockThreadMutex();  
   }
   
-  unlockIPT();
   current_archmem->unlockArchMemory();
+  unlockIPT();
 
   //current_archmem->unlockArchMemory();
   return true;
 }
 
+void PageManager::deduplicatePages()
+{
+  //this is not threadsafe! but that is not the goal: we want first a lightweight comparison
+  // we do all the heavy locking after that when we really get serious with deduplicating
+  size_t ddp1, ddp2;
+  for (auto iter1 = IPT_.begin(); iter1 != IPT_.end(); iter1++)
+  {
+    ddp1 = iter1->first;
+    void* this_page = (void*) ArchMemory::getIdentAddressOfPPN(iter1->first);
+    for (auto iter2 = iter1 + 1; iter2 < IPT_.end(); iter2++)
+    {
+      ddp2 = iter2->first;
+      void* currentPage = (void*) ArchMemory::getIdentAddressOfPPN(iter2->first);
+      if (memcmp(this_page, currentPage, PAGE_SIZE) == 0)
+      {
+        debug(DEDUBLI_THREAD, "[deduplication found 2 equal pages!]\n");
+        if(deduplicate(ddp1, ddp2))
+          debug(DEDUBLI_THREAD, "deduplication of page %lx and page %lx worked\n", ddp1, ddp2);
+        else
+          debug(DEDUBLI_THREAD, "somehow could not ddp page %lx and page %lx\n", ddp1, ddp2);
+      }
+    }
+    
+  }
+  
+}
+
+bool PageManager::deduplicate(size_t page_1, size_t page_2)
+{
+  lockIPT();
+  ustl::vector<ustl::pair<UserProcess*, size_t>> progs;
+  //add effected progs
+  for (auto iter = IPT_[page_1].begin(); iter < IPT_[page_1].end(); iter++)
+    progs.push_back(*iter);
+  for (auto iter2 = IPT_[page_2].begin(); iter2 < IPT_[page_2].end(); iter2++)
+  {
+    if (ustl::find(progs.begin(), progs.end(), *iter2) != progs.end())
+      progs.push_back(*iter2);
+  }
+  ProcessRegistry::instance()->lockMultArchmem(progs);
+  
+  // -> now no more writes allowed from heeere...
+  for (size_t i = 0; i < progs.size(); i++)
+  {
+    ArchMemoryMapping m = progs[i].first->getLoader()->arch_memory_.resolveMapping(progs[i].second);
+    PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
+    pt_src[m.pti].writeable = 0;
+  }
+  //moment of truth...
+  void* finalcheck1 = (void*) ArchMemory::getIdentAddressOfPPN(page_1);
+  void* finalcheck2 = (void*) ArchMemory::getIdentAddressOfPPN(page_2);
+  if (memcmp(finalcheck1, finalcheck2, PAGE_SIZE) == 0)
+  {
+    //yes! I can actually deduplicate something...
+    for (auto iter1 = IPT_[page_1].begin(); iter1 != IPT_[page_2].end(); iter1++)
+    {
+      ArchMemoryMapping m = iter1->first->getLoader()->arch_memory_.resolveMapping(iter1->second);
+      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
+      pt_src[m.pti].writeable = 0;
+      pt_src[m.pti].cow = 1;
+    }
+    for (auto iter2 = IPT_[page_2].begin(); iter2 != IPT_[page_2].end(); iter2++)
+    {
+      ArchMemoryMapping m = iter2->first->getLoader()->arch_memory_.resolveMapping(iter2->second);
+      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
+      pt_src[m.pti].writeable = 0;
+      pt_src[m.pti].cow = 1;
+      pt_src[m.pti].page_ppn = page_1;
+    }
+    
+    for (auto iter2 = IPT_[page_2].begin(); iter2 < IPT_[page_2].end(); iter2++)
+    {
+      if (ustl::find(IPT_[page_1].begin(), IPT_[page_1].end(), *iter2) == progs.end())
+        IPT_[page_1].push_back(*iter2);
+    }
+    IPT_.erase(page_2);
+    freePPN(page_2);
+    ProcessRegistry::instance()->unlockMultArchmem(progs);
+    unlockIPT();
+    return true;
+  }
+  else
+  {
+    //damn... it changed
+    for (size_t i = 0; i < progs.size(); i++)
+    {
+      ArchMemoryMapping m = progs[i].first->getLoader()->arch_memory_.resolveMapping(progs[i].second);
+      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
+      pt_src[m.pti].writeable = 1;
+    } 
+    ProcessRegistry::instance()->unlockMultArchmem(progs);
+    unlockIPT();
+    return false;
+  }
+  
+  
+  
+  
+  
+  //ustl::vector<>[page_1];
+}
 
 
 //----------------------------------------------------------------------------------cow end

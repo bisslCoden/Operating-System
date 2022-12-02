@@ -58,6 +58,11 @@ class PageManager
       page_usage_table_->bmprint();
     }
 
+    //lightweight no large locking algorithm to check for equal pages
+    void deduplicatePages();
+    //the real heavy stuff... here the deduplication is performed with all locks etc.
+    bool deduplicate(size_t page_1, size_t page_2);
+
     //lock IPT BEFOREEEEE
     ustl::vector<ustl::pair<UserProcess*, size_t>> getIPTEntry(size_t ppn){return IPT_[ppn];};
     /**
@@ -73,6 +78,7 @@ class PageManager
 
     void    lockIPT()                  { IPT_lock_.acquire(); }
     void    unlockIPT()                { IPT_lock_.release(); }
+    bool    checkIPT()                 { return IPT_lock_.isHeldBy(currentThread); }
     //      initialized/increases counter.
 
     void    addRef(size_t ppn, UserProcess* proc, size_t vpn);
