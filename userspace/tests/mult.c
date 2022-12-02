@@ -1,4 +1,4 @@
-//#include "../../common/include/kernel/syscall-definitions.h"
+#include "../../common/include/kernel/syscall-definitions.h"
 #include <stdio.h>
 
 

@@ -37,7 +37,7 @@ bool ArchMemory::checkAndRemove(pointer map_ptr, uint64 index)
   }
   return true;
 }
-
+//now starting to break our working COW
 bool ArchMemory::unmapPage(uint64 virtual_page)
 {
   PageManager* pm = PageManager::instance();
