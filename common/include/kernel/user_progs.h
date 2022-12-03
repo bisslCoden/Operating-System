@@ -4,6 +4,12 @@
 char const *user_progs[] = {
 // for reasons of automated testing
                             "/usr/shell.sweb",
+                            "/usr/dedup.sweb",
+                            "/usr/dedup.sweb",
+                            "/usr/dedup.sweb",
+                            "/usr/dedup.sweb",
+                            "/usr/dedup.sweb",
+                            "/usr/dedup.sweb",
                             // "/usr/pcreate.sweb",
                             // "/usr/threadattack.sweb",
                             // "/usr/mutest.sweb",

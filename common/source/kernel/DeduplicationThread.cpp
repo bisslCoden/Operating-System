@@ -1,5 +1,6 @@
 #include "DeduplicationThread.h"
 #include "Scheduler.h"
+#include "PageManager.h"
 
 DeduplicationThread::DeduplicationThread() : Thread(0, "DeduplicaitonThread", Thread::KERNEL_THREAD)
 {
@@ -18,7 +19,12 @@ void DeduplicationThread::kill()
 
 void DeduplicationThread::Run()
 {
-
+    while(1)
+    {
+        debug(DEDUBLI_THREAD, "now scheduled...\n");
+        PageManager::instance()->deduplicatePages();
+        Scheduler::instance()->yield();
+    }
 }
 
 bool DeduplicationThread::schedulable()

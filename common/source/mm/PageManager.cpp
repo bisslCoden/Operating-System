@@ -530,7 +530,7 @@ bool PageManager::deduplicate(size_t page_1, size_t page_2)
       progs.push_back(*iter2);
   }
   ProcessRegistry::instance()->lockMultArchmem(progs);
-  
+  debug(DEDUBLI_THREAD, "locking sucessful!\n");
   // -> now no more writes allowed from heeere...
   for (size_t i = 0; i < progs.size(); i++)
   {
