@@ -218,45 +218,48 @@ bool UserThread::schedulable()
       was_scheduled_ = 0;
       return false;
     }
-
-    //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (mystack_.UserMutex == USERMUTEX_INVALID)
-    {
-
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
-      return true;
-    }
-
-    size_t sleepy = *mystack_.UserMutex;
-    if(sleepy == SLEEPING_KS)
-    {
-      //get the right flag back
-      // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
-      // my_pages_lock_.release();
-      was_scheduled_ = 0;
-      debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
-      return false;
-    }
-    else if (sleepy == AWAKE_KS)
-    {
-      // my_pages_lock_.release();
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
-      debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
-      return true;
-    }
-    else
-    {
-      // my_pages_lock_.release();
-      debug(X_USERTHREAD, "thread: [%ld] sleepy : %ld\n", tid_, sleepy);
-      assert(false && "Sleep flag was neither sleeping nor awake?\n");
-    }
-//    debug(X_THREADSTACK, "schedulable finished!\n");
+    return true;
   }
-  was_scheduled_ = 0;
   return false;
 }
+// F*ck the userspace mutexes now ... they bring no points and only lead to problems...
+//     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
+//     if (mystack_.UserMutex == USERMUTEX_INVALID)
+//     {
+
+//       was_scheduled_ = 1;
+//       setLastStart(Scheduler::instance()->getRDTSC());
+//       return true;
+//     }
+
+//     size_t sleepy = *mystack_.UserMutex;
+//     if(sleepy == SLEEPING_KS)
+//     {
+//       //get the right flag back
+//       // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+//       // my_pages_lock_.release();
+//       was_scheduled_ = 0;
+//       debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
+//       return false;
+//     }
+//     else if (sleepy == AWAKE_KS)
+//     {
+//       // my_pages_lock_.release();
+//       was_scheduled_ = 1;
+//       setLastStart(Scheduler::instance()->getRDTSC());
+//       debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
+//       return true;
+//     }
+//     else
+//     {
+//       // my_pages_lock_.release();
+//       debug(X_USERTHREAD, "thread: [%ld] sleepy : %ld\n", tid_, sleepy);
+//       assert(false && "Sleep flag was neither sleeping nor awake?\n");
+//     }
+// //    debug(X_THREADSTACK, "schedulable finished!\n");
+//   }
+//   was_scheduled_ = 0;
+//}
 
 
 void UserThread::setCancelState(int state)

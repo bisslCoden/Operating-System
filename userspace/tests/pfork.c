@@ -51,6 +51,7 @@ size_t large_routine(args2* params)
 {
     int arr[ARRSIZE];
     pid_t pid = fork();
+    printf("now filling large array..\n");
     for (size_t i = 0; i < ARRSIZE; i++)
     {
         arr[i] = 78;
