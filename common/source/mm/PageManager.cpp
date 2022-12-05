@@ -25,7 +25,7 @@ PageManager* PageManager::instance()
   return instance_;
 }
 
-PageManager::PageManager() : lock_("PageManager::lock_"), IPT_lock_("PageManger::cow_count_lock_")
+PageManager::PageManager() : lock_("PageManager::lock_")
 {
   assert(instance_ == 0);
   instance_ = this;
@@ -265,104 +265,6 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
 //   return cow_cnt_[ppn]; 
 // }
 
-void  PageManager::addRef(size_t ppn, UserProcess* proc, size_t vpn)
-{
-  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE Lock IPT()!!!!");
-  
-  if (IPT_.find(ppn) == IPT_.end())
-  {
-    ustl::vector<ustl::pair<UserProcess*, size_t>> ref;
-    IPT_.insert(ustl::make_pair(ppn, ref));
-    IPT_[ppn].push_back(ustl::make_pair(proc, vpn));
-  }
-  else
-  {
-    //I think this rare edgecase shouldnt happen... lets hope i am right
-    // if (IPT_[ppn].size() == 1)
-    // {
-    //   ArchMemory* dest_archmem = &IPT_[ppn][0]->getLoader()->arch_memory_;
-    //   if(!dest_archmem.checkArchMemory())
-    //     dest_archmem.lockArchMemory();
-    //   ArchMemoryMapping m = dest_archmem->resolveMapping(vpn);
-    //   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-    //   pt_ident[m.pti].cow = 1;
-    //   pt_ident[m.pti].writeable = 0;
-    //   dest_archmem->unlockArchMemory();
-    // }
-    bool in = false;
-    for (size_t i = 0; i < IPT_[ppn].size(); i++)
-    {
-      if(IPT_[ppn][i].first == proc)
-      {
-        //this is just for security... should never happen
-        if (IPT_[ppn][i].second != vpn)
-          assert(false && "Whaat happened here? Tried to add same proc but different vpn for same ppn\n");
-        
-        debug(X_USERPROCESS, "Tried to at proc %ld twice?!\n", proc->getPID());
-        in = true;
-        break;
-      }
-    }
-    if(!in)
-      IPT_[ppn].push_back(ustl::make_pair(proc, vpn));
-    
-    debug(X_USERPROCESS, "added Proc %ld to page %lx size is then %ld\n",proc->getPID(), ppn, IPT_[ppn].size());
-  }
-  return;
-}
-
-size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow)
-{
-  assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
-
-  if (IPT_.find(ppn) == IPT_.end())
-  {
-    debug(X_USERPROCESS, "Wtf? Tried to free a page which is not in the IPT anymore!!!\n");
-    return 0;
-  }
-  else
-  {
-    ustl::vector<ustl::pair<UserProcess*, size_t>>::iterator it;
-    for (it = IPT_[ppn].begin(); it != IPT_[ppn].end(); it++)
-    {
-      if((*(it)).first == proc)
-        break;
-    }
-    if(it != IPT_[ppn].end())
-    {
-      debug(X_USERPROCESS, "[%lx] [%ld] erasing parent Proc [%ld] size is then %ld\n", ppn,currentThread->getTID() ,proc->getPID(), IPT_[ppn].size() - 1);
-      int cow_if_del = (int)IPT_[ppn].size() - 1;
-      if (cow_if_del == 0)
-      {
-        if (cow)
-        {
-          return WAS_LAST;
-        }
-        else
-        {
-          IPT_.erase(ppn);
-          return 0;
-        }
-      }
-      else if (cow_if_del == -1)
-      {
-        assert(false && "just a check that this never happens\n");
-        // IPT_.erase(ppn);
-        // return 0;
-      }
-      else if (cow_if_del >= 1)
-      {
-        IPT_[ppn].erase(it);
-        return IPT_.size();
-      }
-      else
-        assert(false && "really weird!: cow list is way in the negatiiives\n");
-    }
-    else
-      debug(X_USERPROCESS, "[%ld] Tried to delete ref for proc [%ld] on page [%lx] even though someone else did already for me\n", currentThread->getTID(), currentUserProcess->getPID(), ppn);
-    return -1;
-  }
-}
 
 //LOCK ARCHMEM OUTSIDE!!
 bool PageManager::checkForCow(size_t address)
@@ -399,12 +301,12 @@ bool PageManager::checkForCow(size_t address)
   }
   current_archmem->unlockArchMemory();
 
-
-  if (!checkIPT())
-    lockIPT();
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+  if (!IPT->checkIPT())
+    IPT->lockIPT();
   
   current_archmem->lockArchMemory();
-
+  
   //need to resolve again because sth might have changed in the meanttime.... IPT lock waiting can take looong
   m = current_archmem->resolveMapping(vpn);
   //0x7b68de0eb570
@@ -415,6 +317,7 @@ bool PageManager::checkForCow(size_t address)
     debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
   //  unlockIPT();
     current_archmem->unlockArchMemory();
+    IPT->unlockIPT();
     return false;
   }
   
@@ -422,18 +325,19 @@ bool PageManager::checkForCow(size_t address)
   //this is for keeping correct locking convention
   
   size_t ppn = m.page_ppn;
+  
+  //need ident??
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
-  int ret = deleteRef(ppn, current_proc, true);
+  debug(X_USERPROCESS, "my PageTable is at page %x/%x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, m.pt->page_ppn, ppn);
+  int ret = IPT->deleteRef(ppn, current_proc); 
   //bool dbg_gave = false;
   if (ret == -1)
   {
-    unlockIPT();
+    IPT->unlockIPT();
+    //lets leave this in here for now
     assert(false && "Something went wrong with deleting my ref!\n");
-    //unlockIPT();
     return false;
   }
-
   if (ret == (int)WAS_LAST)
   {
     pt_ident[m.pti].cow = 0;
@@ -442,7 +346,7 @@ bool PageManager::checkForCow(size_t address)
   }
   else if (ret == 0)
   {
-    assert(false && "wanted to free page in cow? This shouldnt happen!");
+    assert(false && "IPT didnt know this was a cow Page?? Hmmmm.... -.-\n");
   }
   else
   {
@@ -451,7 +355,7 @@ bool PageManager::checkForCow(size_t address)
     pt_ident[m.pti].cow = 0;
     pt_ident[m.pti].writeable = 1;
     pt_ident[m.pti].present = 1;
-    addRef(pt_ident[m.pti].page_ppn, current_proc, vpn);
+    InvertedPageTable::instance()->addRef(pt_ident[m.pti].page_ppn, current_proc, vpn);
   }
 
   // F*ck the userspace mutexes now ... they bring no points and only lead to problems...
@@ -484,112 +388,10 @@ bool PageManager::checkForCow(size_t address)
   // }
   
   current_archmem->unlockArchMemory();
-  unlockIPT();
+  IPT->unlockIPT();
 
   //current_archmem->unlockArchMemory();
   return true;
-}
-
-void PageManager::deduplicatePages()
-{
-  //this is not threadsafe! but that is not the goal: we want first a lightweight comparison
-  // we do all the heavy locking after that when we really get serious with deduplicating
-  size_t ddp1, ddp2;
-  for (auto iter1 = IPT_.begin(); iter1 != IPT_.end(); iter1++)
-  {
-    ddp1 = iter1->first;
-    void* this_page = (void*) ArchMemory::getIdentAddressOfPPN(iter1->first);
-    for (auto iter2 = iter1 + 1; iter2 < IPT_.end(); iter2++)
-    {
-      ddp2 = iter2->first;
-      void* currentPage = (void*) ArchMemory::getIdentAddressOfPPN(iter2->first);
-      if (memcmp(this_page, currentPage, PAGE_SIZE) == 0)
-      {
-        debug(DEDUBLI_THREAD, "[deduplication found 2 equal pages!]\n");
-        if(deduplicate(ddp1, ddp2))
-          debug(DEDUBLI_THREAD, "deduplication of page %lx and page %lx worked\n", ddp1, ddp2);
-        else
-          debug(DEDUBLI_THREAD, "somehow could not ddp page %lx and page %lx\n", ddp1, ddp2);
-      }
-    }
-    
-  }
-  
-}
-
-bool PageManager::deduplicate(size_t page_1, size_t page_2)
-{
-  lockIPT();
-  ustl::vector<ustl::pair<UserProcess*, size_t>> progs;
-  //add effected progs
-  for (auto iter = IPT_[page_1].begin(); iter < IPT_[page_1].end(); iter++)
-    progs.push_back(*iter);
-  for (auto iter2 = IPT_[page_2].begin(); iter2 < IPT_[page_2].end(); iter2++)
-  {
-    if (ustl::find(progs.begin(), progs.end(), *iter2) != progs.end())
-      progs.push_back(*iter2);
-  }
-  ProcessRegistry::instance()->lockMultArchmem(progs);
-  debug(DEDUBLI_THREAD, "locking sucessful!\n");
-  // -> now no more writes allowed from heeere...
-  for (size_t i = 0; i < progs.size(); i++)
-  {
-    ArchMemoryMapping m = progs[i].first->getLoader()->arch_memory_.resolveMapping(progs[i].second);
-    PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
-    pt_src[m.pti].writeable = 0;
-  }
-  //moment of truth...
-  void* finalcheck1 = (void*) ArchMemory::getIdentAddressOfPPN(page_1);
-  void* finalcheck2 = (void*) ArchMemory::getIdentAddressOfPPN(page_2);
-  if (memcmp(finalcheck1, finalcheck2, PAGE_SIZE) == 0)
-  {
-    //yes! I can actually deduplicate something...
-    for (auto iter1 = IPT_[page_1].begin(); iter1 != IPT_[page_2].end(); iter1++)
-    {
-      ArchMemoryMapping m = iter1->first->getLoader()->arch_memory_.resolveMapping(iter1->second);
-      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
-      pt_src[m.pti].writeable = 0;
-      pt_src[m.pti].cow = 1;
-    }
-    for (auto iter2 = IPT_[page_2].begin(); iter2 != IPT_[page_2].end(); iter2++)
-    {
-      ArchMemoryMapping m = iter2->first->getLoader()->arch_memory_.resolveMapping(iter2->second);
-      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
-      pt_src[m.pti].writeable = 0;
-      pt_src[m.pti].cow = 1;
-      pt_src[m.pti].page_ppn = page_1;
-    }
-    
-    for (auto iter2 = IPT_[page_2].begin(); iter2 < IPT_[page_2].end(); iter2++)
-    {
-      if (ustl::find(IPT_[page_1].begin(), IPT_[page_1].end(), *iter2) == progs.end())
-        IPT_[page_1].push_back(*iter2);
-    }
-    IPT_.erase(page_2);
-    freePPN(page_2);
-    ProcessRegistry::instance()->unlockMultArchmem(progs);
-    unlockIPT();
-    return true;
-  }
-  else
-  {
-    //damn... it changed
-    for (size_t i = 0; i < progs.size(); i++)
-    {
-      ArchMemoryMapping m = progs[i].first->getLoader()->arch_memory_.resolveMapping(progs[i].second);
-      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt->page_ppn);
-      pt_src[m.pti].writeable = 1;
-    } 
-    ProcessRegistry::instance()->unlockMultArchmem(progs);
-    unlockIPT();
-    return false;
-  }
-  
-  
-  
-  
-  
-  //ustl::vector<>[page_1];
 }
 
 

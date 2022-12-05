@@ -91,8 +91,8 @@ class ProcessRegistry : public Thread
     void addProcToList(UserProcess* new_proc);
 
     //just write 0 if you dont care about vpn
-    void lockMultArchmem(ustl::vector<ustl::pair<UserProcess*, size_t>> procs);
-    void unlockMultArchmem(ustl::vector<ustl::pair<UserProcess*, size_t>> procs);
+    void lockMultArchmem(ustl::map<UserProcess*, size_t> procs);
+    void unlockMultArchmem(ustl::map<UserProcess*, size_t> procs);
 
 
     /** @brief 1st argument is PID for process to wait to, other are not important, just for posix standard

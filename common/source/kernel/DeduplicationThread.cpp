@@ -22,7 +22,7 @@ void DeduplicationThread::Run()
     while(1)
     {
         debug(DEDUBLI_THREAD, "now scheduled...\n");
-        PageManager::instance()->deduplicatePages();
+        InvertedPageTable::instance()->deduplicatePages();
         Scheduler::instance()->yield();
     }
 }

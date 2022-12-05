@@ -7,11 +7,12 @@
 #include "umap.h"
 #include "Mutex.h"
 #include "UserProcess.h"
+#include "InvertedPageTable.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
 
-#define WAS_LAST 0x82426784
+//#define WAS_LAST 0x82426784
 
 class UserProcess;
 class PageManager
@@ -63,8 +64,6 @@ class PageManager
     //the real heavy stuff... here the deduplication is performed with all locks etc.
     bool deduplicate(size_t page_1, size_t page_2);
 
-    //lock IPT BEFOREEEEE
-    ustl::vector<ustl::pair<UserProcess*, size_t>> getIPTEntry(size_t ppn){return IPT_[ppn];};
     /**
      * @brief Handles a cow Pagefault and refreshes the cow ist accordingly 
      * IMPORTANT: Locking Policy: 1st aquire Pagemanager::cnt_lock_ and then 
@@ -76,16 +75,6 @@ class PageManager
      */
     bool checkForCow(size_t address);
 
-    void    lockIPT()                  { IPT_lock_.acquire(); }
-    void    unlockIPT()                { IPT_lock_.release(); }
-    bool    checkIPT()                 { return IPT_lock_.isHeldBy(currentThread); }
-    //      initialized/increases counter.
-
-    void    addRef(size_t ppn, UserProcess* proc, size_t vpn);
-    //      decreaseCowCnt returns cow_cnt_[ppn]. 0 if not in map. also erases if counter is 1
-    size_t  deleteRef(size_t ppn, UserProcess* proc, bool cow);
-    //      isInCowCnt() returns true if ppn found in map
-    //      getNrOfCows() ASSERTS if ppn not in map. check before! returns value for counter
   private:
     /**
      * used internally to mark pages as reserved
@@ -107,7 +96,4 @@ class PageManager
 
     size_t HEAP_PAGES;
 
-    // the cow_cnt_ maps the ppn of a page to the number of processes that haven't copied yet
-    ustl::map<size_t, ustl::vector<ustl::pair<UserProcess*, size_t>>> IPT_;
-    Mutex IPT_lock_;
 };

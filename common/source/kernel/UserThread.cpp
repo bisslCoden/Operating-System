@@ -316,14 +316,14 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
   // 
   DYING_ = true;
   my_pages_lock_.acquire();
-  PageManager::instance()->lockIPT();
+  InvertedPageTable::instance()->lockIPT();
   loader_->arch_memory_.lockArchMemory();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
     assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
   }
-  PageManager::instance()->unlockIPT();
+  InvertedPageTable::instance()->unlockIPT();
   loader_->arch_memory_.unlockArchMemory();
   my_pages_lock_.release();
 
