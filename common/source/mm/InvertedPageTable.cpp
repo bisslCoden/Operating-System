@@ -20,7 +20,7 @@ InvertedPageTable::InvertedPageTable() : IPT_lock_("InvertedPageTable::lock_")
 }
 
 
-void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags)
+void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags, size_t pml)
 {
   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE Lock IPT()!!!!");
   
@@ -33,10 +33,14 @@ void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFla
       new_entry.my_flags = { false, false, false };
    
     new_entry.progs_mappings.insert(ustl::make_pair(proc, vpn));
+    new_entry.page_map_level = pml;
     IPT_.emplace(ppn, new_entry);
   }
   else
   {
+    if (pml != IPT_[ppn].page_map_level)
+      assert(false && "NOPE! dont mix pagemaplevels on a page!\n");
+    
     auto my_proc = IPT_[ppn].progs_mappings.find(proc);
     if (my_proc != IPT_[ppn].progs_mappings.end())
     {
@@ -45,6 +49,7 @@ void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFla
         assert(false && "tried to add same proc same vpn twice ... i should assert\n");
       }
     }
+
     if (flags)
         IPT_[ppn].my_flags = { flags->cow, flags->shared, flags->swapped };
     
@@ -53,7 +58,7 @@ void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFla
   }
 }
 
-size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn)
+size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn, size_t pml)
 {
   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
 
@@ -65,17 +70,24 @@ size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn)
   }
   else
   {
+    if (pml != IPT_[ppn].page_map_level)
+      assert(false && "NOPE! dont mix pagemaplevels on a page!\n");
+    
     auto my_proc = IPT_[ppn].progs_mappings.find(proc);
     debug(X_USERPROCESS, "[%ld] found my entry vpn: %lx(searched: %lx)\n", my_proc->first->getPID(), my_proc->second, vpn);
+    
     if (my_proc != IPT_[ppn].progs_mappings.end())
     {
-      while (my_proc->second != vpn)
+      if (pml == 0)
       {
-        my_proc++;
-        if (my_proc->first != proc)
+        while (my_proc->second != vpn)
         {
-          assert(false && "my ref is not in here for THAT vpn\n");
-        }
+          my_proc++;
+          if (my_proc->first != proc)
+          {
+            assert(false && "my ref is not in here for THAT vpn\n");
+          }
+        }  
       }
       
       if (IPT_[ppn].my_flags.cow)
@@ -87,6 +99,7 @@ size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn)
           return WAS_LAST;
         }
       }
+
       IPT_[ppn].progs_mappings.erase(my_proc);
       debug(X_USERPROCESS, "erasing [%ld] vpn: %lx from %lx\n", my_proc->first->getPID(), vpn, ppn);
       if (IPT_[ppn].progs_mappings.size() == 0)
@@ -240,6 +253,11 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
       unlockIPT();
       return false;
     }
+    else if(IPT_[page_1].page_map_level != IPT_[page_2].page_map_level)
+    {
+      unlockIPT();
+      return false;
+    }
     for (auto prog : IPT_[page_1].progs_mappings)
     {
       debug(DEDUBLI_THREAD, "emplacing [%ld]\n", prog.first->getPID());
@@ -262,10 +280,6 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
       Scheduler::instance()->yield();
     }
   }
-  
-  
-  
-  
   
   debug(DEDUBLI_THREAD, "locking sucessful!\n");
   // -> now no more writes allowed from heeere...

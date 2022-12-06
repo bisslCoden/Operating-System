@@ -126,6 +126,8 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
+  bool checkforPMLCow(size_t vpn);
+
   /**
    * @brief sets/increases the PageManager*::cow_cnt_ 
    * 

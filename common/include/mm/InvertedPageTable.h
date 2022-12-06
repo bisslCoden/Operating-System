@@ -21,6 +21,7 @@ struct InvertedPageTableEntry
 {
     ustl::multimap<UserProcess*, size_t> progs_mappings;
     IPTFlags my_flags;
+    size_t page_map_level;
 };
 
 
@@ -32,8 +33,8 @@ public:
     static InvertedPageTable* instance();
 
     //NOTE: LOCK IPT BEFORE ANY OF THESE
-    void    addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags = 0);
-    size_t  deleteRef(size_t ppn, UserProcess* proc, size_t vpn);
+    void    addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags = 0, size_t pml = 0);
+    size_t  deleteRef(size_t ppn, UserProcess* proc, size_t vpn, size_t pml = 0);
     InvertedPageTableEntry* getEntry(size_t ppn);
     IPTFlags* getFlags(size_t ppn);
     
