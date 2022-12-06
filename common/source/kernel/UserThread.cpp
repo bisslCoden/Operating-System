@@ -215,6 +215,7 @@ bool UserThread::schedulable()
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
       // my_pages_lock_.release();
+      debug(SLEEP, "[%ld] I should still sleep: %ld, %ld\n", tid_, getTimeToWake(), Scheduler::instance()->getRDTSC() * 10);
       was_scheduled_ = 0;
       return false;
     }

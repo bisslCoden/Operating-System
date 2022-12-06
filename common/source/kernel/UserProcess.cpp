@@ -62,7 +62,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   }
   threads_lock_.release();
   *returnto = 0; 
-  ProcessRegistry::instance()->addProcToList(this);
+  //ProcessRegistry::instance()->addProcToList(this);
   first_thread_ = first_thread;
   //Scheduler::instance()->addNewThread(first_thread);
   return;
@@ -128,7 +128,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   //?
  // Scheduler::instance()->printThreadList();
  first_thread_ = thread;
- ProcessRegistry::instance()->addProcToList(this);
   *returnto = 0;
   return;
 }

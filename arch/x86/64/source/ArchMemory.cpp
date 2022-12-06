@@ -55,11 +55,17 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   size_t ppn = m.pt[m.pti].page_ppn;
   
   //pm->lockIPT();
-  if(IPT->deleteRef(ppn, my_proc) == 0)
+  int ret = IPT->deleteRef(ppn, my_proc, virtual_page);
+  if(ret == 0)
   {
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
     PageManager::instance()->freePPN(ppn);
     //pm->unlockIPT();
+  }
+  else if(ret == (int) WAS_LAST)
+  {
+    IPT->deleteRef(ppn, my_proc, virtual_page);
+    PageManager::instance()->freePPN(ppn);
   }
   else
   {
@@ -203,12 +209,26 @@ ArchMemory::~ArchMemory()
                 if (pt[pti].present)
                 {
                   size_t ppn = pt[pti].page_ppn;
-                  if(IPT->deleteRef(ppn, my_proc) == 0)
+                  size_t vpn = (pml4i << 39) + (pdpti << 30) + (pdi << 21) + (pti << 12);
+                  vpn = vpn >> 12;
+
+                  int ret = IPT->deleteRef(ppn, my_proc, vpn);
+                  if(ret == 0)
                   {
                     debug(X_USERPROCESS, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", my_proc->getPID(), ppn);
                     PageManager::instance()->freePPN(ppn);
-                    pt[pti].present = 0;
                   }
+                  else if(ret == (int) WAS_LAST)
+                  {
+                    IPT->deleteRef(ppn, my_proc, vpn);
+                    PageManager::instance()->freePPN(ppn);
+                  }
+                  else
+                  {
+                    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
+                  //  pm->unlockIPT();
+                  }
+                  pt[pti].present = 0;
                 }
               }
               pd[pdi].pt.present = 0;
@@ -437,6 +457,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
                   //PageManager::instance()->addRef(pt_src[pti].page_ppn, parent);
                   //debug(X_USERPROCESS, "adding proc %ld\n", child_proc->getPID());
                   size_t vpn = (pml4i << 39) + (pdpti << 30) + (pdi << 21) + (pti << 12);
+                  vpn = vpn >> 12;
                   debug(X_USERPROCESS, "cowing vpn: %lx\n", vpn);
                   IPTFlags* flags = IPT->getFlags(pt_dest[pti].page_ppn);
                   flags->cow = true;

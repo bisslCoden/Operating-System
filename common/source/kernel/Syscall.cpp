@@ -8,6 +8,7 @@
 #include "ProcessRegistry.h"
 #include "File.h"
 #include "../../../userspace/libc/include/time.h"
+#include "umultimap.h"
 
 typedef struct threadattribute
 {
@@ -22,7 +23,7 @@ typedef struct threadattribute
 size_t Syscall::syscallException(size_t syscall_number, size_t arg1, size_t arg2, size_t arg3, size_t arg4, size_t arg5)
 {
   size_t return_value = 0;
-
+  
   if ((syscall_number != sc_sched_yield) && (syscall_number != sc_outline)) // no debug print because these might occur very often
     debug(SYSCALL, "Syscall %zd called with arguments %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) %zd(=%zx) by thread [%ld]\n",
           syscall_number, arg1, arg1, arg2, arg2, arg3, arg3, arg4, arg4, arg5, arg5, currentThread->getTID());
@@ -560,6 +561,19 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 }
 
 size_t Syscall::pthread_self(){
+
+  ustl::multimap<int, int> map;
+  map.insert(ustl::make_pair<int, int> (1, 2));
+  map.insert(ustl::make_pair<int, int> (1, 3));
+  map.insert(ustl::make_pair<int, int> (3, 5));
+  map.insert(ustl::make_pair<int, int> (2, 7));
+  for (auto it = map.begin(); it != map.end(); it++)
+  {
+   kprintf("map experimt: %d\n", *it);
+  }
+  kprintf("map experimt: %d\n", map.find(1)->second);
+  
+  
   return currentUserThread->getTID();
 }
 

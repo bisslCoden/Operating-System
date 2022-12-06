@@ -329,7 +329,7 @@ bool PageManager::checkForCow(size_t address)
   //need ident??
   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
   debug(X_USERPROCESS, "my PageTable is at page %x/%x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, m.pt->page_ppn, ppn);
-  int ret = IPT->deleteRef(ppn, current_proc); 
+  int ret = IPT->deleteRef(ppn, current_proc, vpn); 
   //bool dbg_gave = false;
   if (ret == -1)
   {

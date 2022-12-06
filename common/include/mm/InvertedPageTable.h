@@ -3,6 +3,7 @@
 #include "types.h"
 #include "Mutex.h"
 #include "umap.h"
+#include "umultimap.h"
 #include "uvector.h"
 #include "UserProcess.h"
 
@@ -18,7 +19,7 @@ struct IPTFlags
 
 struct InvertedPageTableEntry
 {
-    ustl::map<UserProcess*, size_t> progs_mappings;
+    ustl::multimap<UserProcess*, size_t> progs_mappings;
     IPTFlags my_flags;
 };
 
@@ -32,7 +33,7 @@ public:
 
     //NOTE: LOCK IPT BEFORE ANY OF THESE
     void    addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags = 0);
-    size_t  deleteRef(size_t ppn, UserProcess* proc);
+    size_t  deleteRef(size_t ppn, UserProcess* proc, size_t vpn);
     InvertedPageTableEntry* getEntry(size_t ppn);
     IPTFlags* getFlags(size_t ppn);
     
@@ -44,7 +45,7 @@ public:
     //for Deduplication Thread
     void deduplicatePages();
     bool deduplicate(size_t page_1, size_t page_2);
-
+    size_t computeChecksum(size_t* start);
 
 private:
     static InvertedPageTable* instance_;

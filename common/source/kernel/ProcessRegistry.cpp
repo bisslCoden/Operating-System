@@ -162,6 +162,8 @@ size_t ProcessRegistry::processFork()
     delete process;
     return -1;
   }
+
+  ProcessRegistry::instance()->addProcToList(process);
   process->addToThreadList(process->first_thread_);
   Scheduler::instance()->addNewThread(process->first_thread_);
   process->unLockThreadMutex();
@@ -205,6 +207,7 @@ void ProcessRegistry::createProcess(const char* path)
     delete process;
     return;
   }
+  addProcToList(process);
   process->addToThreadList(process->first_thread_);
   Scheduler::instance()->addNewThread(process->first_thread_);
   process->unLockThreadMutex();
@@ -213,7 +216,8 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-void ProcessRegistry::addProcToList(UserProcess* new_proc){
+void ProcessRegistry::addProcToList(UserProcess* new_proc)
+{
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(new_proc->getPID(), new_proc));
   processStart(); //should also be called if you fork a process
@@ -350,8 +354,10 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   return return_pid;
 }
 
-void ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
+bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
 {
+  size_t i_want = procs.size();
+  size_t count = 0;
   list_of_processes_lock_.acquire();
   ustl::map<size_t, UserProcess*>::iterator it; 
   for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
@@ -360,9 +366,24 @@ void ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
     {
       if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
         it->second->getLoader()->arch_memory_.lockArchMemory();
+      count++;
     }
   }
+  if (count != i_want)
+  {
+    for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+    {
+      if (procs.find(it->second) != procs.end())
+      {
+        if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+          it->second->getLoader()->arch_memory_.unlockArchMemory();
+      }
+    }
+    list_of_processes_lock_.release();
+    return false;
+  }
   list_of_processes_lock_.release();
+  return true;
 }
 
 void ProcessRegistry::unlockMultArchmem(ustl::map<UserProcess*, size_t> procs)
