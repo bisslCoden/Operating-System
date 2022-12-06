@@ -423,8 +423,8 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
       pml4_src[pml4i].writeable = 0;
 
       pml4_dest[pml4i] = pml4_src[pml4i];
-      IPT->addRef(pml4_src[pml4i].page_ppn, child_proc, 0, 3);
-      flags = IPT->getFlags();
+      IPT->addRef(pml4_src[pml4i].page_ppn, child_proc, 0, 0, 3);
+      flags = IPT->getFlags(pml4_src[pml4i].page_ppn);
       flags->cow = true;
      // pml4_dest[pml4i].page_ppn = PageManager::instance()->allocPPN();
       debug(X_ARCHMEM, "setCowToArchmemPages(): pml4_dest[pml4i].page_ppn = %lx\n",  (size_t)pml4_dest[pml4i].page_ppn);
@@ -438,12 +438,12 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
           pdpt_src[pdpti].pd.cow = 1;
           pdpt_src[pdpti].pd.writeable = 0;
           
-          IPT->addRef(pdpt_src[pdpti].pd.page_ppn, child_proc, 0, 2);
-          flags = IPT->getFlags();
+          IPT->addRef(pdpt_src[pdpti].pd.page_ppn, child_proc, 0, 0, 2);
+          flags = IPT->getFlags(pdpt_src[pdpti].pd.page_ppn);
           flags->cow = true;
           //resolve cowwww
 
-          debug(X_ARCHMEM, "setCowToArchmemPages(): pdpt_dest[pdpti].pd.page_ppn = %lx\n", (size_t)pdpt_dest[pdpti].pd.page_ppn);
+        // debug(X_ARCHMEM, "setCowToArchmemPages(): pdpt_dest[pdpti].pd.page_ppn = %lx\n", (size_t)pdpt_dest[pdpti].pd.page_ppn);
           PageDirEntry* pd_src  = (PageDirEntry*) getIdentAddressOfPPN(pdpt_src[pdpti].pd.page_ppn);
           // PageDirEntry* pd_dest = (PageDirEntry*) getIdentAddressOfPPN(pdpt_dest[pdpti].pd.page_ppn);
           // memcpy((void*) pd_dest, (void*) pd_src, PAGE_SIZE);
@@ -455,10 +455,10 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
               pd_src[pdi].pt.cow = 1;
               pd_src[pdi].pt.writeable = 0;
               
-              IPT->addRef(pd_src[pdi].pt.page_ppn, child_proc, 0, 1);
-              flags = IPT->getFlags();
+              IPT->addRef(pd_src[pdi].pt.page_ppn, child_proc, 0, 0, 1);
+              flags = IPT->getFlags(pdpt_src[pdpti].pd.page_ppn);
               flags->cow = true;
-              debug(X_ARCHMEM, "setCowToArchmemPages(): pd_dest[pdi].pt.page_ppn = %lx\n", (size_t)pd_dest[pdi].pt.page_ppn);
+            //  debug(X_ARCHMEM, "setCowToArchmemPages(): pd_dest[pdi].pt.page_ppn = %lx\n", (size_t)pd_dest[pdi].pt.page_ppn);
               //pd_src[pdi]
               PageTableEntry* pt_src  = (PageTableEntry*) getIdentAddressOfPPN(pd_src[pdi].pt.page_ppn);
               //PageTableEntry* pt_dest = (PageTableEntry*) getIdentAddressOfPPN(pd_dest[pdi].pt.page_ppn);
@@ -554,11 +554,63 @@ size_t ArchMemory::allocDestAndCopySrc(size_t ppn_src)
   return ppn_dest;
 }
 
+template <typename T> 
+size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level)
+{
+  int ret;
+  size_t next_PML;
+  T* entry = (T*) entrypt;
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+
+  if (entry[index].cow && entry[index].present)
+  {
+    ret = IPT->deleteRef(entry[index].page_ppn, my_proc, 0, level);
+    if (ret == -1)
+    {
+      return (size_t) 0;
+    }
+    else if (ret == (int) WAS_LAST)
+    {
+      entry[index].cow = 0;
+      entry[index].writeable = 1;
+      next_PML = (size_t) getIdentAddressOfPPN(entry[index].page_ppn);
+    }
+    else if (ret > 0)
+    {
+      entry[index].page_ppn = allocDestAndCopySrc(entry[index].page_ppn);
+      entry[index].cow = 0;
+      entry[index].writeable = 1;
+      IPT->addRef(entry[index].page_ppn, my_proc, 0, 0, level);
+    }
+    else
+    {
+      return (size_t) 0;
+    }
+  }
+  else if (entry[index].present)
+  {
+    next_PML = (size_t) getIdentAddressOfPPN(entry[index].page_ppn);
+  }
+  else
+    assert(false && "pml not present... might have to change that tho");
+  return next_PML;
+}
+
+
 //lock IPT and archmem from outside
 // do with template ...
 bool ArchMemory::checkforPMLCow(size_t vpn)
 {
   ArchMemoryMapping m = resolveMapping(vpn);
-
-
+  m.pdpt_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i, 3);
+  assert(m.pdpt_ppn != 0);
+  m.pd_ppn = cowPML<PageDirPointerTablePageDirEntry> (getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, 2);
+  assert(m.pd_ppn != 0);
+  m.pt_ppn = cowPML<PageDirPageTableEntry> (getIdentAddressOfPPN(m.pd_ppn), m.pdi, 1); 
+  assert(m.pt_ppn != 0);
+  //size_t* page_start = cowPML<PageTableEntry, size_t>(pt_id, m.pti, 0);
+  return true;
 }
+
+
+

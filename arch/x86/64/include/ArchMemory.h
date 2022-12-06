@@ -158,6 +158,7 @@ private:
  * @param physical_page_table_page physical page of the new page table.
  */
   template <typename T> static bool insert(pointer map_ptr, uint64 index, uint64 ppn, uint64 bzero, uint64 size, uint64 user_access, uint64 writeable);
+  template <typename T> size_t cowPML(pointer entrypt, size_t index, size_t level);
 
 /**
  * Removes a page directory entry from a given page directory if it is present
