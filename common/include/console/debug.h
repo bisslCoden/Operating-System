@@ -106,4 +106,6 @@ const size_t DBEK               = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t CLOCK              = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t SLEEP              = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t WAITPID            = Ansi_Magenta;
-const size_t DEDUBLI_THREAD     = Ansi_Red     | OUTPUT_ENABLED;
+const size_t DEDUBLI_THREAD     = Ansi_Red    ;
+const size_t MULTICOW           = Ansi_Yellow     | OUTPUT_ENABLED;
+

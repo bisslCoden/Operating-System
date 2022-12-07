@@ -42,37 +42,33 @@ bool ArchMemory::checkAndRemove(pointer map_ptr, uint64 index)
 //now starting to break our working COW
 bool ArchMemory::unmapPage(uint64 virtual_page)
 {
- // PageManager* pm = PageManager::instance();
   InvertedPageTable* IPT = InvertedPageTable::instance();
-
-  //lockArchMemory();
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
+  assert(checkforPMLCow(virtual_page, true) && "pmlcow didnt work for some reason...\n");
+  //need to resolve again bc something might  have changed...
+  m = resolveMapping(virtual_page);
 
-  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  // free if counter not in map or after descresing counter = 0.
-  size_t ppn = m.pt[m.pti].page_ppn;
+  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
+  pt_ident[m.pti].present = 0;
   
-  //pm->lockIPT();
-  int ret = IPT->deleteRef(ppn, my_proc, virtual_page);
+  // free if counter not in map or after descresing counter = 0.
+  int ret = IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
+  
   if(ret == 0)
   {
-    debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
-    PageManager::instance()->freePPN(ppn);
-    //pm->unlockIPT();
+    debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+    PageManager::instance()->freePPN(m.page_ppn);
   }
   else if(ret == (int) WAS_LAST)
   {
-    IPT->deleteRef(ppn, my_proc, virtual_page);
-    PageManager::instance()->freePPN(ppn);
+    IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
+    PageManager::instance()->freePPN(m.page_ppn);
   }
   else
-  {
-    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
-  //  pm->unlockIPT();
-  }
-  pt_ident[m.pti].present = 0;
+    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+  
 
   
   //pm->unlockIPT();
@@ -83,19 +79,40 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   {
     empty = checkAndRemove<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi);
     debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pt_ppn = %zx)\n", virtual_page, m.pt_ppn);
-    PageManager::instance()->freePPN(m.pt_ppn);
+    ret = IPT->deleteRef(m.pt_ppn, my_proc, 0, 1);
+    if (ret == 0)
+      PageManager::instance()->freePPN(m.pt_ppn);
+    else if (ret == (int) WAS_LAST)
+    {
+      IPT->deleteRef(m.pt_ppn, my_proc, 0, 1);
+      PageManager::instance()->freePPN(m.pt_ppn);
+    }
   }
   if (empty)
   {
     empty = checkAndRemove<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti);
     debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pd_ppn = %zx)\n", virtual_page, m.pd_ppn);
-    PageManager::instance()->freePPN(m.pd_ppn);
+    ret = IPT->deleteRef(m.pd_ppn, my_proc, 0, 2);
+    if (ret == 0)
+      PageManager::instance()->freePPN(m.pd_ppn);
+    else if (ret == (int) WAS_LAST)
+    {
+      IPT->deleteRef(m.pd_ppn, my_proc, 0, 2);
+      PageManager::instance()->freePPN(m.pd_ppn);
+    }
   }
   if (empty)
   {
     empty = checkAndRemove<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i);
     debug(X_ARCHMEM, "unmapPage(virtual_page = %zx) calling freePPN(m.pdpt_ppn = %zx)\n", virtual_page, m.pdpt_ppn);
-    PageManager::instance()->freePPN(m.pdpt_ppn);
+    ret = IPT->deleteRef(m.pdpt_ppn, my_proc, 0, 3);
+    if (ret == 0)
+      PageManager::instance()->freePPN(m.pdpt_ppn);
+    else if (ret == (int) WAS_LAST)
+    {
+      ret = IPT->deleteRef(m.pdpt_ppn, my_proc, 0, 3);
+      PageManager::instance()->freePPN(m.pdpt_ppn);
+    }
   }
   //unlockArchMemory();
   return true;
@@ -127,8 +144,6 @@ bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_
 {
   InvertedPageTable* IPT = InvertedPageTable::instance();
   debug(A_MEMORY, "%zx %zx %zx %zx\n", page_map_level_4_, virtual_page, physical_page, user_access);
-  ArchMemoryMapping m = resolveMapping(page_map_level_4_, virtual_page);
-  assert((m.page_size == 0) || (m.page_size == PAGE_SIZE));
 
   if (!IPT->checkIPT())
     IPT->lockIPT();
@@ -137,32 +152,38 @@ bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_
     lockArchMemory();
   
 
-  size_t ppn;
+  ArchMemoryMapping m = resolveMapping(page_map_level_4_, virtual_page);
+  assert((m.page_size == 0) || (m.page_size == PAGE_SIZE));
+  
+  if(!checkforPMLCow(virtual_page, true))
+    debug(MULTICOW, "well seems like we ll have to add some more levels... good thing i cowed everything we have so far...\n");
+  debug(MULTICOW, "cowed all levels...\n");
+  m = resolveMapping(page_map_level_4_, virtual_page);
+ // size_t ppn;
   if (m.pdpt_ppn == 0)
   {
-    ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i, 3);
-    if (ppn)
-      m.pdpt_ppn = ppn;
-    else
-    {
-      m.pdpt_ppn = PageManager::instance()->allocPPN();
-      IPT->addRef(m.pdpt_ppn, my_proc, 0, 0, 3);
-    }
-    
+    // ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i, 3);
+    // if (ppn)
+    //   m.pdpt_ppn = ppn;
+    // else
+    // {
+    m.pdpt_ppn = PageManager::instance()->allocPPN();
+    IPT->addRef(m.pdpt_ppn, my_proc, 0, 0, 3);
+    //}
     debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pdpt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pdpt_ppn);
     insert<PageMapLevel4Entry>((pointer) m.pml4, m.pml4i, m.pdpt_ppn, 1, 0, 1, 1);
   }
 
   if (m.pd_ppn == 0)
   {
-    ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, 2);
-    if (ppn)
-      m.pd_ppn = ppn;
-    else
-    {
-      m.pd_ppn = PageManager::instance()->allocPPN();
-      IPT->addRef(m.pd_ppn, my_proc, 0, 0, 2);
-    }
+    // ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, 2);
+    // if (ppn)
+    //   m.pd_ppn = ppn;
+    // else
+    // {
+    m.pd_ppn = PageManager::instance()->allocPPN();
+    IPT->addRef(m.pd_ppn, my_proc, 0, 0, 2);
+    //}
     
     debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pd_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pd_ppn);
     insert<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, m.pd_ppn, 1, 0, 1, 1);
@@ -170,16 +191,16 @@ bool ArchMemory::mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_
 
   if (m.pt_ppn == 0)
   {
-    ppn = cowPML<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi, 1);
-    if (ppn)
-    {
-      m.pt_ppn = ppn;
-    }
-    else
-    {
-       m.pt_ppn = PageManager::instance()->allocPPN();
-       IPT->addRef(m.pt_ppn, my_proc, 0, 0, 1);
-    }
+    // ppn = cowPML<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi, 1);
+    // if (ppn)
+    // {
+    //   m.pt_ppn = ppn;
+    // }
+    // else
+    // {
+    m.pt_ppn = PageManager::instance()->allocPPN();
+    IPT->addRef(m.pt_ppn, my_proc, 0, 0, 1);
+    // }
     debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pt_ppn);
     insert<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi, m.pt_ppn, 1, 0, 1, 1);
   }
@@ -208,6 +229,7 @@ ArchMemory::~ArchMemory()
     IPT->lockIPT();
   
   lockArchMemory();
+  int ret;
   assert(currentThread->kernel_registers_->cr3 != page_map_level_4_ * PAGE_SIZE && "thread deletes its own arch memory");
 
   PageMapLevel4Entry* pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
@@ -236,7 +258,7 @@ ArchMemory::~ArchMemory()
                   size_t vpn = (pml4i << 39) + (pdpti << 30) + (pdi << 21) + (pti << 12);
                   vpn = vpn >> 12;
 
-                  int ret = IPT->deleteRef(ppn, my_proc, vpn);
+                  ret = IPT->deleteRef(ppn, my_proc, vpn);
                   if(ret == 0)
                   {
                     debug(X_USERPROCESS, "[%ld] ~ArchMemory(): will call freePPN(ppn = %lx)\n", my_proc->getPID(), ppn);
@@ -252,19 +274,50 @@ ArchMemory::~ArchMemory()
                     debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), ppn);
                   //  pm->unlockIPT();
                   }
-                  pt[pti].present = 0;
+                  //not sure if i can do thiss.... (I really dont wanna cow everything just for deleting right after)
+                  //pt[pti].present = 0;
                 }
               }
-              pd[pdi].pt.present = 0;
-              PageManager::instance()->freePPN(pd[pdi].pt.page_ppn);
+              ret = IPT->deleteRef(pd[pdi].pt.page_ppn, my_proc, 0, 1);
+              if (ret == 0)
+              {
+                PageManager::instance()->freePPN(pd[pdi].pt.page_ppn);
+              }
+              else if (ret == (int) WAS_LAST)
+              {
+                ret = IPT->deleteRef(pd[pdi].pt.page_ppn, my_proc, 0, 1);
+                PageManager::instance()->freePPN(pd[pdi].pt.page_ppn);
+              }
+              //pd[pdi].pt.present = 0;
+              //PageManager::instance()->freePPN(pd[pdi].pt.page_ppn);
             }
           }
-          pdpt[pdpti].pd.present = 0;
-          PageManager::instance()->freePPN(pdpt[pdpti].pd.page_ppn);
+          ret = IPT->deleteRef(pdpt[pdpti].pd.page_ppn, my_proc, 0, 2);
+          if (ret == 0)
+          {
+            PageManager::instance()->freePPN(pdpt[pdpti].pd.page_ppn);
+          }
+          else if (ret == (int) WAS_LAST)
+          {
+            ret = IPT->deleteRef(pdpt[pdpti].pd.page_ppn, my_proc, 0, 2);
+            PageManager::instance()->freePPN(pdpt[pdpti].pd.page_ppn);
+          }
+          // pdpt[pdpti].pd.present = 0;
+          // PageManager::instance()->freePPN(pdpt[pdpti].pd.page_ppn);
         }
       }
-      pml4[pml4i].present = 0;
-      PageManager::instance()->freePPN(pml4[pml4i].page_ppn);
+      ret = IPT->deleteRef(pml4[pml4i].page_ppn, my_proc, 0, 3);
+      if (ret == 0)
+      {
+        PageManager::instance()->freePPN(pml4[pml4i].page_ppn);
+      }
+      else if (ret == (int) WAS_LAST)
+      {
+        ret = IPT->deleteRef(pml4[pml4i].page_ppn, my_proc, 0, 3);
+        PageManager::instance()->freePPN(pml4[pml4i].page_ppn);
+      }
+      // pml4[pml4i].present = 0;
+      // PageManager::instance()->freePPN(pml4[pml4i].page_ppn);
     }
   }
   PageManager::instance()->freePPN(page_map_level_4_);
@@ -488,7 +541,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
                 pd_src[pdi].pt.writeable = 0;
               }
               IPT->addRef(pd_src[pdi].pt.page_ppn, child_proc, 0, 0, 1);
-              flags = IPT->getFlags(pdpt_src[pdpti].pd.page_ppn);
+              flags = IPT->getFlags(pd_src[pdi].pt.page_ppn);
               if(!flags->cow) 
                 flags->cow = true;
             //  debug(X_ARCHMEM, "setCowToArchmemPages(): pd_dest[pdi].pt.page_ppn = %lx\n", (size_t)pd_dest[pdi].pt.page_ppn);
@@ -538,7 +591,7 @@ size_t ArchMemory::allocDestAndCopySrc(size_t ppn_src)
 }
 
 template <typename T> 
-size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level)
+size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level, size_t vpn)
 {
   int ret;
   T* entry = (T*) entrypt;
@@ -546,7 +599,7 @@ size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level)
 
   if (entry[index].cow && entry[index].present)
   {
-    ret = IPT->deleteRef(entry[index].page_ppn, my_proc, 0, level);
+    ret = IPT->deleteRef(entry[index].page_ppn, my_proc, vpn, level);
     if (ret == (int) WAS_LAST)
     {
       entry[index].cow = 0;
@@ -559,11 +612,12 @@ size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level)
       entry[index].page_ppn = allocDestAndCopySrc(entry[index].page_ppn);
       entry[index].cow = 0;
       entry[index].writeable = 1;
-      IPT->addRef(entry[index].page_ppn, my_proc, 0, 0, level);
+      IPT->addRef(entry[index].page_ppn, my_proc, vpn, 0, level);
       entry[index].present = 1;
     }
     else
     {
+      debug(X_USERPROCESS, "Cow returned me %d\n", ret);
       assert(false && "something went wrong with the cow");
     }
   }
@@ -577,7 +631,7 @@ size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level)
 
 //lock IPT and archmem from outside
 // do with template ...
-bool ArchMemory::checkforPMLCow(size_t vpn)
+bool ArchMemory::checkforPMLCow(size_t vpn, bool unmap)
 {
   ArchMemoryMapping m = resolveMapping(vpn);
   m.pdpt_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(m.pml4_ppn), m.pml4i, 3);
@@ -589,9 +643,12 @@ bool ArchMemory::checkforPMLCow(size_t vpn)
   m.pt_ppn = cowPML<PageDirPageTableEntry> (getIdentAddressOfPPN(m.pd_ppn), m.pdi, 1); 
   if(!m.pt_ppn)
     return false;
-  m.page_ppn = cowPML<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, 0);
-  if (!m.page_ppn)
-    return false;
+  if (!unmap)
+  {
+    m.page_ppn = cowPML<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, 0, vpn);
+    if (!m.page_ppn)
+      return false;
+  }
   return true;
 }
 

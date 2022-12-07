@@ -74,7 +74,7 @@ size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn, s
       assert(false && "NOPE! dont mix pagemaplevels on a page!\n");
     
     auto my_proc = IPT_[ppn].progs_mappings.find(proc);
-    debug(X_USERPROCESS, "[%ld] found my entry vpn: %lx(searched: %lx)\n", my_proc->first->getPID(), my_proc->second, vpn);
+    debug(X_USERPROCESS, "[%ld] found my entry vpn: %lx ppn: %lx (searched vpn: %lx)\n", my_proc->first->getPID(), my_proc->second, ppn, vpn);
     
     if (my_proc != IPT_[ppn].progs_mappings.end())
     {

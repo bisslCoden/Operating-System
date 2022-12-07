@@ -126,7 +126,7 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
-  bool checkforPMLCow(size_t vpn);
+  bool checkforPMLCow(size_t vpn, bool unmap = false);
 
   /**
    * @brief sets/increases the PageManager*::cow_cnt_ 
@@ -158,7 +158,7 @@ private:
  * @param physical_page_table_page physical page of the new page table.
  */
   template <typename T> static bool insert(pointer map_ptr, uint64 index, uint64 ppn, uint64 bzero, uint64 size, uint64 user_access, uint64 writeable);
-  template <typename T> size_t cowPML(pointer entrypt, size_t index, size_t level);
+  template <typename T> size_t cowPML(pointer entrypt, size_t index, size_t level, size_t vpn = 0);
 
 /**
  * Removes a page directory entry from a given page directory if it is present
