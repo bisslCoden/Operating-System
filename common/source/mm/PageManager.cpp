@@ -324,39 +324,53 @@ bool PageManager::checkForCow(size_t address)
   debug(X_PAGEFAULT, "seems like we re in cow\n");
   //this is for keeping correct locking convention
   
-  size_t ppn = m.page_ppn;
-  
-  //need ident??
-  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-  debug(X_USERPROCESS, "my PageTable is at page %x/%x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, m.pt->page_ppn, ppn);
-  int ret = IPT->deleteRef(ppn, current_proc, vpn); 
-  //bool dbg_gave = false;
-  if (ret == -1)
-  {
-    IPT->unlockIPT();
-    //lets leave this in here for now
-    assert(false && "Something went wrong with deleting my ref!\n");
-    return false;
-  }
-  if (ret == (int)WAS_LAST)
-  {
-    pt_ident[m.pti].cow = 0;
-    pt_ident[m.pti].writeable = 1;
-    //dbg_gave = true;
-  }
-  else if (ret == 0)
-  {
-    assert(false && "IPT didnt know this was a cow Page?? Hmmmm.... -.-\n");
-  }
-  else
-  {
-    pt_ident[m.pti].present = 0;
-    pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
-    pt_ident[m.pti].cow = 0;
-    pt_ident[m.pti].writeable = 1;
-    pt_ident[m.pti].present = 1;
-    InvertedPageTable::instance()->addRef(pt_ident[m.pti].page_ppn, current_proc, vpn);
-  }
+  if(!current_archmem->checkforPMLCow(vpn))
+    assert(false && "something went wrong with cow");
+
+  current_archmem->unlockArchMemory();
+  IPT->unlockIPT();
+
+  //current_archmem->unlockArchMemory();
+  return true;
+}
+
+
+
+
+
+
+
+  // //need ident??
+  // PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+  // debug(X_USERPROCESS, "my PageTable is at page %x/%x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, m.pt->page_ppn, ppn);
+  // int ret = IPT->deleteRef(ppn, current_proc, vpn); 
+  // //bool dbg_gave = false;
+  // if (ret == -1)
+  // {
+  //   IPT->unlockIPT();
+  //   //lets leave this in here for now
+  //   assert(false && "Something went wrong with deleting my ref!\n");
+  //   return false;
+  // }
+  // if (ret == (int)WAS_LAST)
+  // {
+  //   pt_ident[m.pti].cow = 0;
+  //   pt_ident[m.pti].writeable = 1;
+  //   //dbg_gave = true;
+  // }
+  // else if (ret == 0)
+  // {
+  //   assert(false && "IPT didnt know this was a cow Page?? Hmmmm.... -.-\n");
+  // }
+  // else
+  // {
+  //   pt_ident[m.pti].present = 0;
+  //   pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+  //   pt_ident[m.pti].cow = 0;
+  //   pt_ident[m.pti].writeable = 1;
+  //   pt_ident[m.pti].present = 1;
+  //   InvertedPageTable::instance()->addRef(pt_ident[m.pti].page_ppn, current_proc, vpn);
+  // }
 
   // F*ck the userspace mutexes now ... they bring no points and only lead to problems...
   // UserThread* mut_change = 0;
@@ -387,12 +401,4 @@ bool PageManager::checkForCow(size_t address)
   //   currentUserProcess->unLockThreadMutex();  
   // }
   
-  current_archmem->unlockArchMemory();
-  IPT->unlockIPT();
-
-  //current_archmem->unlockArchMemory();
-  return true;
-}
-
-
 //----------------------------------------------------------------------------------cow end
