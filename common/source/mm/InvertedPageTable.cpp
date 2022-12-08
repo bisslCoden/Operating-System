@@ -343,8 +343,8 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     {
       int level = IPT_[page_1].page_map_level;
       PageMapLevel4Entry* pml4;
-      PageDirPointerTablePageDirEntry* pdpt;
-      PageDirPageEntry* pd;
+      PageDirPointerTableEntry* pdpt;
+      PageDirEntry* pd;
       debug(DEDUBLI_THREAD, "Now it gets interesting for pages %lx and %lx! found PML %d Cow\n", page_1, page_2, level);
       if (!IPT_[page_1].my_flags.cow)
       {
@@ -354,6 +354,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
             assert(false);
           ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
           ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_1, level);
+          assert(ppn_index.first != 0);
           debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %ld and my index at %ld were on page 1\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
        
           switch (level)
@@ -364,14 +365,14 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
             pml4[ppn_index.second].writeable = 0;
             break;
           case 2:
-            pdpt = (PageDirPointerTablePageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
-            pdpt[ppn_index.second].cow = 1;
-            pdpt[ppn_index.second].writeable = 0;
+            pdpt = (PageDirPointerTableEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+            pdpt[ppn_index.second].pd.cow = 1;
+            pdpt[ppn_index.second].pd.writeable = 0;
             break;
           case 1:
-            pd = (PageDirPageEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
-            pd[ppn_index.second].cow = 1;
-            pd[ppn_index.second].writeable = 0;
+            pd = (PageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+            pd[ppn_index.second].pt.cow = 1;
+            pd[ppn_index.second].pt.writeable = 0;
             break;
           default:
             assert(false && "which level should this be??\n");
@@ -386,6 +387,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           assert(false);
         ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
         ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_2, level);
+        assert(ppn_index.first != 0);
         debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %lx and my index at %ld were on page 2\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
         switch (level)
         {
@@ -396,16 +398,16 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           pml4[ppn_index.second].page_ppn = page_1;
           break;
         case 2:
-          pdpt = (PageDirPointerTablePageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
-          pdpt[ppn_index.second].cow = 1;
-          pdpt[ppn_index.second].writeable = 0;
-          pdpt[ppn_index.second].page_ppn = page_1;
+          pdpt = (PageDirPointerTableEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+          pdpt[ppn_index.second].pd.cow = 1;
+          pdpt[ppn_index.second].pd.writeable = 0;
+          pdpt[ppn_index.second].pd.page_ppn = page_1;
           break;
         case 1:
-          pd = (PageDirPageEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
-          pd[ppn_index.second].cow = 1;
-          pd[ppn_index.second].writeable = 0;
-          pd[ppn_index.second].page_ppn = page_1;
+          pd = (PageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+          pd[ppn_index.second].pt.cow = 1;
+          pd[ppn_index.second].pt.writeable = 0;
+          pd[ppn_index.second].pt.page_ppn = page_1;
           break;
         default:
           assert(false && "which level should this be??\n");

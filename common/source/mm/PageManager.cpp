@@ -284,6 +284,7 @@ bool PageManager::checkForCow(size_t address)
     current_archmem->lockArchMemory();
  
   ArchMemoryMapping m = current_archmem->resolveMapping(vpn);
+  debug(X_PAGEFAULT, "checking for levels on pdpt: %lx pd: %lx pt: %lx page: %lx\n", m.pdpt_ppn, m.pd_ppn, m.pt_ppn, m.page_ppn);
   if(!current_archmem->checkAddressValid(address))
   {
     debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);

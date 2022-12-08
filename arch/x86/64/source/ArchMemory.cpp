@@ -654,7 +654,7 @@ bool ArchMemory::checkforPMLCow(size_t vpn, bool unmap)
 
 ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
 {
-  if (level == 0 || level > 3)
+  if (level < 1 || level > 3)
   {
     debug(MULTICOW, "Wrong level!!\n");
     return ustl::make_pair(0,0);
@@ -670,12 +670,12 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
         return ustl::make_pair(page_map_level_4_, pml4i);
       continue;
     } 
-    PageDirPointerTablePageDirEntry* pdpt = (PageDirPointerTablePageDirEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
+    PageDirPointerTableEntry* pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
     for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
     {
       if (level == 2)
       {
-        if (pdpt[pdpti].present && pdpt[pdpti].page_ppn == ppn)
+        if (pdpt[pdpti].pd.present && pdpt[pdpti].pd.page_ppn == ppn)
         {
           pml4[pml4i].page_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(page_map_level_4_), pml4i, 3);
           page = pml4[pml4i].page_ppn;
@@ -685,21 +685,17 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
         }
         continue;
       }
-      PageDirPageTableEntry* pd = (PageDirPageTableEntry*) getIdentAddressOfPPN(pdpt[pdpti].page_ppn);
+      PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
       for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
       {
-        if (level == 1)
+        if (pd[pdi].pt.present && pd[pdi].pt.page_ppn == ppn)
         {
-          if (pd[pdi].present && pd[pdi].page_ppn == ppn)
-          {
-            pml4[pml4i].page_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(page_map_level_4_), pml4i, 3);
-            pdpt = (PageDirPointerTablePageDirEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
-            pdpt[pdpti].page_ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(pml4[pml4i].page_ppn), pdpti, 2);
-            page = pdpt[pdpti].page_ppn;
-            debug(MULTICOW, "cowing pd resulted in %lx/%lx for pdpt and %lx for pd\n", pdpt->page_ppn, pml4[pml4i].page_ppn, page);
-            return ustl::make_pair(page, pdi);
-          }
-          continue;
+          pml4[pml4i].page_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(page_map_level_4_), pml4i, 3);
+          pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
+          pdpt[pdpti].pd.page_ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(pml4[pml4i].page_ppn), pdpti, 2);
+          page = pdpt[pdpti].pd.page_ppn;
+          debug(MULTICOW, "cowing pd resulted in %lx for pdpt and %lx for pd\n", pml4[pml4i].page_ppn, page);
+          return ustl::make_pair(page, pdi);
         }
       }
     }
