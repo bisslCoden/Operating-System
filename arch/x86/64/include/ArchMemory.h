@@ -128,6 +128,8 @@ public:
 
   bool checkforPMLCow(size_t vpn, bool unmap = false);
 
+  ustl::pair<size_t, size_t> cowUntil(size_t ppn, size_t level);
+
   /**
    * @brief sets/increases the PageManager*::cow_cnt_ 
    * 

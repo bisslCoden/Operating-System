@@ -8,7 +8,10 @@ const char* yey = "yes!";
 int main()
 {
     printf("hey! i am dedup proc\n");
-    sleep(10);
+    for (size_t i = 0; i < 40; i++)
+    {
+        sched_yield();
+    }
     printf("%d %s\n", data_init, yey);
     return 0;
 }

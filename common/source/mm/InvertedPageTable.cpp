@@ -282,14 +282,19 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   }
   
   debug(DEDUBLI_THREAD, "locking sucessful!\n");
-  // -> now no more writes allowed from heeere...
-  for (auto prog : progs)
+  // -> now no more writes allowed from heeere... we only need to do this for lowest lvl bc for the higher levels writes
+  //need locks anyways...
+  if (IPT_[page_1].page_map_level == 0)
   {
-    ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
-    PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-    debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
-    pt_src[m.pti].writeable = 0;
+    for (auto prog : progs)
+    {
+      ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+      //debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
+      pt_src[m.pti].writeable = 0;
+    }
   }
+  
   //moment of truth...
   void* finalcheck1 = (void*) ArchMemory::getIdentAddressOfPPN(page_1);
   void* finalcheck2 = (void*) ArchMemory::getIdentAddressOfPPN(page_2);
@@ -297,38 +302,116 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   {
     //yes! I can actually deduplicate something...
     debug(DEDUBLI_THREAD, "Pages still equal! now dedublication\n");
-    
-    if (!IPT_[page_1].my_flags.cow)
+    //level one case: this is easy!
+    if (IPT_[page_1].page_map_level == 0)
     {
-      for (auto prog : IPT_[page_1].progs_mappings)
+      if (!IPT_[page_1].my_flags.cow)
       {
-        debug(DEDUBLI_THREAD, "Proc: [%ld], vpn %lx is on %d page\n",prog.first->getPID(), prog.second, 1);
-        if (!prog.first->getLoader())
+        for (auto prog : IPT_[page_1].progs_mappings)
         {
-          assert(false);
+          debug(DEDUBLI_THREAD, "Proc: [%ld], vpn %lx is on %d page\n",prog.first->getPID(), prog.second, 1);
+          if (!prog.first->getLoader())
+            assert(false);
+          
+          ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
+          assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
+          ArchMemoryMapping m = archmem->resolveMapping(prog.second);
+          PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
+          pt_src[m.pti].writeable = 0;
+          pt_src[m.pti].cow = 1;
         }
+      IPT_[page_1].my_flags.cow = true;
+      }
+    
+      for (auto prog : IPT_[page_2].progs_mappings)
+      {
+        debug(DEDUBLI_THREAD, "Proc: [%ld], vpn %lx is on %d page\n",prog.first->getPID(), prog.second, 2);
+        if (!prog.first->getLoader())
+          assert(false);
         
-        ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
-        PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+        ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
+        assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
+        ArchMemoryMapping m = archmem->resolveMapping(prog.second);
+        PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
         pt_src[m.pti].writeable = 0;
         pt_src[m.pti].cow = 1;
+        pt_src[m.pti].page_ppn = page_1;
+        addRef(page_1, prog.first, prog.second);
       }
-      IPT_[page_1].my_flags.cow = true;
     }
-    
-    for (auto prog : IPT_[page_2].progs_mappings)
+    else
     {
-      debug(DEDUBLI_THREAD, "Proc: [%ld], vpn %lx is on %d page\n",prog.first->getPID(), prog.second, 2);
-      if (!prog.first->getLoader())
+      int level = IPT_[page_1].page_map_level;
+      PageMapLevel4Entry* pml4;
+      PageDirPointerTablePageDirEntry* pdpt;
+      PageDirPageEntry* pd;
+      debug(DEDUBLI_THREAD, "Now it gets interesting for pages %lx and %lx! found PML %d Cow\n", page_1, page_2, level);
+      if (!IPT_[page_1].my_flags.cow)
       {
-        assert(false);
+        for (auto prog : IPT_[page_1].progs_mappings)
+        {
+          if (!prog.first->getLoader())
+            assert(false);
+          ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
+          ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_1, level);
+          debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %ld and my index at %ld were on page 1\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
+       
+          switch (level)
+          {
+          case 3:
+            pml4 = (PageMapLevel4Entry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+            pml4[ppn_index.second].cow = 1;
+            pml4[ppn_index.second].writeable = 0;
+            break;
+          case 2:
+            pdpt = (PageDirPointerTablePageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+            pdpt[ppn_index.second].cow = 1;
+            pdpt[ppn_index.second].writeable = 0;
+            break;
+          case 1:
+            pd = (PageDirPageEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+            pd[ppn_index.second].cow = 1;
+            pd[ppn_index.second].writeable = 0;
+            break;
+          default:
+            assert(false && "which level should this be??\n");
+            break;
+          }
+        }
+        IPT_[page_1].my_flags.cow = true;
       }
-      ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
-      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-      pt_src[m.pti].writeable = 0;
-      pt_src[m.pti].cow = 1;
-      pt_src[m.pti].page_ppn = page_1;
-      addRef(page_1, prog.first, prog.second);
+      for (auto prog : IPT_[page_2].progs_mappings)
+      {
+        if (!prog.first->getLoader())
+          assert(false);
+        ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
+        ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_2, level);
+        debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %lx and my index at %ld were on page 2\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
+        switch (level)
+        {
+        case 3:
+          pml4 = (PageMapLevel4Entry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+          pml4[ppn_index.second].cow = 1;
+          pml4[ppn_index.second].writeable = 0;
+          pml4[ppn_index.second].page_ppn = page_1;
+          break;
+        case 2:
+          pdpt = (PageDirPointerTablePageDirEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+          pdpt[ppn_index.second].cow = 1;
+          pdpt[ppn_index.second].writeable = 0;
+          pdpt[ppn_index.second].page_ppn = page_1;
+          break;
+        case 1:
+          pd = (PageDirPageEntry*) ArchMemory::getIdentAddressOfPPN(ppn_index.first);
+          pd[ppn_index.second].cow = 1;
+          pd[ppn_index.second].writeable = 0;
+          pd[ppn_index.second].page_ppn = page_1;
+          break;
+        default:
+          assert(false && "which level should this be??\n");
+          break;
+        }
+      }
     }
 
     IPT_.erase(page_2);
@@ -340,12 +423,16 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   else
   {
     //damn... it changed
-    for (auto prog : progs)
+    if (IPT_[page_1].page_map_level == 0)
     {
-      ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
-      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
-      pt_src[m.pti].writeable = 1;
-    } 
+      for (auto prog : progs)
+      {
+        ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+        PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+        pt_src[m.pti].writeable = 1;
+      } 
+    }
+    
     ProcessRegistry::instance()->unlockMultArchmem(progs);
     unlockIPT();
     return false;

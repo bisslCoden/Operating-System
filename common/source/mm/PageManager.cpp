@@ -320,6 +320,15 @@ bool PageManager::checkForCow(size_t address)
     IPT->unlockIPT();
     return false;
   }
+
+  if (m.pt[m.pti].writeable && m.pt[m.pti].present && !m.pt[m.pti].cow)
+  {
+    //seems like everything is okay.....
+    current_archmem->unlockArchMemory();
+    IPT->unlockIPT();
+    return true;
+  }
+  
   
   debug(X_PAGEFAULT, "seems like we re in cow\n");
   //this is for keeping correct locking convention
