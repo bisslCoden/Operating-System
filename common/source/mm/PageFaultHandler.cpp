@@ -60,7 +60,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
         switch_to_us);
 
   ArchThreads::printThreadRegisters(currentThread, false);
-
+  //test
   if (checkPageFaultIsValid(address, user, present, switch_to_us))
   {
     currentThread->loader_->loadPage(address);
