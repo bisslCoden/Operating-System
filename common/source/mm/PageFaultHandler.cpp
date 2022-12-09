@@ -69,7 +69,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   ArchThreads::printThreadRegisters(currentThread, false);
   
 
-  
+  //test
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
     if (PageManager::instance()->checkForCow(address))
