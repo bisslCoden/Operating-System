@@ -7,17 +7,24 @@
 #include "Loader.h"
 #include "Syscall.h"
 #include "ArchThreads.h"
+#include "PageManager.h"
+#include "ArchMemory.h"
+
 extern "C" void arch_contextSwitch();
 
 const size_t PageFaultHandler::null_reference_check_border_ = PAGE_SIZE;
 
 inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
-                                                    bool present, bool switch_to_us)
+                                                    bool present, bool switch_to_us, bool writing)
 {
-  debug(X_PAGEFAULT, "Entered checkPageFaultIsValid(). CurrentThread %p: with name %s\n", currentThread, currentThread->getName());
+  Scheduler::instance()->printThreadList();
+  debug(X_PAGEFAULT, "Entered checkPageFaultIsValid(). CurrentThread %p: with name %s \n", currentThread, currentThread->getName());
+  if(currentThread->isUserThread())
+    debug(X_PAGEFAULT, "currentthread is a userthread also\n");
   assert((user == switch_to_us) && "Thread is in user mode even though is should not be.");
   assert(!(address < USER_BREAK && currentThread->loader_ == 0) && "Thread accesses the user space, but has no loader.");
   assert(!(user && currentThread->user_registers_ == 0) && "Thread is in user mode, but has no valid registers.");
+ // assert(address && "addres of pagefault was 0");
 
   if(address < null_reference_check_border_)
   {
@@ -31,13 +38,13 @@ inline bool PageFaultHandler::checkPageFaultIsValid(size_t address, bool user,
   {
     debug(PAGEFAULT, "You are accessing a kernel address in user-mode.\n");
   }
-  else if(present)
+  else if(present && !writing)
   {
-    debug(PAGEFAULT, "You got a pagefault even though the address is mapped.\n");
+    debug(PAGEFAULT, "You got a pagefault even though the address is mapped. and writable\n");
   }
   else
   {
-    // everything seems to be okay
+    debug(PAGEFAULT, "everything seems to be okay....\n");
     return true;
   }
   debug(PAGEFAULT, "OH NO... pagefault invalid?!?!?\n");
@@ -60,10 +67,44 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
         switch_to_us);
 
   ArchThreads::printThreadRegisters(currentThread, false);
-  //test
-  if (checkPageFaultIsValid(address, user, present, switch_to_us))
+  
+
+  
+  if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    currentThread->loader_->loadPage(address);
+    if (PageManager::instance()->checkForCow(address))
+    {
+      debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
+      return;
+    }
+    if (switch_to_us && address > END_OF_STACKS)
+    {
+      debug(PAGEFAULT, "checking for stack-extension....\n");
+      currentUserProcess->lockThreadMutex();
+      UserThread* stack_owner = 0;
+      if((stack_owner = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
+      {
+        debug(PAGEFAULT, "seems like our currentthread just wants a new Page for someone!\n");
+        stack_owner->getNewStackPage(address);  
+        currentUserProcess->unLockThreadMutex();    
+      }
+      else
+      {
+        currentUserProcess->unLockThreadMutex();
+        debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
+            // the page-fault seems to be faulty, print out the thread stack traces
+        ArchThreads::printThreadRegisters(currentThread, true);
+        currentThread->printBacktrace(true);
+        if (currentThread->loader_)
+          Syscall::exit(9999);
+        else
+          currentThread->kill();
+      }
+    }
+    else
+    {
+      currentThread->loader_->loadPage(address);
+    }
   }
   else
   {

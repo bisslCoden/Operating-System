@@ -99,7 +99,7 @@ public:
   static void yield();
 
 /**
- * sets a threads page map level 4
+ * sets a thread's cr3 to the page map level 4 that should've been created in the ArchMemory() constructor.
  *
  * @param *thread Pointer to Thread Object
  * @param arch_memory the arch memory object for the address space

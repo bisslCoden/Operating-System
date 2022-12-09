@@ -1,4 +1,4 @@
-#pragma once
+  #pragma once
 
 #include "kprintf.h"
 
@@ -40,7 +40,7 @@ const size_t KPRINTF            = Ansi_Yellow;
 //group kernel
 const size_t LOCK               = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t LOADER             = Ansi_White   | OUTPUT_ENABLED;
-const size_t SCHEDULER          = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t SCHEDULER          = Ansi_Yellow  ;
 const size_t SYSCALL            = Ansi_Blue    | OUTPUT_ENABLED;
 const size_t MAIN               = Ansi_Red     | OUTPUT_ENABLED;
 const size_t THREAD             = Ansi_Magenta | OUTPUT_ENABLED;
@@ -77,7 +77,7 @@ const size_t DENTRY             = Ansi_Blue;
 const size_t INODE              = Ansi_Blue;
 const size_t PATHWALKER         = Ansi_Yellow;
 const size_t PSEUDOFS           = Ansi_Yellow;
-const size_t VFSSYSCALL         = Ansi_Yellow;
+const size_t VFSSYSCALL         = Ansi_Yellow ;
 const size_t VFS                = Ansi_Yellow | OUTPUT_ENABLED;
 const size_t VFS_FILE           = Ansi_Yellow;
 const size_t SUPERBLOCK         = Ansi_Yellow;
@@ -91,9 +91,18 @@ const size_t M_ZONE             = Ansi_Yellow;
 // add your debug message-categories here. pls also use a X_ as prefix as it indicates to X-treme debugging
 const size_t X_PROCESS_REG      = Ansi_Yellow  | OUTPUT_ENABLED;
 const size_t X_USERPROCESS      = Ansi_Cyan    | OUTPUT_ENABLED;
-const size_t X_USERTHREAD       = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_USERTHREAD       = Ansi_Magenta | OUTPUT_ENABLED;
 const size_t X_PAGEFAULT        = Ansi_Green   | OUTPUT_ENABLED;
-const size_t X_ARCHMEM          = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t X_ARCHMEM          = Ansi_Yellow  ;
 const size_t X_PAGEMANAGER      = Ansi_Green   | OUTPUT_ENABLED;
+const size_t X_ARCHTHREADS      = Ansi_Yellow;
+const size_t X_THREADSTACK      = Ansi_Red;
+const size_t FORK               = Ansi_Magenta;
+const size_t FORK_PAGESRC       = Ansi_Magenta;
+const size_t X_KMM              = Ansi_Yellow ;
+const size_t X_EXECV            = Ansi_Red     | OUTPUT_ENABLED;
 const size_t X_LOADER           = Ansi_Green   | OUTPUT_ENABLED;
-const size_t X_ARCHTHREADS      = Ansi_Yellow  | OUTPUT_ENABLED;
+const size_t DBEK               = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t CLOCK              = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t SLEEP              = Ansi_Magenta | OUTPUT_ENABLED;
+const size_t WAITPID            = Ansi_Magenta;

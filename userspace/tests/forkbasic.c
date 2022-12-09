@@ -18,8 +18,13 @@ int main(int argc, char** argv)
     assert (pid != 0);  // hello
   }else
   {
-    printf("Error while forking!");
+    printf("Error while forking!\n");
   }
-  printf("Call to Fork finished!\n");
+  //printf("just again the pid: %d\n", pid);
+
+  // if (!pid)
+  // {
+  //   printf("[%d] I am the Child!
+  // else if (pid > 0)
   return 0;
 }

@@ -23,7 +23,7 @@ PageManager* PageManager::instance()
   return instance_;
 }
 
-PageManager::PageManager() : lock_("PageManager::lock_")
+PageManager::PageManager() : lock_("PageManager::lock_"), cow_cnt_lock_("PageManger::cow_count_lock_")
 {
   assert(instance_ == 0);
   instance_ = this;
@@ -225,14 +225,16 @@ uint32 PageManager::allocPPN(uint32 page_size)
   }
 
   memset((void*)ArchMemory::getIdentAddressOfPPN(found), 0, page_size);
+  debug(X_PAGEMANAGER, "allocPPN() found page at %x\n", found);
   return found;
 }
 
 void PageManager::freePPN(uint32 page_number, uint32 page_size)
 {
   assert((page_size % PAGE_SIZE) == 0);
-  debug(X_PAGEMANAGER, "freePPN(page_numer = %x, page_size = %d) entered.\n", page_number, page_size);
+  //debug(X_PAGEMANAGER, "freePPN(page_numer = %x, page_size = %d) entered.\n", page_number, page_size);
 
+  // does this also set present to 0?
   memset((void*)ArchMemory::getIdentAddressOfPPN(page_number), 0xFF, page_size);
 
   lock_.acquire();
@@ -244,6 +246,227 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
     page_usage_table_->unsetBit(p);
   }
   lock_.release();
-
-  debug(X_PAGEMANAGER, "freePPN(page_numer = %x, page_size = %d) finished.\n", page_number, page_size);
 }
+
+//----------------------------------------------------------------------------------cow start
+// bool PageManager::isInCowCnt(size_t ppn)
+// { 
+//   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   return cow_cnt_.find(ppn) != cow_cnt_.end(); 
+// }
+
+// size_t PageManager::getNrOfCows(size_t ppn)
+// { 
+//   assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+//   assert(isInCowCnt(ppn) && "if you use this method pls check isInCowCnt(ppn) before");
+//   debug(X_PAGEMANAGER, "getNrOfCows(%lx) found value %ld\n", ppn, cow_cnt_[ppn]);
+//   return cow_cnt_[ppn]; 
+// }
+
+void  PageManager::addRef(size_t ppn, UserProcess* proc)
+{
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+  
+  if (cow_list_.find(ppn) == cow_list_.end())
+  {
+    ustl::vector<UserProcess*> ref;
+    cow_list_.insert(ustl::make_pair(ppn, ref));
+    cow_list_[ppn].push_back(proc);
+  }
+  else
+  {
+    //I think this rare edgecase shouldnt happen... lets hope i am right
+    // if (cow_list_[ppn].size() == 1)
+    // {
+    //   ArchMemory* dest_archmem = &cow_list_[ppn][0]->getLoader()->arch_memory_;
+    //   if(!dest_archmem.checkArchMemory())
+    //     dest_archmem.lockArchMemory();
+    //   ArchMemoryMapping m = dest_archmem->resolveMapping(vpn);
+    //   PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+    //   pt_ident[m.pti].cow = 1;
+    //   pt_ident[m.pti].writeable = 0;
+    //   dest_archmem->unlockArchMemory();
+    // }
+    bool in = false;
+    for (size_t i = 0; i < cow_list_[ppn].size(); i++)
+    {
+      if(cow_list_[ppn][i] == proc)
+      {
+        debug(X_USERPROCESS, "Tried to at proc %ld twice?!\n", proc->getPID());
+        in = true;
+        break;
+      }
+    }
+    if(!in)
+      cow_list_[ppn].push_back(proc);
+    
+    debug(X_USERPROCESS, "added Proc %ld to page %lx size is then %ld\n",proc->getPID(), ppn, cow_list_[ppn].size());
+  }
+  return;
+}
+
+size_t PageManager::deleteRef(size_t ppn, UserProcess* proc, bool cow_del)
+{
+  assert(cow_cnt_lock_.isHeldBy(currentThread) && "PLEASE lockCowCnt()!!!!");
+
+  if (cow_list_.find(ppn) == cow_list_.end())
+  {
+    //debug(X_USERPROCESS, "Wtf? tried to delete my ref even though the page isnt cow!!!\n");
+    return 0;
+  }
+  else
+  {
+    ustl::vector<UserProcess*>::iterator it;
+    for (it = cow_list_[ppn].begin(); it != cow_list_[ppn].end(); it++)
+    {
+      if(*(it) == proc)
+        break;
+    }
+    if(it != cow_list_[ppn].end())
+    {
+      debug(X_USERPROCESS, "[%lx] erasing Proc [%ld] size is then %ld\n", ppn,proc->getPID(), cow_list_[ppn].size() - 1);
+      int cow_if_del = (int)cow_list_[ppn].size() - 1;
+      if (cow_if_del == 0)
+      {
+        if (cow_del)
+        {
+          cow_list_.erase(ppn);
+          return WAS_LAST;
+        }
+        else
+        {
+          cow_list_.erase(ppn);
+          return 0;
+        }
+      }
+      else if (cow_if_del == -1)
+      {
+        assert(false && "just a check that this never happens\n");
+        cow_list_.erase(ppn);
+        return 0;
+      }
+      else if (cow_if_del >= 1)
+      {
+        cow_list_[ppn].erase(it);
+        return cow_list_.size();
+      }
+      else
+        assert(false && "really weird!: cow list is in the negatiiives\n");
+    }
+    else
+      debug(X_USERPROCESS, "Wtf? tried to delete my ref even though I dont habe one!!!\n");
+    return -1;
+  }
+}
+
+//LOCK ARCHMEM OUTSIDE!!
+bool PageManager::checkForCow(size_t address)
+{
+  debug(X_PAGEFAULT, "checkForCow(%lx) entered. will now checkAddressValid()\n", address);
+  // setup archmem and checkAddressValid()
+
+  UserProcess* current_proc = currentUserThread->getProcess();
+  ArchMemory* current_archmem = &current_proc->getLoader()->arch_memory_;
+  size_t vpn = address/PAGE_SIZE;
+  size_t mutexflag = AWAKE_KS;
+  
+  if (!current_archmem->checkArchMemory(currentThread))
+    current_archmem->lockArchMemory();
+  
+  //lockCowCnt();
+  if(!current_archmem->checkAddressValid(address))
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says checkAddressValid() failed. return false\n", address);
+    //unlockCowCnt();
+    current_archmem->unlockArchMemory();
+    return false;
+  }
+  
+  // if !present OR !(cow =1 AND writable = 0) -> no cow, that's another problem
+  ArchMemoryMapping m = current_archmem->resolveMapping(vpn);
+  
+  if(!m.pt[m.pti].present)
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says !present. return false\n", address);
+    current_archmem->unlockArchMemory();
+    //unlockCowCnt();
+    return false;
+  }
+
+  if(!(m.pt[m.pti].cow && !m.pt[m.pti].writeable))
+  {
+    debug(X_PAGEFAULT, "checkForCow(%lx) says not (cow =1 AND writable = 0). return false\n", address);
+    current_archmem->unlockArchMemory();
+    //unlockCowCnt();
+    return false;
+  }
+  lockCowCnt();
+  // decrease for this ppn. if cow_cnts_left > 0 copy else take page
+  size_t ppn = m.page_ppn;
+  PageTableEntry* pt_ident  = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+  debug(X_USERPROCESS, "my PageTable is at page %x the page at %lx\n", m.pd[m.pdi].pt.page_ppn, ppn);
+  int ret = deleteRef(ppn, current_proc, true);
+  //bool dbg_gave = false;
+  if (ret == -1)
+  {
+    unlockCowCnt();
+    assert(false && "Something went wrong with deleting my ref!\n");
+    //unlockCowCnt();
+    return false;
+  }
+
+  if (ret == (int)WAS_LAST)
+  {
+    pt_ident[m.pti].cow = 0;
+    pt_ident[m.pti].writeable = 1;
+    //dbg_gave = true;
+  }
+  else if (ret == 0)
+  {
+    assert(false && "wanted to free page in cow? This shouldnt happen!");
+  }
+  else
+  {
+    pt_ident[m.pti].present = 0;
+    pt_ident[m.pti].page_ppn = current_archmem->allocDestAndCopySrc(ppn);
+    pt_ident[m.pti].cow = 0;
+    pt_ident[m.pti].writeable = 1;
+    pt_ident[m.pti].present = 1;
+  }
+
+  UserThread* mut_change = 0;
+  if (address > END_OF_STACKS && address < USER_BREAK)
+  {
+    currentUserProcess->lockThreadMutex();
+    if((mut_change = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
+    {
+      if(vpn == (mut_change->getStackInfo()->userstack_start_ / PAGE_SIZE))
+      {
+        debug(X_PAGEMANAGER, "seems like we re cowing THE FIRRST stackpage... of [%ld]time to change ident\n", mut_change->getTID());
+        mutexflag = *mut_change->getStackInfo()->UserMutex;
+        debug(X_PAGEMANAGER, "mutexflag is %s\n", (mutexflag == AWAKE_KS) ? "awake" : "zzzz");
+        size_t location = (size_t) ArchMemory::getIdentAddressOfPPN(pt_ident[m.pti].page_ppn);
+        location += PAGE_SIZE - sizeof(size_t);
+        size_t* dbg_flag  = mut_change->getStackInfo()->UserMutex;
+        debug(X_USERTHREAD, "PREV my mutexflag is now at %p\n", dbg_flag);
+        mut_change->setUserMutex((size_t*) location);
+        dbg_flag = mut_change->getStackInfo()->UserMutex;
+        debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", dbg_flag);
+        //debug(X_USERTHREAD, "AFTER my mutexflag is now at %p\n", currentUserThread->getStackInfo()->UserMutex);
+        *mut_change->getStackInfo()->UserMutex = mutexflag;
+       // mut_change->setUserMutex(USERMUTEX_INVALID);
+      }
+      else
+        mut_change = 0;
+    }
+    currentUserProcess->unLockThreadMutex();  
+  }
+  
+  unlockCowCnt();
+  current_archmem->unlockArchMemory();
+
+  //current_archmem->unlockArchMemory();
+  return true;
+}
+
+//----------------------------------------------------------------------------------cow end

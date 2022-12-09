@@ -6,7 +6,7 @@
 #include "VfsSyscall.h"
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
-
+#include "offsets.h"
 
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
@@ -15,7 +15,6 @@ ProcessRegistry::ProcessRegistry(FileSystemInfo *root_fs_info, char const *progs
     Thread(root_fs_info, "ProcessRegistry", Thread::KERNEL_THREAD), progs_(progs), progs_running_(0),
     counter_lock_("ProcessRegistry::counter_lock_"),
     all_processes_killed_(&counter_lock_, "ProcessRegistry::all_processes_killed_"),
-    next_id_lock_("ProcessRegistry::next_pid_lock_"),
     list_of_processes_lock_("ProcessRegistry::list_of_processes_lock_")
 {
   debug(X_PROCESS_REG, "instance created\n");
@@ -76,8 +75,29 @@ void ProcessRegistry::Run()
   kill();
 }
 
-void ProcessRegistry::processExit()
+void ProcessRegistry::processExit(UserProcess* user_proc)
 {
+  list_of_processes_lock_.acquire();
+  if (list_of_processes_.find(user_proc->getPID()) != list_of_processes_.end())
+  {
+    list_of_processes_.erase(user_proc->getPID());
+    UserProcess* waiter = 0;
+    if ((waiter = user_proc->checkWaiter()) != 0)
+    {
+      debug(X_USERPROCESS, "Process [%ld] now dying and posting for [%ld]\n", user_proc->getPID(), waiter->getPID());
+      waiter->postPIDSem();
+    }
+    else
+      debug(X_USERPROCESS, "Process [%ld] now dying and posting for nobody :(\n", user_proc->getPID());
+  }
+  else
+  {
+    list_of_processes_lock_.release();
+    return;
+  }
+  list_of_processes_lock_.release();
+
+    //assert(false && "how did that process get removed already?");
   counter_lock_.acquire();
 
   if (--progs_running_ == 0)
@@ -85,6 +105,7 @@ void ProcessRegistry::processExit()
 
   counter_lock_.release();
 }
+
 
 void ProcessRegistry::processStart()
 {
@@ -102,54 +123,230 @@ size_t ProcessRegistry::processCount()
 
 size_t ProcessRegistry::createID()
 {
-  /*next_id_lock_.acquire();
-  size_t tmp = next_id_++;
-  next_id_lock_.release();
-  return tmp; */
-  ArchThreads::atomic_add(next_id_,1);
-  return next_id_;
+  size_t id = ArchThreads::atomic_add(next_id_,1);
+  return id;
 }
 
 size_t ProcessRegistry::processFork()
 {
-  size_t pid = createID();
-
-  debug(PROCESS_REG, "Forking Process, next call to the UserProcess constructor with pid %ld\n",pid);
-  auto parent = ((UserThread*)currentThread)->getParentProcess();
-  debug(PROCESS_REG, "After parent read %p\n", parent);
-  auto process = new UserProcess(parent,pid);
-  debug(PROCESS_REG, "After new UserProcess\n");
-  if (!process || process->getPID()==0)
+  debug(PROCESS_REG, "processFork() called starting process creation\n");
+  size_t return_to = 6;
+  auto parent = currentUserThread->getProcess();
+  
+  parent->lockThreadMutex();
+  if (parent->checkKill())
   {
-    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for frok!\n");
+    parent->unLockThreadMutex();
+    return -1;
+  }
+  
+  debug(X_USERTHREAD, "[%ld] is creating the proc\n", currentThread->getTID());
+  UserProcess* process = 0;
+  parent->unLockThreadMutex();
+  process = new UserProcess(parent, &return_to);
+  if (return_to != 0)
+  {
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess for fork[%ld]... dont assert!\n", return_to);
+    debug(X_USERTHREAD, "[%ld] is deleting the proc\n", currentThread->getTID());
+    if (process->first_thread_)
+      delete process->first_thread_;
     delete process;
     return -1;
   }
+  process->lockThreadMutex();
+  if (process->checkKill())
+  {
+    process->unLockThreadMutex();
+    if (process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    return -1;
+  }
+  process->addToThreadList(process->first_thread_);
+  Scheduler::instance()->addNewThread(process->first_thread_);
+  process->unLockThreadMutex();
 
+  
+  debug(PROCESS_REG, "forked process with pid (%ld)\n", process->getPID());
+  return process->getPID();
+}
 
+void ProcessRegistry::createProcess(const char* path)
+{
+  debug(PROCESS_REG, "createProcess(path = %s)\n", path);
+
+  // get FileSystemInfo
+  FileSystemInfo* fs_info = new FileSystemInfo(*working_dir_);
+  if(!fs_info)
+  {
+    debug(PROCESS_REG, "ERROR: createProcess() -> unable to create object fs_info\n");
+    return;
+  }
+
+  // return_to used as return value for UserProcess(). 0 = success
+  size_t returnto = 6;
+  UserProcess* process = new UserProcess(path, fs_info, &returnto);
+
+  // check UserProcess construction
+  if (returnto != 0)
+  {
+    if(process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    debug(PROCESS_REG, "Ups, something went wrong creating the UserProcess[%ld]: [%ld]... dont assert!\n",process->getPID(), returnto);
+    return;
+  }
+  process->lockThreadMutex();
+  if (process->checkKill())
+  {
+    process->unLockThreadMutex();
+    if (process->first_thread_)
+      delete process->first_thread_;
+    delete process;
+    return;
+  }
+  process->addToThreadList(process->first_thread_);
+  Scheduler::instance()->addNewThread(process->first_thread_);
+  process->unLockThreadMutex();
+
+  // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
+  debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
+}
+
+void ProcessRegistry::addProcToList(UserProcess* new_proc){
   list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(pid, process));
+  list_of_processes_.insert(ustl::make_pair(new_proc->getPID(), new_proc));
+  processStart(); //should also be called if you fork a process
   list_of_processes_lock_.release();
+}
 
-  debug(PROCESS_REG, "forked process with pid (%ld)\n",pid);
-  return pid;
+
+int ProcessRegistry::execv(const char* path, char *const argv[])
+{
+  debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
+  int argc = areExecArgsValid(argv);
+
+  if(argc == -1)
+  {
+    debug(X_PROCESS_REG, "ERROR: execv found no valid args. returning -1\n");
+    return argc;
+  }
+  else if(argc == 0)
+  {
+    debug(X_PROCESS_REG, "execv() found no arguments. proceeding without args\n");
+    return currentUserThread->getProcess()->execv(path, NULL, 0);
+  }
+  else if(argc > 0)
+  {
+    // copy args locally because user's pointers may lead to wonky behaviour
+    char* kernel_argv[argc];
+    for (int i = 0; i < argc; i++)
+    {
+      // strlen does not count null-termination
+      size_t str_len = strlen(argv[i]);
+      // free'd in UserThread::execv() after copying to new archmemory.
+      kernel_argv[i] = new char[str_len + 1];
+  
+      // copy content 
+      memcpy(kernel_argv[i], argv[i], strlen(argv[i]));
+      // because null termination is not copied, we add it manually - don't get confused by off-by-one!
+      kernel_argv[i][str_len] = '\0';
+
+      debug(X_USERTHREAD, "execv(): memcpy(): copying %s from %lx to kernel_argv[%d] which lies at %lx\n", 
+        argv[i], (size_t)(argv + i), i, (size_t)(kernel_argv + i));
+    }
+
+    debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
+    return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
+  }
+
+  assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");
+}
+
+int ProcessRegistry::areExecArgsValid(char* const argv[])
+{
+  debug(X_PROCESS_REG, "areExecArgsValid()?\n");
+
+  // argc = 0 if any of those is null.
+  int argc = 0;
+  if(!argv || !argv[0])
+    return argc;
+  
+  // in userspace?
+  if((size_t)argv >= USER_BREAK || (size_t)argv[0] >= USER_BREAK)
+    return -1;
+
+  // increase argc until NULL. error for very long strings to detect missing null-terminatioin of string.
+  while(argv[argc])
+  {
+    for(int i = 0; argv[argc][i]; i++)
+      if(unlikely(i > EXECV_MAX_ARG_LEN))
+        return -1;
+    argc++;
+  }
+
+  // everything seemed okay..
+  debug(X_PROCESS_REG, "areExecArgsValid(): everything seems fine\n");
+  return argc;
 }
 
 
 
-void ProcessRegistry::createProcess(const char* path)
-{
-  debug(PROCESS_REG, "create process %s\n", path);
-  FileSystemInfo test = *working_dir_;
-  debug(PROCESS_REG, "was able to deref that\n");
-  UserProcess* process = new UserProcess(path, new FileSystemInfo(*working_dir_));
-  assert(process && "Process creation failed miserably o_O");
 
-  debug(PROCESS_REG, "created process successfully!\n");
-  // successful UserProcess creation: add to ProcessRegistry::list_of_processes_
-  list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(process->getPID(), process));
-  list_of_processes_lock_.release();
-  debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
+size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProcess* parent_process)
+{
+  debug(WAITPID, "id: %ld\n", parent_process->getPID());
+  int return_pid = 0;
+  if((long int) arg1 > 0) // any specifed process
+  {
+    debug(WAITPID, "arg1 greater 0, process %ld\n", arg1);
+    list_of_processes_lock_.acquire();
+    auto search_child = list_of_processes_.find(arg1);
+    if (search_child == list_of_processes_.end())
+    {
+      list_of_processes_lock_.release();
+      debug(WAITPID, "Not found, process %ld\n", arg1);
+      return -1; //exit value returned
+    }
+    UserProcess* to_be_joined = search_child->second;
+    if (to_be_joined->checkWaiter() == 0 && parent_process->checkWaiter() != to_be_joined)
+    {
+      to_be_joined->setWaiter(parent_process);  
+    }
+    else
+    {
+      list_of_processes_lock_.release();
+      return -1;
+    }
+    
+    return_pid = to_be_joined->getPID();
+    list_of_processes_lock_.release();
+    debug(X_USERPROCESS, "Process [%ld] now waiting for [%ld]\n", parent_process->getPID(), to_be_joined->getPID());
+    parent_process->waitPIDSem();
+  }
+  else if((long int) arg1 < -1) //  any child process whose process group ID is equal to the absolute value of pid. 
+  {
+    debug(WAITPID, "arg1 smaller -1\n"); // dont need to implement process groups
+    return 0;
+  }
+  else if((long int) arg1 == 0) // any child process whose process group ID is equal to that of the calling process. 
+  {
+    debug(WAITPID, "arg1 equals 0\n"); // dont need to implement process groups
+    return 0;
+  }
+  else //   something went wrong
+  {
+    debug(WAITPID, "we have an error somewhere, process %ld\n", arg1);
+    return -1;
+  } 
+  if(arg2 != 0)
+  {
+    debug(WAITPID, "arg2 different 0, process %ld\n", arg1);
+  }
+  if(arg3 > 0) 
+  {
+    debug(WAITPID, "arg3 bigger 0, process %ld\n", arg1);
+  }
+  return return_pid;
 }
 

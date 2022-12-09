@@ -1,5 +1,14 @@
-#include <pthread.h>
+#include "pthread.h"
 #include <stdio.h>
+
+#define NUM_THREADS1 5000
+#define NUM_THREADS2 5000
+#define NUM_THREADS3 5000
+
+pthread_t tids[NUM_THREADS1 + NUM_THREADS2+ NUM_THREADS3];
+pthread_t rets[NUM_THREADS1 + NUM_THREADS2+ NUM_THREADS3];
+
+
 
 void simple_routine()
 {
@@ -35,30 +44,30 @@ void simple_routine3()
 
 int main()
 {
-  printf("1 - main: Hello! simple_routine lies at %lx\n", (size_t)simple_routine);
-  pthread_t tids[11]; 
-  int retvals[11];
-
+  printf("1 - main: Hello!\n");
   //int ret = pthread_create(&tid, NULL, (void*(*)(void*))++i&simple_routine, NULL);
   int ret = 0;
-  for(size_t i = 0; i < 5; ++i){
+  for(size_t i = 0; i < NUM_THREADS1; ++i){
     ret = pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL);
   }
-  for(size_t i = 5; i < 9; ++i){
+  for(size_t i = NUM_THREADS1; i < NUM_THREADS1 + NUM_THREADS2; ++i){
     ret = pthread_create(&tids[i], NULL, (void*)&simple_routine2, NULL);
   }
-  ret = pthread_create(&tids[10], NULL, (void*)&simple_routine3, NULL);
-
-  pthread_join(tids[10], (void**)&retvals[10]);
+  for (size_t i = NUM_THREADS1 + NUM_THREADS2; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; i++)
+  {
+    ret = pthread_create(&tids[10], NULL, (void*)&simple_routine3, NULL);
+  }
   printf("3 - main again: pthread_create() returned;\n");
-  for(size_t i = 0; i < 10; ++i){
+  
+
+  for(size_t i = 0; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; ++i){
     pthread_cancel(tids[i]);
   }
-  for(size_t i = 0; i < 10; ++i){
-    pthread_join(tids[i],(void**)&retvals[i]);
+  for(size_t i = 0; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; ++i){
+    pthread_join(tids[i],(void**)&rets[i]);
   }
-  for(size_t i = 0; i < 10; ++i){
-    printf("thread %ld\treturns: %d\n", tids[i], retvals[i]);
+  for(size_t i = 0; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; ++i){
+    printf("thread %ld\treturns: %ld\n", tids[i], rets[i]);
   }
   // anti warinign
   printf("%d\n", ret);

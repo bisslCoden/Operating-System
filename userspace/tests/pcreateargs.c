@@ -1,7 +1,9 @@
 #include "pthread.h"
 #include "stdio.h"
 
-#define PTHREAD_CALLS 10
+#define PTHREAD_CALLS 15000
+  pthread_t tid[PTHREAD_CALLS];
+  size_t values[PTHREAD_CALLS];
 
 void* subroutine(void* args)
 {
@@ -12,8 +14,7 @@ void* subroutine(void* args)
 int main()
 {
   printf("main(): seawas. will call a fuckload of threads.\n");
-  pthread_t tid[PTHREAD_CALLS];
-  size_t values[PTHREAD_CALLS];
+
   for(size_t i = 0; i < PTHREAD_CALLS; i++)
   {
     values[i] = i;

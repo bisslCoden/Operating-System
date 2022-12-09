@@ -102,8 +102,8 @@ void Lock::checkForDeadLock()
     return;
   if(held_by_ == currentThread)
   {
-    debug(LOCK, "Deadlock: Lock: %s (%p), held already by currentThread: %s (%p).\n",
-          name_, this, currentThread->getName(), currentThread);
+    debug(LOCK, "Deadlock: Lock: %s (%p), held already by currentThread [%ld]: %s (%p).\n",
+          name_, this, currentThread->getTID(),currentThread->getName(), currentThread);
     printStatus();
     assert(false);
   }
@@ -140,9 +140,9 @@ void Lock::checkCurrentThreadStillWaitingOnAnotherLock()
     return;
   if(currentThread->lock_waiting_on_ != 0)
   {
-    debug(LOCK, "ERROR: Lock: Thread %s (%p) is trying to lock %s (%p), eventhough is already waiting on lock %s (%p).\n"
+    debug(LOCK, "ERROR: Lock: Thread %s [%ld] (%p) is trying to lock %s (%p), eventhough is already waiting on lock %s (%p).\n"
           "You shouldn't use Scheduler::wake() with a thread sleeping on a lock!\n",
-          currentThread->getName(), currentThread, name_, this,
+          currentThread->getName(), currentThread->getTID(), currentThread, name_, this,
           currentThread->lock_waiting_on_->getName(), currentThread->lock_waiting_on_);
     if(kernel_debug_info)
     {

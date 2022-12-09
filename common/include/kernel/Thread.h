@@ -56,6 +56,8 @@ class Thread
 
     void* getKernelStackStartPointer();
 
+    bool isUserThread(){return type_ == TYPE::USER_THREAD;}
+
     bool isStackCanaryOK();
 
     const char* getName();
@@ -90,7 +92,7 @@ class Thread
      * Tells the scheduler if this thread is ready for scheduling
      * @return true if ready for scheduling
      */
-    bool schedulable();
+    virtual bool schedulable();
   
   
     uint32 kernel_stack_[2048];
@@ -105,6 +107,7 @@ class Thread
     void setState(ThreadState state);
 
     /**
+    size_t time_to_wake_;
      * A part of the single-chained waiters list for the locks.
      * It references to the next element of the list.
      * In case of a spinlock it is a busy-waiter, else usually it is a sleeper ^^.
@@ -143,6 +146,5 @@ class Thread
     FileSystemInfo* working_dir_;
 
     ustl::string name_;
-
 };
 

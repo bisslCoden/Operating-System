@@ -30,6 +30,11 @@ Scheduler::Scheduler()
 {
   block_scheduling_ = 0;
   ticks_ = 0;
+  diff_avg = 0;
+  rdtsc_value = 0;
+  rdtsc_value_old = 0;
+  rdtsc_diff_per_tick = 0;
+  rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
 }
@@ -41,6 +46,27 @@ uint32 Scheduler::schedule()
   {
     debug(SCHEDULER, "schedule: currently blocked\n");
     return 0;
+  }
+  //copied from Daniel, lol, no plagiate
+  auto uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      if(((UserThread*)(*uit))->was_scheduled_ == 1)
+      {
+        ((UserThread*)(*uit))->getProcess()->incDuaration(getRDTSC() - ((UserThread*)(*uit))->getLastStart());
+        break;
+      }
+    }
+  }
+  uit = threads_.begin();
+  for(; uit != threads_.end(); ++uit)
+  {
+    if((*uit)->isUserThread())
+    {
+      ((UserThread*)(*uit))->was_scheduled_ = 0;
+    }
   }
 
   auto it = threads_.begin();
@@ -71,13 +97,30 @@ uint32 Scheduler::schedule()
     ret = 0;
   }
 
+
+  if (currentThread->switch_to_userspace_)
+  {
+     UserThread* current = (UserThread*) currentThread;
+    debug(X_USERTHREAD, "%ld sched \n", currentThread->getTID());
+    //do atomic checks
+    if (!current->myflags_.knotcancelable)
+      if (current->myflags_.kasynchronous)
+        if (current->myflags_.kcancelreq)
+        {
+          currentThreadRegisters = currentThread->kernel_registers_;
+          ret = 0;
+          currentThreadRegisters->rdi = (uint64_t) PTHREAD_CANCELED;
+          currentThread->switch_to_userspace_ = 0;
+          ArchThreads::changeInstructionPointer(currentThreadRegisters, (void*) &Syscall::pthread_exit);
+        }
+  }
   return ret;
 }
 
 void Scheduler::addNewThread(Thread *thread)
 {
   assert(thread);
-  debug(SCHEDULER, "addNewThread: %p  %zd:%s\n", thread, thread->getTID(), thread->getName());
+  debug(SCHEDULER, "addNewThread: %p  [%zd]: %s\n", thread, thread->getTID(), thread->getName());
   if (currentThread)
     ArchThreads::debugCheckNewThread(thread);
   KernelMemoryManager::instance()->getKMMLock().acquire();
@@ -96,9 +139,11 @@ void Scheduler::sleep()
 
 void Scheduler::wake(Thread* thread_to_wake)
 {
+
   // wait until the thread is sleeping
   while(thread_to_wake->getState() != Sleeping)
     yield();
+
   thread_to_wake->setState(Running);
 }
 
@@ -133,6 +178,7 @@ void Scheduler::cleanupDeadThreads()
     if (tmp->getState() == ToBeDestroyed)
     {
       destroy_list[thread_count++] = tmp;
+      debug(X_USERTHREAD, "erasing [%ld]!\n", tmp->getTID());
       threads_.erase(threads_.begin() + i); // Note: erase will not realloc!
       --i;
     }
@@ -155,8 +201,15 @@ void Scheduler::printThreadList()
   lockScheduling();
   debug(SCHEDULER, "Scheduler::printThreadList: %zd Threads in List\n", threads_.size());
   for (size_t c = 0; c < threads_.size(); ++c)
-    debug(SCHEDULER, "Scheduler::printThreadList: threads_[%zd]: %p  %zd:%s     [%s]\n", c, threads_[c],
-          threads_[c]->getTID(), threads_[c]->getName(), Thread::threadStatePrintable[threads_[c]->state_]);
+    debug(SCHEDULER,  "Scheduler::printThreadList: threads_[%zd]: %p  [%zd] %s with PID %ld, with state: [%s] called %s\n", 
+                      c,      
+                      threads_[c],       
+                      threads_[c]->getTID(), 
+                      ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? "UserThread" : "KernelThread"),
+                      ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? ((UserThread*)currentThread)->getProcess()->getPID() : 0),
+                      Thread::threadStatePrintable[threads_[c]->state_],
+                      threads_[c]->getName()
+                      );
   unlockScheduling();
 }
 
@@ -189,10 +242,47 @@ uint32 Scheduler::getTicks()
   return ticks_;
 }
 
+
+size_t Scheduler::getRDTSC()
+{
+  size_t firstbits;
+  size_t lastbits; 
+  asm volatile("rdtsc \n\t" : "=a"(lastbits), "=d"(firstbits));
+  size_t return_ = firstbits << 32 | lastbits;
+  return return_;
+}
+
 void Scheduler::incTicks()
 {
-  ++ticks_;
+  ticks_++;
+  rdtsc_value_old = rdtsc_value;
+  rdtsc_value = getRDTSC();
+  rdtsc_diff_per_tick = rdtsc_value - rdtsc_value_old;
+  rdtsc_diff_sum += rdtsc_diff_per_tick;
+  /*if(ticks_ <= 15)
+  {
+    diff_avg = rdtsc_diff_sum / ticks_;
+  }
+  else
+  {
+    diff_avg = rdtsc_diff_sum / (ticks_ - 15);
+  }*/
+  if(ticks_ % 10 != 0)
+    diff_avg = rdtsc_diff_sum / (ticks_ % 10);
+  else
+  {
+    diff_avg = rdtsc_diff_per_tick;
+    rdtsc_diff_sum = 0;
+  }
+  //debug(SLEEP,"aaverage is %ld, tick is %ld\n", diff_avg, ticks_);
+  //debug(SLEEP,"diff is     %ld, tick is %ld\n", rdtsc_diff_per_tick, ticks_);
 }
+
+
+uint32 Scheduler::getThreadCount() {
+  return threads_.size();
+}
+
 
 void Scheduler::printStackTraces()
 {
@@ -236,3 +326,13 @@ void Scheduler::printLockingInformation()
   debug(LOCK, "Scheduler::printLockingInformation finished\n");
   unlockScheduling();
 }
+
+/*
+{
+  size_t sum = 0;
+  for (size_t c = 0; c < threads_.size(); ++c)
+  {
+    sum += getRDTSC() - threads_[c]->getLastStart();
+  }
+  return sum;
+}*/

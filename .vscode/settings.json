@@ -6,6 +6,10 @@
     },
     "cmake.buildTask": true,
     "files.associations": {
-        "memory": "cpp"
+        "string": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp"
     }
 }

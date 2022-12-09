@@ -1,0 +1,52 @@
+#include <unistd.h>
+#include <stdio.h>
+#include "pthread.h"
+#include "sched.h"
+
+#define MAX_ARGS 5
+#define MAX_THREADS 10
+#define MAX_LOOPS 1000
+
+/**
+ * This program tests if all threads are killed before exec is starting 
+ * the new program. also arguments are passed. 
+ * 
+ */
+
+void simple_routine()
+{
+  size_t value = 123;
+  for(int i = 0; i < MAX_LOOPS; i++)
+  {
+    value *= i;
+    //printf("lalalala\n");
+  }
+}
+
+int main(int argc, const char *argv[])
+{
+	//int ret_pthread[MAX_THREADS];
+  //int retvals[MAX_THREADS];
+  pthread_t tids[MAX_THREADS]; 
+  for(size_t i = 0; i < MAX_THREADS; ++i)
+    assert(pthread_create(&tids[i], NULL, (void*)&simple_routine, NULL) == 0);
+  // exec should be called after threads are destroyed.
+  sched_yield();
+  // if((size_t)ret_pthread > 3)
+  //   printf("ahelo\n");
+ 
+  // hardcoded args :( - MAX_ARGS
+  char* const path = "/usr/printuntilnull.sweb";
+	char* const arg1 = "Eier";
+	char* const arg2 = "Mehl";
+	char* const arg3 = "Butter";
+	char* const arg4 = "Salz";
+	char* const arg5 = "Mehl";
+
+	// exec call
+	char* const args[] = {path, arg1, arg2, arg3, arg4, arg5, NULL};
+	printf("before exec\n");
+	int ret_exec = execv(path, args);
+  printf("execv failed with return value %d!\n", ret_exec);
+	return 42;
+}
