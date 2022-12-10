@@ -415,6 +415,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           assert(false && "which level should this be??\n");
           break;
         }
+        addRef(page_1, prog.first, 0, 0, level);
       }
     }
 
