@@ -656,7 +656,8 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
     debug(MULTICOW, "Wrong level!!\n");
     return ustl::make_pair(0,0);
   }
-
+  debug(MULTICOW, "now starting to cow until %ld for proc [%ld]", level, my_proc->getPID());
+  assert(page_map_level_4_);
   size_t page;
   PageMapLevel4Entry* pml4 = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
   for (size_t pml4i = 0; pml4i < PAGE_MAP_LEVEL_4_ENTRIES / 2; pml4i++)
@@ -667,6 +668,9 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
         return ustl::make_pair(page_map_level_4_, pml4i);
       continue;
     } 
+    if (!pml4[pml4i].present)
+      continue;
+    
     PageDirPointerTableEntry* pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
     for (size_t pdpti = 0; pdpti < PAGE_DIR_POINTER_TABLE_ENTRIES; pdpti++)
     {
@@ -683,6 +687,9 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
         }
         continue;
       }
+      if (!pdpt[pdpti].pd.present)
+        continue;
+      
       PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
       for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
       {
