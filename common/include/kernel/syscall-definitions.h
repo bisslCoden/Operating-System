@@ -34,6 +34,9 @@
 #define sc_sleep 603
 #define sc_clock 604
 
+#define sc_brk   701
+#define sc_sbrk  702
+
 #define sc_ks_wait 902
 #define sc_ks_post 903
 

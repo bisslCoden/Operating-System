@@ -119,6 +119,11 @@ class UserProcess
     size_t getNrOfThreads();
 
 
+    size_t getInitPBreak() { return initial_PBreak_; }
+    void lockPBreak() { if(!PBreak_mutex_.isHeldBy(currentThread)) PBreak_mutex_.acquire(); }
+    void unlockPBreak() { PBreak_mutex_.release(); }
+
+
    /**
      * @brief returns a random offset generated with rdtsc. This should only be used to set
      * UserThread::mystack_.page_offset_!!
@@ -126,6 +131,8 @@ class UserProcess
      * @return the offset AS VPN
      */
     size_t getRandomPageOffset();
+
+    bool initPBreak();
 
     void waitPIDSem(){ waitpid_sem_.wait(); }
     void postPIDSem(){ waitpid_sem_.post(); }
@@ -260,5 +267,8 @@ class UserProcess
     
     KernelSemaphore waitpid_sem_;
     UserProcess* waiter_ = 0;
+
+    Mutex PBreak_mutex_;
+    size_t initial_PBreak_;
 };
 

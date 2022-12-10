@@ -126,6 +126,12 @@ after:
     case sc_ks_post:
       kernelsem_post();
       break;
+    case sc_brk:
+      brk(arg1);
+      break;
+    case sc_sbrk:
+      sbrk((int)arg1);
+      break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }
@@ -562,18 +568,8 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 
 size_t Syscall::pthread_self(){
 
-  ustl::multimap<int, int> map;
-  map.insert(ustl::make_pair<int, int> (1, 2));
-  map.insert(ustl::make_pair<int, int> (1, 3));
-  map.insert(ustl::make_pair<int, int> (3, 5));
-  map.insert(ustl::make_pair<int, int> (2, 7));
-  for (auto it = map.begin(); it != map.end(); it++)
-  {
-   kprintf("map experimt: %d\n", *it);
-  }
-  kprintf("map experimt: %d\n", map.find(1)->second);
-  
-  
+  if(currentUserProcess->getLoader()->printHeaders())
+    debug(X_USERPROCESS, "printing my sections worked!\n");
   return currentUserThread->getTID();
 }
 
@@ -735,4 +731,36 @@ size_t Syscall::clock()
   //sum, time from this function thread
 
   //
+}
+
+
+int Syscall::brk(size_t end_data_segment)
+{
+  if (end_data_segment < currentUserProcess->getInitPBreak() || end_data_segment > END_OF_HEAP)
+  {
+    return -1;
+  }
+  currentUserProcess->lockPBreak();
+  currentUserProcess->getLoader()->setPBreak(end_data_segment);
+  currentUserProcess->unlockPBreak();
+  return 0;
+}
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
+void* Syscall::sbrk(int increment)
+{
+  currentUserProcess->lockPBreak();
+  size_t curbreak = currentUserProcess->getLoader()->getPBreak();
+  size_t new_brk = curbreak + increment;
+  if (new_brk < currentUserProcess->getInitPBreak() || new_brk > END_OF_HEAP)
+  {
+    currentUserProcess->unlockPBreak();
+    return (void*) -1;
+  }
+  currentUserProcess->getLoader()->setPBreak(new_brk);
+  currentUserProcess->unlockPBreak();
+  return (void*) curbreak;
 }

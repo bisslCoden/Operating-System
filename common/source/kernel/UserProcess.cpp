@@ -27,7 +27,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     offsetlist_lock_("UserProcess::offsets"),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    waitpid_sem_("Userprocess::waitpid_sem_")
+    waitpid_sem_("Userprocess::waitpid_sem_"),
+    PBreak_mutex_("Userprocess::PBreak_mutex_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -39,6 +40,14 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     *returnto = 1;
     return;
   }
+  if (!initPBreak())
+  {
+    debug(USERPROCESS, "Binary is too large for a heap to fit in.. kill proc\n");
+    *returnto = 1;
+    return;
+  }
+  initial_PBreak_ = loader_->getPBreak();
+  
 
   size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
@@ -83,7 +92,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   offsetlist_lock_("UserProcess::offsets"),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  waitpid_sem_("Userprocess::waitpid_sem_")
+  waitpid_sem_("Userprocess::waitpid_sem_"),
+  PBreak_mutex_("Userprocess::PBreak_mutex_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -104,6 +114,15 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 1;
     return;
   }
+  if (parent->loader_->getPBreak() > END_OF_HEAP || parent->loader_->getPBreak() < parent->loader_->getBSSEnd())
+  {
+    debug(USERPROCESS, "waaait what?! parent had corrupted heap!!!\n");
+    *returnto = 1;
+  }
+  
+  loader_->setPBreak(parent->loader_->getPBreak());
+  initial_PBreak_ = parent->initial_PBreak_;
+
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
   
   currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
@@ -561,4 +580,36 @@ size_t UserProcess::getClockSum()
     sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
   }
   return sum;
+}
+
+bool UserProcess::initPBreak()
+{
+  size_t rand, offset, addressnooffset;
+  addressnooffset = loader_->getBSSEnd();
+  addressnooffset += (5 * PAGE_SIZE);
+  addressnooffset /= PAGE_SIZE;
+  if (addressnooffset > END_OF_HEAP)
+  {
+    //we cannot get a heap sry...
+    return false;
+  }
+  else if (addressnooffset > BEGIN_HEAP_AT_LEAST)
+  {
+    //guess you ll just have a smaller heap
+    loader_->setPBreak(addressnooffset);
+    return true;
+  }
+  offset = 0;
+  
+  while (!offset)
+  {
+    rand = Scheduler::instance()->getRDTSC();
+    offset = rand % ((BEGIN_HEAP_AT_LEAST - addressnooffset) * PAGE_SIZE);
+    //just to double check
+    if ((addressnooffset + (offset * PAGE_SIZE)) > BEGIN_HEAP_AT_LEAST)
+      offset = 0;
+  }
+  loader_->setPBreak(addressnooffset + offset * PAGE_SIZE);
+  debug(USERPROCESS, "set PBreak to %lx\n", loader_->getPBreak());
+  return true;
 }

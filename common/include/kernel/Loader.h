@@ -33,11 +33,17 @@ class Loader
      */
     void loadPage(pointer virtual_address);
 
+    bool printHeaders();
+
     Stabs2DebugInfo const* getDebugInfos() const;
 
     void* getEntryFunction() const;
 
     ArchMemory arch_memory_;
+
+    size_t getBSSEnd();
+    void setPBreak(size_t PBreak)         { program_break_ = PBreak; };
+    size_t getPBreak()                    { return program_break_; }
 
   private:
 
@@ -65,6 +71,7 @@ class Loader
     Elf::Ehdr *hdr_;
     ustl::list<Elf::Phdr> phdrs_;
     Mutex program_binary_lock_;
+    size_t program_break_ = 0;
 
     Stabs2DebugInfo *userspace_debug_info_;
 
