@@ -1,5 +1,5 @@
 project(userspace_tests)
-include(../../../arch/${ARCH}/CMakeLists.userspace)
+include(../../arch/${ARCH}/CMakeLists.userspace)
 
 # Put userspace libraries and executables in seperated paths
 set(LIBRARY_OUTPUT_PATH  "${LIBRARY_OUTPUT_PATH}/userspace")
