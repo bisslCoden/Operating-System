@@ -69,10 +69,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page)
   else
     debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
   
-
-  
   //pm->unlockIPT();
-
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
   bool empty = checkAndRemove<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti);
   if (empty)
@@ -678,6 +675,7 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
         if (pdpt[pdpti].pd.present && pdpt[pdpti].pd.page_ppn == ppn)
         {
           pml4[pml4i].page_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(page_map_level_4_), pml4i, 3);
+          assert(pml4[pml4i].page_ppn != 0 && "this should be present!");
           page = pml4[pml4i].page_ppn;
           debug(MULTICOW, "Hit! found the page! cowing pdpt resulted in %lx for pdpt\n", page);
           //pdpt = getIdentAddressOfPPN(pml4[pml4i].page_ppn);
@@ -688,11 +686,13 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, size_t level)
       PageDirEntry* pd = (PageDirEntry*) getIdentAddressOfPPN(pdpt[pdpti].pd.page_ppn);
       for (size_t pdi = 0; pdi < PAGE_DIR_ENTRIES; pdi++)
       {
-        if (pd[pdi].pt.present && pd[pdi].pt.page_ppn == ppn)
+        if (pd[pdi].pt.present && (pd[pdi].pt.page_ppn == ppn))
         {
           pml4[pml4i].page_ppn = cowPML<PageMapLevel4Entry>(getIdentAddressOfPPN(page_map_level_4_), pml4i, 3);
+          assert(pml4[pml4i].page_ppn != 0 && "this should be present!");
           pdpt = (PageDirPointerTableEntry*) getIdentAddressOfPPN(pml4[pml4i].page_ppn);
           pdpt[pdpti].pd.page_ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(pml4[pml4i].page_ppn), pdpti, 2);
+          assert(pdpt[pdpti].pd.page_ppn != 0 && "should be present aswell");
           page = pdpt[pdpti].pd.page_ppn;
           debug(MULTICOW, "cowing pd resulted in %lx for pdpt and %lx for pd\n", pml4[pml4i].page_ppn, page);
           return ustl::make_pair(page, pdi);

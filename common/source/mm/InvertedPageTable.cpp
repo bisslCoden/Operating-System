@@ -61,7 +61,8 @@ void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFla
 size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn, size_t pml)
 {
   assert(IPT_lock_.isHeldBy(currentThread) && "PLEASE lockIPT()!!!!");
-
+  assert(proc != 0);
+  debug(X_USERPROCESS, "proc [%ld] for page %lx on level %ld: tries to delete ref...\n", proc->getPID(), ppn, pml);
   if (IPT_.find(ppn) == IPT_.end())
   {
     debug(X_USERPROCESS, "[%ld] proc [%ld] Wtf? Tried to free a page which is not in the IPT anymore forgot to set present to 0 somewhere!!!\n", currentThread->getTID(), 
@@ -74,10 +75,10 @@ size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn, s
       assert(false && "NOPE! dont mix pagemaplevels on a page!\n");
     
     auto my_proc = IPT_[ppn].progs_mappings.find(proc);
-    debug(X_USERPROCESS, "[%ld] found my entry vpn: %lx ppn: %lx (searched vpn: %lx)\n", my_proc->first->getPID(), my_proc->second, ppn, vpn);
     
     if (my_proc != IPT_[ppn].progs_mappings.end())
     {
+      debug(X_USERPROCESS, "[%ld] found my entry vpn: %lx ppn: %lx (searched vpn: %lx)\n", my_proc->first->getPID(), my_proc->second, ppn, vpn);
       if (pml == 0)
       {
         while (my_proc->second != vpn)
@@ -239,6 +240,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
  // lockIPT();
   //add effected progs
   ustl::map<UserProcess*, size_t> progs;
+  ArchMemoryMapping m;
   
   debug(DEDUBLI_THREAD, "Pages %lx and %lx are equal! we have %ld progs on first and %ld on second page\n", page_1, page_2, 
   IPT_[page_1].progs_mappings.size(), IPT_[page_2].progs_mappings.size());
@@ -288,7 +290,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   {
     for (auto prog : progs)
     {
-      ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+      m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
       PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
       //debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
       pt_src[m.pti].writeable = 0;
@@ -315,7 +317,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           
           ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
           assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
-          ArchMemoryMapping m = archmem->resolveMapping(prog.second);
+          m = archmem->resolveMapping(prog.second);
           PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
           pt_src[m.pti].writeable = 0;
           pt_src[m.pti].cow = 1;
@@ -331,7 +333,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
         
         ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
         assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
-        ArchMemoryMapping m = archmem->resolveMapping(prog.second);
+        m = archmem->resolveMapping(prog.second);
         PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
         pt_src[m.pti].writeable = 0;
         pt_src[m.pti].cow = 1;
@@ -429,7 +431,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     {
       for (auto prog : progs)
       {
-        ArchMemoryMapping m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+        m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
         PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
         pt_src[m.pti].writeable = 1;
       } 

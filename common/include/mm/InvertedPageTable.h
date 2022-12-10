@@ -16,6 +16,7 @@ struct IPTFlags
     bool swapped;
 };
 
+//0x446: proc2 -> WAS_LAST
 
 struct InvertedPageTableEntry
 {
@@ -36,6 +37,7 @@ public:
     void    addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags = 0, size_t pml = 0);
     size_t  deleteRef(size_t ppn, UserProcess* proc, size_t vpn, size_t pml = 0);
     InvertedPageTableEntry* getEntry(size_t ppn);
+    
     IPTFlags* getFlags(size_t ppn);
     
     //locking from outside
