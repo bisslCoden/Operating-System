@@ -741,6 +741,10 @@ int Syscall::brk(size_t end_data_segment)
     return -1;
   }
   currentUserProcess->lockPBreak();
+  
+  if (end_data_segment < currentUserProcess->getLoader()->getPBreak())
+    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), end_data_segment);
+  
   currentUserProcess->getLoader()->setPBreak(end_data_segment);
   currentUserProcess->unlockPBreak();
   return 0;
@@ -760,6 +764,11 @@ void* Syscall::sbrk(int increment)
     currentUserProcess->unlockPBreak();
     return (void*) -1;
   }
+
+  if (new_brk < currentUserProcess->getLoader()->getPBreak())
+    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), new_brk);
+  
+  debug(USERPROCESS, "Sbrk: break was at %lx and not i set it to %lx...\n", currentUserProcess->getLoader()->getPBreak(), new_brk);
   currentUserProcess->getLoader()->setPBreak(new_brk);
   currentUserProcess->unlockPBreak();
   return (void*) curbreak;

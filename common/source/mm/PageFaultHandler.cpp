@@ -77,7 +77,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       return;
     }
-    if (switch_to_us && address > END_OF_STACKS)
+    else if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");
       currentUserProcess->lockThreadMutex();
@@ -90,6 +90,30 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       }
       else
       {
+        currentUserProcess->unLockThreadMutex();
+        debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
+            // the page-fault seems to be faulty, print out the thread stack traces
+        ArchThreads::printThreadRegisters(currentThread, true);
+        currentThread->printBacktrace(true);
+        if (currentThread->loader_)
+          Syscall::exit(9999);
+        else
+          currentThread->kill();
+      }
+    }
+    else if (address < END_OF_HEAP && (address > currentUserProcess->getInitPBreak()))
+    {
+      currentUserProcess->lockThreadMutex();
+      currentUserProcess->lockPBreak();
+      if (address <= currentUserProcess->getLoader()->getPBreak())
+      {
+        currentUserProcess->getHeapPage(address);
+        currentUserProcess->unlockPBreak();
+        currentUserProcess->unLockThreadMutex();
+      }
+      else
+      {
+        currentUserProcess->unlockPBreak();
         currentUserProcess->unLockThreadMutex();
         debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
             // the page-fault seems to be faulty, print out the thread stack traces

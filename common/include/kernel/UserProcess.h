@@ -122,6 +122,9 @@ class UserProcess
     size_t getInitPBreak() { return initial_PBreak_; }
     void lockPBreak() { if(!PBreak_mutex_.isHeldBy(currentThread)) PBreak_mutex_.acquire(); }
     void unlockPBreak() { PBreak_mutex_.release(); }
+    void getHeapPage(size_t address);
+    bool initPBreak();
+    void checkBrkFree(size_t brk_prev, size_t brk_now);
 
 
    /**
@@ -132,7 +135,6 @@ class UserProcess
      */
     size_t getRandomPageOffset();
 
-    bool initPBreak();
 
     void waitPIDSem(){ waitpid_sem_.wait(); }
     void postPIDSem(){ waitpid_sem_.post(); }

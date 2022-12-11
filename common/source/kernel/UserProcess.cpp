@@ -587,7 +587,7 @@ bool UserProcess::initPBreak()
   size_t rand, offset, addressnooffset;
   addressnooffset = loader_->getBSSEnd();
   addressnooffset += (5 * PAGE_SIZE);
-  addressnooffset /= PAGE_SIZE;
+  addressnooffset = addressnooffset PAGE_SIZE;
   if (addressnooffset > END_OF_HEAP)
   {
     //we cannot get a heap sry...
@@ -604,7 +604,7 @@ bool UserProcess::initPBreak()
   while (!offset)
   {
     rand = Scheduler::instance()->getRDTSC();
-    offset = rand % ((BEGIN_HEAP_AT_LEAST - addressnooffset) * PAGE_SIZE);
+    offset = rand % ((BEGIN_HEAP_AT_LEAST - addressnooffset) / PAGE_SIZE);
     //just to double check
     if ((addressnooffset + (offset * PAGE_SIZE)) > BEGIN_HEAP_AT_LEAST)
       offset = 0;
@@ -612,4 +612,40 @@ bool UserProcess::initPBreak()
   loader_->setPBreak(addressnooffset + offset * PAGE_SIZE);
   debug(USERPROCESS, "set PBreak to %lx\n", loader_->getPBreak());
   return true;
+}
+
+void UserProcess::getHeapPage(size_t address)
+{
+  //seems like we need a heap page!
+  assert(threads_lock_.isHeldBy(currentThread));
+  assert(PBreak_mutex_.isHeldBy(currentThread));
+  
+  if (checkKill())
+    return;
+  size_t ppn = PageManager::instance()->allocPPN();
+  if (!loader_->arch_memory_.mapPage((address / PAGE_SIZE), ppn, 1))
+  {
+    debug(USERPROCESS, "getnewpage(): RIP. asserting.\n");
+    assert(false);
+  }
+}
+
+void UserProcess::checkBrkFree(size_t brk_prev, size_t brk_now)
+{
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+  size_t vpn_start, vpn_end;
+  vpn_start = brk_now / PAGE_SIZE;
+  vpn_end = brk_prev / PAGE_SIZE;
+  IPT->lockIPT();
+  loader_->arch_memory_.lockArchMemory();
+  for (size_t iter = vpn_start + 1; iter <= vpn_end; iter++)
+  {
+    ArchMemoryMapping m = loader_->arch_memory_.resolveMapping(iter);
+    if (m.pt[m.pti].present)
+    {
+      loader_->arch_memory_.unmapPage(iter);
+    }
+  }
+  IPT->unlockIPT();
+  loader_->arch_memory_.unlockArchMemory();
 }
