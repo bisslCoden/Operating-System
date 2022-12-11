@@ -587,7 +587,9 @@ bool UserProcess::initPBreak()
   size_t rand, offset, addressnooffset;
   addressnooffset = loader_->getBSSEnd();
   addressnooffset += (5 * PAGE_SIZE);
-  addressnooffset = addressnooffset PAGE_SIZE;
+  addressnooffset = addressnooffset >> 12;
+  addressnooffset = addressnooffset<< 12;
+  debug(USERPROCESS, "%lx is adress no offset\n", addressnooffset);
   if (addressnooffset > END_OF_HEAP)
   {
     //we cannot get a heap sry...
@@ -609,7 +611,7 @@ bool UserProcess::initPBreak()
     if ((addressnooffset + (offset * PAGE_SIZE)) > BEGIN_HEAP_AT_LEAST)
       offset = 0;
   }
-  loader_->setPBreak(addressnooffset + offset * PAGE_SIZE);
+  loader_->setPBreak(addressnooffset + (offset * PAGE_SIZE));
   debug(USERPROCESS, "set PBreak to %lx\n", loader_->getPBreak());
   return true;
 }

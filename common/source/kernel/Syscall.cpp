@@ -127,10 +127,10 @@ after:
       kernelsem_post();
       break;
     case sc_brk:
-      brk(arg1);
+      return_value = brk(arg1);
       break;
     case sc_sbrk:
-      sbrk((int)arg1);
+      return_value = sbrk((int)arg1);
       break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
@@ -754,7 +754,7 @@ int Syscall::brk(size_t end_data_segment)
  * function stub
  * posix compatible signature - do not change the signature!
  */
-void* Syscall::sbrk(int increment)
+size_t Syscall::sbrk(int increment)
 {
   currentUserProcess->lockPBreak();
   size_t curbreak = currentUserProcess->getLoader()->getPBreak();
@@ -762,14 +762,14 @@ void* Syscall::sbrk(int increment)
   if (new_brk < currentUserProcess->getInitPBreak() || new_brk > END_OF_HEAP)
   {
     currentUserProcess->unlockPBreak();
-    return (void*) -1;
+    return -1;
   }
 
   if (new_brk < currentUserProcess->getLoader()->getPBreak())
     currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), new_brk);
   
-  debug(USERPROCESS, "Sbrk: break was at %lx and not i set it to %lx...\n", currentUserProcess->getLoader()->getPBreak(), new_brk);
   currentUserProcess->getLoader()->setPBreak(new_brk);
   currentUserProcess->unlockPBreak();
-  return (void*) curbreak;
+  debug(USERPROCESS, "Sbrk: break returned: %p and not i set it to %lx...\n", (void*) curbreak, new_brk);
+  return curbreak;
 }

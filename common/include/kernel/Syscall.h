@@ -146,7 +146,7 @@ class Syscall
  * function stub
  * posix compatible signature - do not change the signature!
  */
-  static void* sbrk(int increment);
+  static size_t sbrk(int increment);
 
 
 

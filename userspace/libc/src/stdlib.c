@@ -1,6 +1,7 @@
 #include "stdlib.h"
 #include "pthread.h"
 #include "nonstd.h"
+#include "stdio.h"
 
 metadata* head = NULL;
 pthread_spinlock_t memory_lock;
@@ -13,6 +14,7 @@ metadata* add_block(size_t size_sbrk)
   if ((long) size_sbrk < 0)
     return NULL;
   new_mem_void = sbrk(size_sbrk);
+  printf("got %p from sbrk\n", new_mem_void);
   if(new_mem_void == (void*)-1)
   {
       //new_mem_void = sbrk(0);
@@ -92,6 +94,7 @@ void *malloc(size_t size)
   metadata* iter = head;
   if (head == NULL)
   {
+    printf("head is 0 so i ll get a block..\n");
     if((size + sizeof(metadata)) % PAGE_SIZE_US == 0)
       this_block = add_block(size + sizeof(metadata));
     else
@@ -108,6 +111,7 @@ void *malloc(size_t size)
       }
     }
     head = this_block;
+    printf("set head to %p and now leaving..\n", head);
   }
   else 
   {
@@ -166,6 +170,7 @@ void *malloc(size_t size)
     }
   }
   //void* addr = sbrk(0);fs
+  printf("sucessfully leaving malloc!\n");
   pthread_spin_unlock(&memory_lock);
   return this_block->user_start;
 }
