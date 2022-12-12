@@ -291,14 +291,14 @@ void UserThread::sendCancelRequest()
 }
 
 
-void UserThread::getNewStackPage(size_t adress)
+void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
 {
   if(process_->checkKill())
     return;
   my_pages_lock_.acquire();
-  size_t new_page = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
-  if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
+  //size_t new_page = PageManager::instance()->allocPPN();
+  //debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
+  if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), ppns, 1))
   {
     //might need change in the future
     debug(USERTHREAD, "getnewpage(): RIP. asserting.\n");
@@ -338,7 +338,7 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
 }
 
 
-bool UserThread::setupStack()
+bool UserThread::setupStack(ustl::queue<size_t>* ppns)
 {
   debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
 
@@ -352,13 +352,13 @@ bool UserThread::setupStack()
   size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
  
-  size_t ppn_for_stack = PageManager::instance()->allocPPN();
-  assert(vpn_for_stack && ppn_for_stack);
-  if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
+  //size_t ppn_for_stack = PageManager::instance()->allocPPN();
+  assert(vpn_for_stack && !ppns->empty());
+  if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppns, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
     assert(false);
-    PageManager::instance()->freePPN(ppn_for_stack);
+    //PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
   debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
@@ -388,11 +388,11 @@ bool UserThread::setupStack()
   return true;
 }
 
-bool UserThread::reuseStack(StackInfo* old_stackinfo)
+bool UserThread::reuseStack(StackInfo* old_stackinfo, ustl::queue<size_t>* ppns)
 {
-  size_t ppn = PageManager::instance()->allocPPN();
+  // size_t ppn = PageManager::instance()->allocPPN();
   debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
-  if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
+  if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppns, 1))
     return false;
   
   my_pages_lock_.acquire();
@@ -421,7 +421,7 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo)
 }
 
 
-int UserThread::execv(char* const argv[], size_t argc)
+int UserThread::execv(char* const argv[], size_t argc, ustl::queue<size_t>* ppns)
 {
   
   if(!((argv && argc) || (!argv && !argc)))
@@ -442,9 +442,9 @@ int UserThread::execv(char* const argv[], size_t argc)
   // args: copy from argv[] (kernel_argv) into fresh archmem ONLY IF NECESSARY
   if(argc)
   {
-    size_t ppn = PageManager::instance()->allocPPN();
+    //size_t ppn = ppn;
     size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE; // the virtual page we use to pass the args
-    assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "why tf was this mapped? This is exec place");
+    assert(loader_->arch_memory_.mapPage(vpn, ppns, 1) && "why tf was this mapped? This is exec place");
     size_t new_argv = USER_BREAK - PAGE_SIZE; // the virtual address
     char** argv_arr = (char**) new_argv; // the virtual address casted
     size_t str_offset = argc * sizeof(char*) + sizeof(size_t); // + sizeof(size_t) for null termination

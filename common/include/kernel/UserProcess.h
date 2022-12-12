@@ -5,6 +5,7 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "uatomic.h"
+#include "uqueue.h"
 #include "uvector.h"
 #include "KernelSemaphore.h"
 #include "Loader.h"
@@ -89,7 +90,7 @@ class UserProcess
      * @return true if success,
      * @return false if rip
      */
-    bool setupLoader(ssize_t fd);
+    bool setupLoader(ssize_t fd, size_t ppn);
 
 
     /**
@@ -122,7 +123,7 @@ class UserProcess
     size_t getInitPBreak() { return initial_PBreak_; }
     void lockPBreak() { if(!PBreak_mutex_.isHeldBy(currentThread)) PBreak_mutex_.acquire(); }
     void unlockPBreak() { PBreak_mutex_.release(); }
-    void getHeapPage(size_t address);
+    void getHeapPage(size_t address, ustl::queue<size_t>* ppns);
     bool initPBreak();
     void checkBrkFree(size_t brk_prev, size_t brk_now);
 

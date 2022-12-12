@@ -250,6 +250,29 @@ void PageManager::freePPN(uint32 page_number, uint32 page_size)
   lock_.release();
 }
 
+void PageManager::allocPagesAndAddQueue(size_t num_pages, ustl::queue<size_t>* ppns)
+{
+  size_t ppn;
+  for (size_t i = 0; i < num_pages; i++)
+  {
+    ppn = allocPPN();
+    ppns->push(ppn);
+  }
+}
+
+void PageManager::freeRestOfPages(ustl::queue<size_t>* ppns)
+{
+  size_t ppn;
+  while (!ppns->empty())
+  {
+    ppn = ppns->front();
+    freePPN(ppn);
+    ppns->pop();
+  }
+}
+
+
+
 //----------------------------------------------------------------------------------cow start
 // bool PageManager::isInCowCnt(size_t ppn)
 // { 

@@ -5,6 +5,7 @@
 #include "Condition.h"
 #include "UserProcess.h"
 #include "uatomic.h"
+#include "uqueue.h"
 
 #define currentUserThread ((UserThread*) currentThread)
 
@@ -101,8 +102,8 @@ class UserThread : public Thread
      * @return true stack set successfully
      * @return false stack not setup.
      */
-    bool setupStack();
-    bool reuseStack(StackInfo* old_stackinfo);
+    bool setupStack(ustl::queue<size_t>* ppns);
+    bool reuseStack(StackInfo* old_stackinfo, ustl::queue<size_t>* ppns);
 
 
     /**
@@ -113,7 +114,7 @@ class UserThread : public Thread
      * @param argc the argument count.
      * @return error return values
      */
-    int execv(char* const argv[], size_t argc);
+    int execv(char* const argv[], size_t argc, size_t ppn);
 
     void signalExec()                 { exec_wait_.signal();}
     void waitExec()                   { exec_wait_.wait();}
@@ -137,7 +138,7 @@ class UserThread : public Thread
     void setJoinState(int state)      {myflags_.joinable = state;}
     int getJoinState()                {return myflags_.joinable;}
 
-    void getNewStackPage(size_t adress);
+    void getNewStackPage(size_t adress, ustl::queue<size_t>* ppns);
     
     /**
      * @brief kills thread immediately if needed.

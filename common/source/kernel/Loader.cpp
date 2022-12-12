@@ -16,7 +16,7 @@
 #include "File.h"
 #include "FileDescriptor.h"
 
-Loader::Loader(ssize_t fd) : fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0)
+Loader::Loader(ssize_t fd, size_t pml4_ppn) : fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0), arch_memory_(pml4_ppn)
 {
 }
 
@@ -28,15 +28,16 @@ Loader::~Loader()
   hdr_ = nullptr;
 }
 
-void Loader::loadPage(pointer virtual_address)
+void Loader::loadPage(pointer virtual_address, ustl::queue<size_t>* ppns)
 {
   debug(LOADER, "Loader:loadPage: Request to load the page for address %p. currentThread: [%ld]\n", (void*)virtual_address, currentThread->getTID());
   const pointer virt_page_start_addr = virtual_address & ~(PAGE_SIZE - 1);
   const pointer virt_page_end_addr = virt_page_start_addr + PAGE_SIZE;
   bool found_page_content = false;
   // get a new page for the mapping
-  size_t ppn = PageManager::instance()->allocPPN();
-
+  size_t ppn = ppns->front();
+  
+  
   program_binary_lock_.acquire();
 
   // Iterate through all sections and load the ones intersecting into the page.
@@ -56,7 +57,7 @@ void Loader::loadPage(pointer virtual_address)
         {
           program_binary_lock_.release();
           debug(X_LOADER, "loadPage() calling freePPN(%ld)\n", ppn);
-          PageManager::instance()->freePPN(ppn);
+          PageManager::instance()->freeRestOfPages(ppns);
           debug(LOADER, "ERROR! Some parts of the content could not be loaded from the binary.\n");
           Syscall::exit(999);
         }
@@ -72,16 +73,16 @@ void Loader::loadPage(pointer virtual_address)
 
   if(!found_page_content)
   {
-    PageManager::instance()->freePPN(ppn);
+    PageManager::instance()->freeRestOfPages(ppns);
     debug(LOADER, "Loader::loadPage: ERROR! No section refers to the given address.\n");
     Syscall::exit(666);
   }
 
-  bool page_mapped = arch_memory_.mapPage(virt_page_start_addr / PAGE_SIZE, ppn, true);
+  bool page_mapped = arch_memory_.mapPage(virt_page_start_addr / PAGE_SIZE, ppns, true);
   if (!page_mapped)
   {
     debug(LOADER, "Loader::loadPage: The page has been mapped by someone else.\n");
-    PageManager::instance()->freePPN(ppn);
+    PageManager::instance()->freeRestOfPages(ppns);
   }
   debug(LOADER, "Loader::loadPage: Load request for address %p has been successfully finished.\n", (void*)virtual_address);
 }

@@ -16,7 +16,7 @@ class Loader
   public:
   
   
-    Loader(ssize_t fd);
+    Loader(ssize_t fd, size_t pml4_ppn);
     ~Loader();
 
     /**
@@ -31,7 +31,7 @@ class Loader
      * loads one page by its virtual address: gets a free page, copies the page, maps it
      * @param virtual_address virtual address where to find the page to load
      */
-    void loadPage(pointer virtual_address);
+    void loadPage(pointer virtual_address, ustl::queue<size_t>* ppns);
 
     bool printHeaders();
 

@@ -8,6 +8,7 @@
 #include "Mutex.h"
 #include "UserProcess.h"
 #include "InvertedPageTable.h"
+#include "uqueue.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!
@@ -58,11 +59,10 @@ class PageManager
     {
       page_usage_table_->bmprint();
     }
+    
+    void allocPagesAndAddQueue(size_t num_pages, ustl::queue<size_t>* ppns);
+    void freeRestOfPages(ustl::queue<size_t>* ppns);
 
-    //lightweight no large locking algorithm to check for equal pages
-    void deduplicatePages();
-    //the real heavy stuff... here the deduplication is performed with all locks etc.
-    bool deduplicate(size_t page_1, size_t page_2);
 
     /**
      * @brief Handles a cow Pagefault and refreshes the cow ist accordingly 

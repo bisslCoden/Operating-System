@@ -34,8 +34,8 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   waitpid_sem_.init(0);
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
-
-  if(!setupLoader(fd_))
+  size_t ppn = PageManager::instance()->allocPPN();
+  if(!setupLoader(fd_, ppn))
   {
     *returnto = 1;
     return;
@@ -108,10 +108,11 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 2;
     return;
   }
-
-  if (!setupLoader(fd_))
+  size_t ppn = PageManager::instance()->allocPPN(); 
+  if (!setupLoader(fd_, ppn))
   {
     *returnto = 1;
+    //PageManager::instance()->freePPN();
     return;
   }
   if (parent->loader_->getPBreak() > END_OF_HEAP || parent->loader_->getPBreak() < parent->loader_->getBSSEnd())
@@ -492,7 +493,7 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   return 0;
 }
 
-bool UserProcess::setupLoader(ssize_t fd)
+bool UserProcess::setupLoader(ssize_t fd, size_t ppn)
 {
   // faulty fd
   if(fd < 0)
@@ -503,11 +504,12 @@ bool UserProcess::setupLoader(ssize_t fd)
 
   // set fd_, new_loader -> check new loader, get ready to rumble if possible
   fd_ = fd;
-  Loader* new_loader = new Loader(fd_);
+  Loader* new_loader = new Loader(fd_, ppn);
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
   {
     debug(LOADER, "setuploader() failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
     loader_ = 0;
+    PageManager::instance()->freePPN(ppn);
     return false;
   }
 
@@ -616,7 +618,7 @@ bool UserProcess::initPBreak()
   return true;
 }
 
-void UserProcess::getHeapPage(size_t address)
+void UserProcess::getHeapPage(size_t address, ustl::queue<size_t>* ppns)
 {
   //seems like we need a heap page!
   assert(threads_lock_.isHeldBy(currentThread));
@@ -638,8 +640,8 @@ void UserProcess::getHeapPage(size_t address)
   }
   debug(USERPROCESS, "Page NOT present: getting a new one!\n");
   
-  size_t ppn = PageManager::instance()->allocPPN();
-  if (!loader_->arch_memory_.mapPage((address / PAGE_SIZE), ppn, 1))
+ //size_t ppn = PageManager::instance()->allocPPN();
+  if (!loader_->arch_memory_.mapPage((address / PAGE_SIZE), ppns, 1))
   {
     debug(USERPROCESS, "getnewpage(): RIP. asserting.\n");
     assert(false);
