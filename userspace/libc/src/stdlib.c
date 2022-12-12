@@ -1,6 +1,7 @@
 #include "stdlib.h"
 #include "pthread.h"
 #include "nonstd.h"
+#include "string.h"
 #include "stdio.h"
 
 metadata* head = NULL;
@@ -14,7 +15,7 @@ metadata* add_block(size_t size_sbrk)
   if ((long) size_sbrk < 0)
     return NULL;
   new_mem_void = sbrk(size_sbrk);
-  printf("got %p from sbrk\n", new_mem_void);
+ // printf("got %p from sbrk\n", new_mem_void);
   if(new_mem_void == (void*)-1)
   {
       //new_mem_void = sbrk(0);
@@ -52,14 +53,31 @@ void merge(metadata* first_block, metadata* second_block){
   first_block->size += second_block->size + sizeof(metadata);
 }
 
-int check_next_block(void* user_start, size_t size){
-  char* user_start_c = user_start;
-  metadata* this_meta = (metadata*) (user_start_c - sizeof(metadata));
-  if (this_meta->magic_number != MAGIC_NUMBER)
-  {
-    printf("invalid metadata or didnt find block!\n");
+int check_next_block(void* ptr, size_t size){
+  metadata* this_meta = 0;
+  if (head == 0)
+    return -1;
+  metadata* iter = head;
+  do {
+    if(iter->user_start == ptr)
+    {
+      if(iter->free)
+        return(-1);
+      this_meta = iter; 
+    }
+    if(iter->magic_number != MAGIC_NUMBER)
+      exit(-1);
+    if (iter->free && iter->next != NULL && iter->next->free)
+      merge(iter, iter->next);
+    iter = iter->next;
+  } while (iter != NULL);
+  
+  if(!this_meta)
     return(-1);
-  }
+  
+  if (this_meta->magic_number != MAGIC_NUMBER)
+    exit(-1);
+  
   if (size < this_meta->size)
   {
     this_meta = split(this_meta, size);
@@ -73,7 +91,7 @@ int check_next_block(void* user_start, size_t size){
   {
     int blocks_to_add = 0;
     size_t size_so_far = this_meta->size;
-    metadata* iter = this_meta;
+    iter = this_meta;
     while (iter->next != NULL && iter->next->free == 1)
     {
       iter = iter->next;
@@ -90,7 +108,7 @@ int check_next_block(void* user_start, size_t size){
       }
       return 1;
     }
-    return 0;
+    return this_meta->size;
   }
 }
 
@@ -138,7 +156,7 @@ void *malloc(size_t size)
   metadata* iter = head;
   if (head == NULL)
   {
-    printf("head is 0 so i ll get a block..\n");
+   // printf("head is 0 so i ll get a block..\n");
     if((size + sizeof(metadata)) % PAGE_SIZE_US == 0)
       this_block = add_block(size + sizeof(metadata));
     else
@@ -155,7 +173,7 @@ void *malloc(size_t size)
       }
     }
     head = this_block;
-    printf("set head to %p and now leaving..\n", head);
+   // printf("set head to %p and now leaving..\n", head);
   }
   else 
   {
@@ -214,7 +232,7 @@ void *malloc(size_t size)
     }
   }
   //void* addr = sbrk(0);fs
-  printf("sucessfully leaving malloc!\n");
+ // printf("sucessfully leaving malloc!\n");
   pthread_spin_unlock(&memory_lock);
   return this_block->user_start;
 }
@@ -313,11 +331,13 @@ void *realloc(void *ptr, size_t size)
   void* ret_ptr = ptr;
   //exits if ptr is invalid
   int ret = check_next_block(ptr, size); 
-  if(ret == 0)
+  if(ret != 1)
   {
     //seems like we need a new block
-    free(ptr);
+    //printf("[realloc] need to copy mem");
     ret_ptr = malloc(size);
+    memcpy(ret_ptr, ptr, ret);
+    free(ptr);
   }
   else if (ret == -1)
     return NULL;
