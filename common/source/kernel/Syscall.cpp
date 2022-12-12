@@ -6,6 +6,7 @@
 #include "VfsSyscall.h"
 #include "UserProcess.h"
 #include "ProcessRegistry.h"
+#include "PageManager.h"
 #include "File.h"
 #include "../../../userspace/libc/include/time.h"
 #include "umultimap.h"
@@ -313,7 +314,7 @@ int Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, si
   debug(SYSCALL, "Syscall::pthread_create(thread = %lx, attr = %lx, start_routine = %lx, arg = %lx, wrapper = %lx) called\n", thread, attr, start_routine, arg, wrapper);
   assert(currentThread->getType() == Thread::TYPE::USER_THREAD && "how tf did that happen?");
   // could be dangerous but we have NO locks here...
-
+  ustl::queue<size_t> ppns;
   // handle joinstate. standard is joinable
   int joinstate = PTHREAD_CREATE_JOINABLE;
   if(attr >= 0x1000)
@@ -325,24 +326,30 @@ int Syscall::pthread_create(size_t thread, size_t attr, size_t start_routine, si
       return -1;
   }
   
+  PageManager::instance()->allocPagesAndAddQueue(4, &ppns);
   // create thread
-  UserThread* newthread = currentUserProcess->createNewThread(start_routine, arg, wrapper, joinstate);
+  UserThread* newthread = currentUserProcess->createNewThread(start_routine, arg, wrapper, &ppns, joinstate);
   debug(SYSCALL, "Syscall::pthread_create returns thread with tid: [%ld]\n", newthread->getTID());
 
   // check thread creation
   if(newthread == 0)
+  {
+    PageManager::instance()->freeRestOfPages(&ppns);
     return -1;
+  }
 
   currentUserProcess->lockThreadMutex();
   if (currentUserProcess->checkKill())
   {
     newthread->reDirectToDeath();
+    PageManager::instance()->freeRestOfPages(&ppns);
     currentUserProcess->unLockThreadMutex();
     return -1;
   }
   currentUserProcess->unLockThreadMutex();
   
   // success
+  PageManager::instance()->freeRestOfPages(&ppns);
   *(size_t*)thread = newthread->getTID();
   return 0;
 }
@@ -617,12 +624,19 @@ int Syscall::execv(const char * user_path, char *const user_argv[])
 {
   char*  path = (char*)user_path;
   char** argv = (char**)user_argv;
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(5, &ppns);
+  
   debug(SYSCALL, "execv() checking path.\n");
   if(!isExecPathValid(path))
+  {
+    PageManager::instance()->freeRestOfPages(&ppns);
     return -1;
+  }
 
-  int ret = ProcessRegistry::instance()->execv(path, argv);
+  int ret = ProcessRegistry::instance()->execv(path, argv, &ppns);
   debug(SYSCALL, "execProcess returned %d\n", ret);
+  PageManager::instance()->freeRestOfPages(&ppns);
   return ret;
 }
 
@@ -736,17 +750,22 @@ size_t Syscall::clock()
 
 int Syscall::brk(size_t end_data_segment)
 {
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(3, &ppns);
+
   if (end_data_segment < currentUserProcess->getInitPBreak() || end_data_segment > END_OF_HEAP)
   {
+    PageManager::instance()->freeRestOfPages(&ppns);
     return -1;
   }
   currentUserProcess->lockPBreak();
   
   if (end_data_segment < currentUserProcess->getLoader()->getPBreak())
-    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), end_data_segment);
+    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), end_data_segment, &ppns);
   
   currentUserProcess->getLoader()->setPBreak(end_data_segment);
   currentUserProcess->unlockPBreak();
+  PageManager::instance()->freeRestOfPages(&ppns);
   return 0;
 }
 
@@ -756,20 +775,24 @@ int Syscall::brk(size_t end_data_segment)
  */
 size_t Syscall::sbrk(int increment)
 {
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(3, &ppns);
   currentUserProcess->lockPBreak();
   size_t curbreak = currentUserProcess->getLoader()->getPBreak();
   size_t new_brk = curbreak + increment;
   if (new_brk < currentUserProcess->getInitPBreak() || new_brk > END_OF_HEAP)
   {
+    PageManager::instance()->freeRestOfPages(&ppns);
     currentUserProcess->unlockPBreak();
     return -1;
   }
 
   if (new_brk < currentUserProcess->getLoader()->getPBreak())
-    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), new_brk);
+    currentUserProcess->checkBrkFree(currentUserProcess->getLoader()->getPBreak(), new_brk, &ppns);
   
   currentUserProcess->getLoader()->setPBreak(new_brk);
   currentUserProcess->unlockPBreak();
+  PageManager::instance()->freeRestOfPages(&ppns);
   debug(USERPROCESS, "Sbrk: break returned: %p and not i set it to %lx...\n", (void*) curbreak, new_brk);
   return curbreak;
 }

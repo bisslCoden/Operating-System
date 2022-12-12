@@ -1,6 +1,5 @@
 #include "ProcessRegistry.h"
 #include "UserProcess.h"
-#include "UserThread.h"
 #include "kprintf.h"
 #include "Console.h"
 #include "Loader.h"
@@ -52,8 +51,12 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setChildStatus(0);
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(4, &ppns);
 
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th);
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th, &ppns);
+
+  PageManager::instance()->freeRestOfPages(&ppns);
 
   //assert(first_thread && "UserThread constructor failed");
   if (returnto_th != 0)
@@ -350,7 +353,7 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate = PTHREAD_CREATE_JOINABLE)
+UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, ustl::queue<size_t>* ppns, int32 joinstate = PTHREAD_CREATE_DETACHED)
 {
   UserThread* thread = 0;
   size_t return_to = 6;
@@ -362,7 +365,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   }
   threads_lock_.release();
 
-  thread = new UserThread(wrapper, &return_to);
+  thread = new UserThread(wrapper, &return_to, ppns);
   
   threads_lock_.acquire();
 
@@ -447,7 +450,7 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   return false;
 }
 
-int UserProcess::execv(const char* path, char *const argv[], size_t argc)
+int UserProcess::execv(const char* path, char *const argv[], size_t argc, ustl::queue<size_t>* ppns)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
 
@@ -459,7 +462,9 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
     ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
 
     // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
-    bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
+    size_t loader_ppn = ppns->front();
+    ppns->pop();
+    bool setup_fail = !setupLoader(new_fd, loader_ppn) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc, ppns) == -1);
 
     if(setup_fail)
     {
@@ -499,6 +504,7 @@ bool UserProcess::setupLoader(ssize_t fd, size_t ppn)
   if(fd < 0)
   {
     debug(X_USERPROCESS, "setuploader(%ld) failed because... fd value\n", fd);
+    PageManager::instance()->freePPN(ppn);
     return false;
   }
 
@@ -648,7 +654,7 @@ void UserProcess::getHeapPage(size_t address, ustl::queue<size_t>* ppns)
   }
 }
 
-void UserProcess::checkBrkFree(size_t brk_prev, size_t brk_now)
+void UserProcess::checkBrkFree(size_t brk_prev, size_t brk_now, ustl::queue<size_t>* ppns)
 {
   InvertedPageTable* IPT = InvertedPageTable::instance();
   size_t vpn_start, vpn_end;
@@ -659,9 +665,9 @@ void UserProcess::checkBrkFree(size_t brk_prev, size_t brk_now)
   for (size_t iter = vpn_start + 1; iter <= vpn_end; iter++)
   {
     ArchMemoryMapping m = loader_->arch_memory_.resolveMapping(iter);
-    if (m.pt[m.pti].present)
+    if (m.pml4[m.pml4i].present && m.pdpt[m.pdpti].pd.present && m.pd[m.pdi].pt.present && m.pt[m.pti].present)
     {
-      loader_->arch_memory_.unmapPage(iter);
+      loader_->arch_memory_.unmapPage(iter, ppns);
     }
   }
   IPT->unlockIPT();

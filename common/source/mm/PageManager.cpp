@@ -290,7 +290,7 @@ void PageManager::freeRestOfPages(ustl::queue<size_t>* ppns)
 
 
 //LOCK ARCHMEM OUTSIDE!!
-bool PageManager::checkForCow(size_t address)
+bool PageManager::checkForCow(size_t address, ustl::queue<int>* ppns)
 {
   debug(X_PAGEFAULT, "checkForCow(%lx) entered. will now checkAddressValid()\n", address);
   // setup archmem and checkAddressValid()
@@ -357,7 +357,7 @@ bool PageManager::checkForCow(size_t address)
   debug(X_PAGEFAULT, "seems like we re in cow\n");
   //this is for keeping correct locking convention
   
-  if(!current_archmem->checkforPMLCow(vpn))
+  if(!current_archmem->checkforPMLCow(vpn, ppns))
     assert(false && "something went wrong with cow");
 
   current_archmem->unlockArchMemory();

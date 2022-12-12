@@ -47,7 +47,7 @@ bool ArchMemory::unmapPage(uint64 virtual_page, ustl::queue<size_t>* ppns)
   ArchMemoryMapping m = resolveMapping(virtual_page);
 
   assert(m.page_ppn != 0 && m.page_size == PAGE_SIZE && m.pt[m.pti].present);
-  assert(checkforPMLCow(virtual_page, true) && "pmlcow didnt work for some reason...\n");
+  assert(checkforPMLCow(virtual_page, ppns, true) && "pmlcow didnt work for some reason...\n");
   //need to resolve again bc something might  have changed...
   m = resolveMapping(virtual_page);
 
@@ -171,10 +171,11 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
     // else
     // {
     m.pdpt_ppn = ppns->front();
+    free_if_fail.push(ppns->front());
     IPT->addRef(m.pdpt_ppn, my_proc, 0, 0, 3);
     ppns->pop();
     //}
-    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pdpt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pdpt_ppn);
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pdpt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, ppn, user_access, m.pdpt_ppn);
     insert<PageMapLevel4Entry>((pointer) m.pml4, m.pml4i, m.pdpt_ppn, 1, 0, 1, 1);
   }
 
@@ -186,11 +187,12 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
     // else
     // {
     m.pd_ppn = ppns->front();
+    free_if_fail.push(ppns->front());
     IPT->addRef(m.pd_ppn, my_proc, 0, 0, 2);
     ppns->pop();
     //}
     
-    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pd_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pd_ppn);
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pd_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, ppn, user_access, m.pd_ppn);
     insert<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(m.pdpt_ppn), m.pdpti, m.pd_ppn, 1, 0, 1, 1);
   }
 
@@ -204,24 +206,31 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
     // else
     // {
     m.pt_ppn = ppns->front();
+    free_if_fail.push(ppns->front());
     IPT->addRef(m.pt_ppn, my_proc, 0, 0, 1);
     ppns->pop();
     // }
-    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, physical_page, user_access, m.pt_ppn);
+    debug(X_ARCHMEM, "mapPage(virtual_page = %zx, physical_page = %zx, user_access = %zx) m.pt_ppn was zero. set to ppn = %zx. inserting\n", virtual_page, ppn, user_access, m.pt_ppn);
     insert<PageDirPageTableEntry>(getIdentAddressOfPPN(m.pd_ppn), m.pdi, m.pt_ppn, 1, 0, 1, 1);
   }
 
   if (m.page_ppn == 0)
   {
-    bool worked = insert<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, ppns->front(), 0, 0, user_access, 1);
+    bool worked = insert<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, ppn, 0, 0, user_access, 1);
     if (worked)
+    {
       IPT->addRef(ppns->front(), my_proc, virtual_page);
-    
-    ppns->pop();
-    unlockArchMemory();
-    IPT->unlockIPT();
-    return worked;
+      IPT->unlockIPT();
+      unlockArchMemory();
+      return worked;
+    }
   }
+  while (!free_if_fail.empty())
+  {
+    ppns->push(free_if_fail.front());
+    free_if_fail.pop();
+  }
+  
   PageManager::instance()->freePPN(ppn);
   unlockArchMemory();
   IPT->unlockIPT();
@@ -618,7 +627,7 @@ size_t ArchMemory::cowPML(pointer entrypt,  size_t index, size_t level, ustl::qu
     {
       entry[index].present = 0;
       assert(!ppns->empty() && "no more pages? should not happen\n");
-      entry[index].page_ppn = allocDestAndCopySrc(entry[index].page_ppn, ppns->front);
+      entry[index].page_ppn = allocDestAndCopySrc(entry[index].page_ppn, ppns->front());
       ppns->pop();
       entry[index].cow = 0;
       entry[index].writeable = 1;

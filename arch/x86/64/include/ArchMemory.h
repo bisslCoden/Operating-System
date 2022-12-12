@@ -5,6 +5,7 @@
 #include "paging-definitions.h"
 #include "Mutex.h"
 #include "umap.h"
+#include "uqueue.h"
 
 //vpn to adress shift by 12 or divide through Page size
 //userbreak ends 0x8000000

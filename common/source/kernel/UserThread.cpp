@@ -19,7 +19,7 @@ UserThread::UserThread( UserProcess* process,
                         FileSystemInfo* working_dir, 
                         ustl::string name, 
                         uint32 terminal_number, 
-                        size_t* returnto) :
+                        size_t* returnto, ustl::queue<size_t>* ppns) :
   Thread( working_dir, name, USER_THREAD, 
           ProcessRegistry::instance()->createID()), 
   process_(process),
@@ -33,7 +33,7 @@ UserThread::UserThread( UserProcess* process,
   // loader and stack setup
   loader_ = process_->getLoader();
   mystack_.page_offset_ = process_->getRandomPageOffset();
-  setupStack();
+  setupStack(ppns);
 
   // check if process already got killed
   process_->lockThreadMutex();
@@ -72,7 +72,7 @@ UserThread::UserThread( UserProcess* process,
 
 // pthread_create
 UserThread::UserThread( size_t wrapper, 
-                        size_t* returnto, 
+                        size_t* returnto, ustl::queue<size_t>* ppns,
                         uint32_t terminal_number) :
   Thread( currentUserThread->working_dir_, currentUserThread->name_, USER_THREAD, 
           ProcessRegistry::instance()->createID()),
@@ -87,7 +87,7 @@ UserThread::UserThread( size_t wrapper,
   // loader and stack setup
   loader_ = process_->getLoader();
   mystack_.page_offset_ = getProcess()->getRandomPageOffset();
-  setupStack();
+  setupStack(ppns);
 
   // check if process already got killed
   process_->lockThreadMutex();
@@ -316,6 +316,8 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
   if (process_->checkKill() && actually_die)
     this->kill();
   
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(5, &ppns);
   // 
   DYING_ = true;
   my_pages_lock_.acquire();
@@ -324,11 +326,13 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
-    assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
+    assert(loader_->arch_memory_.unmapPage(my_pages_[i], &ppns) && "couldnt cleanup my own pages?");
   }
   InvertedPageTable::instance()->unlockIPT();
   loader_->arch_memory_.unlockArchMemory();
   my_pages_lock_.release();
+
+  PageManager::instance()->freeRestOfPages(&ppns);
 
   // kill now
   if(actually_die)
@@ -354,6 +358,7 @@ bool UserThread::setupStack(ustl::queue<size_t>* ppns)
  
   //size_t ppn_for_stack = PageManager::instance()->allocPPN();
   assert(vpn_for_stack && !ppns->empty());
+  size_t ppn_for_stack = ppns->front();
   if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppns, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
@@ -361,7 +366,7 @@ bool UserThread::setupStack(ustl::queue<size_t>* ppns)
     //PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
-  debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
+  //debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, pp);
 
   my_pages_lock_.acquire();
   my_pages_.push_back(vpn_for_stack);
@@ -392,6 +397,7 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo, ustl::queue<size_t>* ppns)
 {
   // size_t ppn = PageManager::instance()->allocPPN();
   debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
+  size_t ppn = ppns->front();
   if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppns, 1))
     return false;
   
@@ -482,7 +488,7 @@ int UserThread::execv(char* const argv[], size_t argc, ustl::queue<size_t>* ppns
 
   // setup stack 
   debug(X_USERTHREAD, "execv(): reuseStack() + setting user_registers_.\n");
-  assert(reuseStack(&mystack_));
+  assert(reuseStack(&mystack_, ppns));
   mystack_.UserMutex = USERMUTEX_INVALID; // why not place this in reuse stack?
   // set registers
   user_registers_->rsp = (size_t) mystack_.userstack_start_;

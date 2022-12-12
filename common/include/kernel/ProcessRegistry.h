@@ -3,6 +3,7 @@
 #include "Condition.h"
 #include "Mutex.h"
 #include "Thread.h"
+#include "uqueue.h"
 #include "UserProcess.h"
 #include "types.h"
 
@@ -81,7 +82,7 @@ class ProcessRegistry : public Thread
      * @param argv the args of the user.
      * @return int return value, -1 on fail, shouldn't return on success
      */
-    int execv(const char* path, char *const argv[]);
+    int execv(const char* path, char *const argv[], ustl::queue<size_t>* ppns);
     /**
      * @brief checks exec args
      * @return int that holds argc, -1 on error

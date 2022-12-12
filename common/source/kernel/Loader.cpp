@@ -16,7 +16,7 @@
 #include "File.h"
 #include "FileDescriptor.h"
 
-Loader::Loader(ssize_t fd, size_t pml4_ppn) : fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0), arch_memory_(pml4_ppn)
+Loader::Loader(ssize_t fd, size_t pml4_ppn) : arch_memory_(pml4_ppn), fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0)
 {
 }
 

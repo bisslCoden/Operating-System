@@ -73,7 +73,7 @@ class UserProcess
      * @param argv the arguments ARE CREATED WITH NEW, MUST BE DELETED IN UserThread::execv()
      * @param argc the argument count
      */
-    int execv(const char* path, char *const argv[], size_t argc);
+    int execv(const char* path, char *const argv[], size_t argc, ustl::queue<size_t>* ppns);
 
     /**
      * @brief call exit(), clear revunvalues_, clear offsets_, KILLED_ = false
@@ -125,7 +125,7 @@ class UserProcess
     void unlockPBreak() { PBreak_mutex_.release(); }
     void getHeapPage(size_t address, ustl::queue<size_t>* ppns);
     bool initPBreak();
-    void checkBrkFree(size_t brk_prev, size_t brk_now);
+    void checkBrkFree(size_t brk_prev, size_t brk_now, ustl::queue<size_t>* ppns);
 
 
    /**
@@ -149,7 +149,7 @@ class UserProcess
      * @param start_routine which thread should execute
      * @return size_t thread ID
      */
-    UserThread* createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate);
+    UserThread* createNewThread(size_t start_routine, size_t args, size_t wrapper, ustl::queue<size_t>* ppns, int32 joinstate);
 
     /**
      * @brief exits the whole userprogram if kill_last is true. 

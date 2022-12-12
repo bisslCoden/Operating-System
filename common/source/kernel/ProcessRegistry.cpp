@@ -7,7 +7,8 @@
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
 #include "offsets.h"
-
+#include "PageManager.h"
+#include "uqueue.h"
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
 
@@ -225,10 +226,12 @@ void ProcessRegistry::addProcToList(UserProcess* new_proc)
 }
 
 
-int ProcessRegistry::execv(const char* path, char *const argv[])
+int ProcessRegistry::execv(const char* path, char *const argv[], ustl::queue<size_t>* ppns)
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
+
   int argc = areExecArgsValid(argv);
+
 
   if(argc == -1)
   {
@@ -238,7 +241,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
   else if(argc == 0)
   {
     debug(X_PROCESS_REG, "execv() found no arguments. proceeding without args\n");
-    return currentUserThread->getProcess()->execv(path, NULL, 0);
+    return currentUserThread->getProcess()->execv(path, NULL, 0, ppns);
   }
   else if(argc > 0)
   {
@@ -261,7 +264,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
     }
 
     debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
-    return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
+    return currentUserThread->getProcess()->execv(path, kernel_argv, argc, ppns);
   }
 
   assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");

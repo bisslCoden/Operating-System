@@ -64,7 +64,7 @@ class UserThread : public Thread
      * @param terminal_number the terminal to run in (default 0)
      *
      */
-    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t* returnto);
+    UserThread(UserProcess* process_, FileSystemInfo* working_dir, ustl::string name, uint32 terminal_number, size_t* returnto, ustl::queue<size_t>* ppns);
     
     /**
      * @brief Construct a new User Thread object for pthread_create()
@@ -73,7 +73,7 @@ class UserThread : public Thread
      * @param page_offset offset for stack location
      * @param terminal_number the terminal to run in (default 0)
      */
-    UserThread(size_t wrapper, size_t* returnto, uint32_t terminal_number = 0);
+    UserThread(size_t wrapper, size_t* returnto, ustl::queue<size_t>* ppns, uint32_t terminal_number = 0);
 
     /**
      * @brief Construct a new User Thread object for fork()
@@ -114,7 +114,7 @@ class UserThread : public Thread
      * @param argc the argument count.
      * @return error return values
      */
-    int execv(char* const argv[], size_t argc, size_t ppn);
+    int execv(char* const argv[], size_t argc, ustl::queue<size_t>* ppns);
 
     void signalExec()                 { exec_wait_.signal();}
     void waitExec()                   { exec_wait_.wait();}
