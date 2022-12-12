@@ -1,6 +1,7 @@
 #include "InvertedPageTable.h"
 #include "debug.h"
 #include "ProcessRegistry.h"
+#include "uqueue.h"
 #include "PageManager.h"
 
 InvertedPageTable IPT;
@@ -246,6 +247,8 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   IPT_[page_1].progs_mappings.size(), IPT_[page_2].progs_mappings.size());
  
   bool prog_safe = false;
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(3, &ppns);
   while (!prog_safe)
   {
     lockIPT();
@@ -316,7 +319,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
             assert(false);
           
           ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
-          assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
+          assert(archmem->checkforPMLCow(prog.second, &ppns, true) && "somthing not present shouldnt happen on lv0");
           m = archmem->resolveMapping(prog.second);
           PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
           pt_src[m.pti].writeable = 0;
@@ -332,7 +335,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           assert(false);
         
         ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
-        assert(archmem->checkforPMLCow(prog.second, true) && "somthing not present shouldnt happen on lv0");
+        assert(archmem->checkforPMLCow(prog.second, &ppns, true) && "somthing not present shouldnt happen on lv0");
         m = archmem->resolveMapping(prog.second);
         PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pt_ppn);
         pt_src[m.pti].writeable = 0;
@@ -355,7 +358,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
           if (!prog.first->getLoader())
             assert(false);
           ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
-          ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_1, level);
+          ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_1, &ppns, level);
           assert(ppn_index.first != 0);
           debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %ld and my index at %ld were on page 1\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
        
@@ -388,7 +391,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
         if (!prog.first->getLoader())
           assert(false);
         ArchMemory* archmem = &(prog.first->getLoader()->arch_memory_);
-        ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_2, level);
+        ustl::pair<size_t, size_t> ppn_index = archmem->cowUntil(page_2, &ppns, level);
         assert(ppn_index.first != 0);
         debug(DEDUBLI_THREAD, "Proc: [%ld] pml is on %lx and my index at %ld were on page 2\n",prog.first->getPID(), ppn_index.first, ppn_index.second);
         switch (level)
@@ -423,6 +426,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     PageManager::instance()->freePPN(page_2);
     ProcessRegistry::instance()->unlockMultArchmem(progs);
     unlockIPT();
+    PageManager::instance()->freeRestOfPages(&ppns);
     return true;
   }
   else
@@ -440,6 +444,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     
     ProcessRegistry::instance()->unlockMultArchmem(progs);
     unlockIPT();
+    PageManager::instance()->freeRestOfPages(&ppns);
     return false;
   }
 }

@@ -141,7 +141,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   else
   {
     // the page-fault seems to be faulty, print out the thread stack traces
-    PageManager::instance()->freeRestOfPages(&ppns);
+    // PageManager::instance()->freeRestOfPages(&ppns);
     ArchThreads::printThreadRegisters(currentThread, true);
     currentThread->printBacktrace(true);
     if (currentThread->loader_)

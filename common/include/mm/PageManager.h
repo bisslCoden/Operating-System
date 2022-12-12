@@ -73,7 +73,7 @@ class PageManager
      * @return true if Pagefault could be handled correctly 
      * @return false else
      */
-    bool checkForCow(size_t address, ustl::queue<int>* ppns);
+    bool checkForCow(size_t address, ustl::queue<size_t>* ppns);
 
   private:
     /**

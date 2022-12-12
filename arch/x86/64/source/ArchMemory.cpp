@@ -219,7 +219,7 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
     bool worked = insert<PageTableEntry>(getIdentAddressOfPPN(m.pt_ppn), m.pti, ppn, 0, 0, user_access, 1);
     if (worked)
     {
-      IPT->addRef(ppns->front(), my_proc, virtual_page);
+      IPT->addRef(ppn, my_proc, virtual_page);
       IPT->unlockIPT();
       unlockArchMemory();
       return worked;
@@ -231,7 +231,7 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
     free_if_fail.pop();
   }
   
-  PageManager::instance()->freePPN(ppn);
+  //PageManager::instance()->freePPN(ppn);
   unlockArchMemory();
   IPT->unlockIPT();
   return false;

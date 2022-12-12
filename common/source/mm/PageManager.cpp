@@ -290,7 +290,7 @@ void PageManager::freeRestOfPages(ustl::queue<size_t>* ppns)
 
 
 //LOCK ARCHMEM OUTSIDE!!
-bool PageManager::checkForCow(size_t address, ustl::queue<int>* ppns)
+bool PageManager::checkForCow(size_t address, ustl::queue<size_t>* ppns)
 {
   debug(X_PAGEFAULT, "checkForCow(%lx) entered. will now checkAddressValid()\n", address);
   // setup archmem and checkAddressValid()
