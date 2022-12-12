@@ -107,6 +107,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       currentUserProcess->lockPBreak();
       if (address <= currentUserProcess->getLoader()->getPBreak())
       {
+        debug(PAGEFAULT, "looks like a heap pagefault!\n");
         currentUserProcess->getHeapPage(address);
         currentUserProcess->unlockPBreak();
         currentUserProcess->unLockThreadMutex();

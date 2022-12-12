@@ -624,6 +624,19 @@ void UserProcess::getHeapPage(size_t address)
   
   if (checkKill())
     return;
+  
+  InvertedPageTable::instance()->lockIPT();
+  loader_->arch_memory_.lockArchMemory();
+  ArchMemoryMapping m = loader_->arch_memory_.resolveMapping(address / PAGE_SIZE);
+  if (m.pt[m.pti].present)
+  {
+    debug(USERPROCESS, "Page already present!\n");
+    InvertedPageTable::instance()->unlockIPT();
+    loader_->arch_memory_.unlockArchMemory();
+    return;
+  }
+  debug(USERPROCESS, "Page NOT present: getting a new one!\n");
+  
   size_t ppn = PageManager::instance()->allocPPN();
   if (!loader_->arch_memory_.mapPage((address / PAGE_SIZE), ppn, 1))
   {

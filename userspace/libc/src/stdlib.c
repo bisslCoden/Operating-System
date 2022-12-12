@@ -47,6 +47,54 @@ metadata* split(metadata* free_block, size_t size){
   return free_block;
 }
 
+void merge(metadata* first_block, metadata* second_block){
+  first_block->next = second_block->next;
+  first_block->size += second_block->size + sizeof(metadata);
+}
+
+int check_next_block(void* user_start, size_t size){
+  char* user_start_c = user_start;
+  metadata* this_meta = (metadata*) (user_start_c - sizeof(metadata));
+  if (this_meta->magic_number != MAGIC_NUMBER)
+  {
+    printf("invalid metadata or didnt find block!\n");
+    return(-1);
+  }
+  if (size < this_meta->size)
+  {
+    this_meta = split(this_meta, size);
+    return 1;
+  }
+  else if (size == this_meta->size)
+  {
+    return 1;
+  }
+  else
+  {
+    int blocks_to_add = 0;
+    size_t size_so_far = this_meta->size;
+    metadata* iter = this_meta;
+    while (iter->next != NULL && iter->next->free == 1)
+    {
+      iter = iter->next;
+      size_so_far += iter->size + sizeof(metadata);
+      blocks_to_add++;
+      if (size_so_far >= size)
+        break;
+    }
+    if (size_so_far >= size)
+    {
+      for (int i = 0; i < blocks_to_add; i++)
+      {
+        merge(this_meta, this_meta->next);
+      }
+      return 1;
+    }
+    return 0;
+  }
+}
+
+
 void reduce_break(metadata* last_used, size_t total_size){
   if (last_used == NULL)
   {
@@ -73,10 +121,6 @@ void reduce_break(metadata* last_used, size_t total_size){
   return;
 }
 
-void merge(metadata* first_block, metadata* second_block){
-  first_block->next = second_block->next;
-  first_block->size += second_block->size + sizeof(metadata);
-}
 
 void *malloc(size_t size)
 {
@@ -245,16 +289,40 @@ void *calloc(size_t nmemb, size_t size)
   if (nmemb == 0 || size == 0)
     return NULL;
   user_return = (char*) malloc(nmemb * size);
-  for (size_t i = 0; i < nmemb * size; i++)
-  {
-    user_return[i] = 0;
-  }
+// dont have to zero out anything ... we have it anyway an it would break our on demand mapping
+//}  for (size_t i = 0; i < nmemb * size; i++)
+//   {
+//     user_return[i] = 0;
+  
   return (void*) user_return;
 }
 
 void *realloc(void *ptr, size_t size)
 {
-  return 0;
+  //params checking...
+  if (size == 0)
+  {
+    free(ptr);
+    return NULL;
+  }
+  if (ptr == 0)
+  {
+    return malloc(size);
+  }
+  
+  void* ret_ptr = ptr;
+  //exits if ptr is invalid
+  int ret = check_next_block(ptr, size); 
+  if(ret == 0)
+  {
+    //seems like we need a new block
+    free(ptr);
+    ret_ptr = malloc(size);
+  }
+  else if (ret == -1)
+    return NULL;
+
+  return ret_ptr;
 }
 
 
