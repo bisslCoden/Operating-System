@@ -248,7 +248,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
  
   bool prog_safe = false;
   ustl::queue<size_t> ppns;
-  PageManager::instance()->allocPagesAndAddQueue(3, &ppns);
+  PageManager::instance()->allocPagesAndAddQueue(IPT_[page_1].progs_mappings.size() * 3 + IPT_[page_2].progs_mappings.size() * 3, &ppns);
   while (!prog_safe)
   {
     lockIPT();
@@ -256,11 +256,13 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     if (IPT_.find(page_1) == IPT_.end() || IPT_.find(page_2) == IPT_.end())
     {
       unlockIPT();
+      PageManager::instance()->freeRestOfPages(&ppns);
       return false;
     }
     else if(IPT_[page_1].page_map_level != IPT_[page_2].page_map_level)
     {
       unlockIPT();
+      PageManager::instance()->freeRestOfPages(&ppns);
       return false;
     }
     for (auto prog : IPT_[page_1].progs_mappings)

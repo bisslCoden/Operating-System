@@ -293,6 +293,7 @@ void UserThread::sendCancelRequest()
 
 void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
 {
+  process_->lockThreadMutex();
   if(process_->checkKill())
     return;
   my_pages_lock_.acquire();
@@ -306,6 +307,7 @@ void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
   }
   my_pages_.push_back(adress / PAGE_SIZE);
   my_pages_lock_.release();
+  process_->unLockThreadMutex();
   return;
 }
 
@@ -332,6 +334,7 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
   loader_->arch_memory_.unlockArchMemory();
   my_pages_lock_.release();
 
+  debug(USERTHREAD, "now freeing the %ld pages i didnt need\n", ppns.size());
   PageManager::instance()->freeRestOfPages(&ppns);
 
   // kill now

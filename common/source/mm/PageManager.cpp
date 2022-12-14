@@ -258,6 +258,8 @@ void PageManager::allocPagesAndAddQueue(size_t num_pages, ustl::queue<size_t>* p
     ppn = allocPPN();
     ppns->push(ppn);
   }
+  debug(X_PAGEMANAGER, "alloced %ld pages as asked (%ld)\n", ppns->size(), num_pages);
+  assert(ppns->size() == num_pages && "couldnt get all pages needed....\n");
 }
 
 void PageManager::freeRestOfPages(ustl::queue<size_t>* ppns)
