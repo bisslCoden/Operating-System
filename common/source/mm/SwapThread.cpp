@@ -206,7 +206,7 @@ uint32 SwapThread::swapOut()
 {
   InvertedPageTable* ipt = InvertedPageTable::instance();
   // PageManager* pm = PageManager::instance();
-  SwapManager* sm = SwapManager::instance();
+  //SwapManager* sm = SwapManager::instance();
   
   ipt->lockIPT();
   
@@ -223,7 +223,8 @@ uint32 SwapThread::swapOut()
 
   // create swap page number, write to swap disk
   uint32 swap_id = swap_cnt_++;
-  sm->writeToDisk(swap_id);
+  //use new function!
+  //sm->writeToDisk(swap_id);
 
   // unlock archmems
 

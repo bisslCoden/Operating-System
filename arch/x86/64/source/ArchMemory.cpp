@@ -57,18 +57,39 @@ bool ArchMemory::unmapPage(uint64 virtual_page, ustl::queue<size_t>* ppns)
   // free if counter not in map or after descresing counter = 0.
   int ret = IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
   
-  if(ret == 0)
+  if (!pt_ident[m.pti].swap)
   {
-    debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
-    PageManager::instance()->freePPN(m.page_ppn);
-  }
-  else if(ret == (int) WAS_LAST)
-  {
-    IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
-    PageManager::instance()->freePPN(m.page_ppn);
+    if(ret == 0)
+    {
+      debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+      PageManager::instance()->freePPN(m.page_ppn);
+    }
+    else if(ret == (int) WAS_LAST)
+    {
+      IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
+      PageManager::instance()->freePPN(m.page_ppn);
+    }
+    else
+      debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
   }
   else
-    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL FREE freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+  {
+   if(ret == 0)
+    {
+      debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+      //PageManager::instance()->freePPN(m.page_ppn);
+      //REQUEST TO SWAPTHREAD
+    }
+    else if(ret == (int) WAS_LAST)
+    {
+      IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
+      //PageManager::instance()->freePPN(m.page_ppn);
+      //REQUEST TO SWAPTHREAD
+    }
+    else
+      debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL freeform device freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
+    
+  }
   
   //pm->unlockIPT();
   ((uint64*)m.pt)[m.pti] = 0; // for easier debugging
@@ -291,6 +312,30 @@ ArchMemory::~ArchMemory()
                   }
                   //not sure if i can do thiss.... (I really dont wanna cow everything just for deleting right after)
                   //pt[pti].present = 0;
+                }
+                else if (pt[pti].swap)
+                {
+                  size_t swID = pt[pti].page_ppn;
+                  size_t vpn = (pml4i << 39) + (pdpti << 30) + (pdi << 21) + (pti << 12);
+                  vpn = vpn >> 12;
+                  ret = IPT->deleteRef(swID, my_proc, vpn);
+                  if(ret == 0)
+                  {
+                    debug(X_USERPROCESS, "[%ld] ~ArchMemory(): will try to free swpn(spn = %lx)\n", my_proc->getPID(), swID);
+                   // PageManager::instance()->freePPN(ppn);
+                   //REQUEST TO SWAPTHREAD
+                  }
+                  else if(ret == (int) WAS_LAST)
+                  {
+                    IPT->deleteRef(swID, my_proc, vpn);
+                    //PageManager::instance()->freePPN(ppn);
+                    //REQUEST TO SWAPTHREAD
+                  }
+                  else
+                  {
+                    debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT clear swpn from disk(spn = %lx)\n", currentThread->getTID(), swID);
+                  //  pm->unlockIPT();
+                  }
                 }
               }
               ret = IPT->deleteRef(pd[pdi].pt.page_ppn, my_proc, 0, 1);

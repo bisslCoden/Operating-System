@@ -10,18 +10,13 @@
 
 #define DEVICE_NUMBER 3
 
-struct Swap_Info
-{
-  ustl::map<ArchMemory*, size_t> arch_memory_vpn_;
-  size_t pml_;
-};
 
 class SwapManager
 {
 public:
   SwapManager();
 
-  virtual ~SwapManager() {};
+  ~SwapManager() {};
 
   static SwapManager* instance();
 
@@ -43,27 +38,32 @@ public:
 
 
 
-  void writePageContent(size_t swap_ID, size_t ppn);
+  //void writePageContent(size_t swap_ID, size_t ppn);
+  size_t allocSPN();
+  void freeSPN(size_t spn);
 
-  size_t writeToDisk(size_t ppn);
+  void writeToDisk(uint32 swap_ID, uint32 ppn);
 
-  void deleteFromDisk(size_t swap_pn);
+  bool readFromDisk(uint32 swap_ID, uint32 ppn);
+
+
+  bool deleteFromDisk(uint32 swap_ID);
 
   /**
    * checks if the page number is in the swap_map_
    * @param swap_pn
    * @return true if pn in map, false if not
    */
-  bool checkPresence(size_t swap_pn);
+  //bool checkPresence(size_t swap_pn);
 
-  void getPageContent(size_t swap_ID, char* buffer);
+  //void getPageContent(size_t swap_ID, char* buffer);
 
   /**
    * adds a page to the swap_map_ with all its information, cow handling included
    * @param vpn
    * @param arch_memory
    */
-  void addEntry(size_t swap_pn, size_t vpn, ArchMemory* arch_memory);
+  //void addEntry(size_t swap_pn, size_t vpn, ArchMemory* arch_memory);
 
   /**
    * removes a page from the swap_map_, cow handling included
@@ -71,7 +71,7 @@ public:
    * @param vpn
    * @param arch_memory
    */
-  void deleteEntry(size_t swap_pn, size_t vpn, ArchMemory* arch_memory);
+ // void deleteEntry(size_t swap_pn, size_t vpn, ArchMemory* arch_memory);
 
 
 private:
@@ -80,7 +80,7 @@ private:
   /**
    * swap_map_ is a multimap, used to store information for swapping
    */
-  ustl::map<size_t, Swap_Info> swap_map_;
+  ustl::map<uint32, size_t> swapID_to_spn_map_;
   
   BDVirtualDevice* device_;
   size_t max_blocks_;
