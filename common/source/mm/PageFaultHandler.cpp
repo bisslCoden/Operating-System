@@ -10,6 +10,7 @@
 #include "PageManager.h"
 #include "ArchMemory.h"
 #include "uqueue.h"
+#include "SwapThread.h"
 
 extern "C" void arch_contextSwitch();
 
@@ -70,7 +71,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   ArchThreads::printThreadRegisters(currentThread, false);
   
 
-  
+  //test
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
     ustl::queue<size_t> ppns;
@@ -91,6 +92,11 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       PageManager::instance()->freeRestOfPages(&ppns);
      // return;
+    }
+    else if(currentThread->loader_->arch_memory_.checkSwap(address)) // swap
+    {
+      debug(PAGEFAULT, "checkSwap() resolved! returning from handlePageFault8)\n");
+      return; // return?
     }
     else if (switch_to_us && address > END_OF_STACKS)
     {

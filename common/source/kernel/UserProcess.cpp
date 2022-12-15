@@ -170,7 +170,7 @@ UserProcess::~UserProcess()
   {
     delete loader_;
   }
-  Scheduler::instance()->printThreadList();
+  //Scheduler::instance()->printThreadList();
   loader_ = 0;
 
   debug(X_USERPROCESS, "annoying but test if vfs is prob\n");

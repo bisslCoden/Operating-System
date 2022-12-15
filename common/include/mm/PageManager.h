@@ -9,6 +9,7 @@
 #include "UserProcess.h"
 #include "InvertedPageTable.h"
 #include "uqueue.h"
+#include "SwapThread.h"
 
 #define DYNAMIC_KMM (0) // Please note that this means that the KMM depends on the page manager
 // and you will have a harder time implementing swapping. Pros only!

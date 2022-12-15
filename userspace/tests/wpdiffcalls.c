@@ -10,14 +10,10 @@
 int main(int argc, char** argv)
 {
   printf("Started the task, my pid: %d\n", getpid());
-  printf("waitpid without fork\n");
-  printf("0\n");
-  int p_id = waitpid(1, NULL, NULL);
-  printf("Return_value %d last pid: %d \n", p_id, getpid());
   int pid = fork();
   pid = fork();
   printf("1\n");
-  p_id = waitpid(pid, NULL, NULL);
+  int p_id = waitpid(pid, NULL, NULL);
   printf("Return_value %d last pid: %d \n", p_id, getpid());
 
   printf("2\n");

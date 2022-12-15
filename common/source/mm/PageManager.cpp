@@ -215,8 +215,10 @@ uint32 PageManager::allocPPN(uint32 page_size)
 
   if (found == 0)
   {
-    assert(false && "PageManager::allocPPN: Out of memory / No more free physical pages");
+    debug(X_PAGEMANAGER, "allocPPN() said found == 0. requestSwapOut()... TID [%ld] already feeling tired\n", currentThread->getTID());
+    SwapThread::instance()->requestSwapOutAndSleep(&found);
   }
+  assert(found && "PageManager::allocPPN: SwapThread's unlimited power and magical capabilities could not help that alloc");
 
   const char* page_ident_addr = (const char*)ArchMemory::getIdentAddressOfPPN(found);
   const char* page_modified = (const char*)memnotchr(page_ident_addr, 0xFF, page_size);

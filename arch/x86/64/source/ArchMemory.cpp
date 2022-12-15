@@ -740,3 +740,40 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, ustl::queue<size_t>*
 
 
 
+
+// -----------------------------------------------------------------------------
+//                                  swapping
+// -----------------------------------------------------------------------------
+
+bool ArchMemory::checkSwap(size_t address)
+{
+  // swap? 
+  lockArchMemory();
+  ArchMemoryMapping m = resolveMapping(address/PAGE_SIZE);
+  if(!m.pt || !m.pt[m.pti].swap)
+  {
+    // !swap
+    unlockArchMemory();
+    debug(X_ARCHMEM, "address: swap = 0.\n");
+    return false;
+  }
+  size_t ppn = m.pt[m.pti].page_ppn;
+  unlockArchMemory();
+
+  // swap
+  SwapThread::instance()->requestSwapInAndSleep(ppn);
+  return true;
+}
+
+
+bool ArchMemory::setPageToSwapOut()
+{
+  assert(false && "nonono");
+  return true;
+}
+
+bool ArchMemory::setPageToSwapIn()
+{
+  assert(false && "nonono");
+  return true;
+}

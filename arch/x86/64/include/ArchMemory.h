@@ -150,6 +150,22 @@ public:
   bool checkArchMemory(Thread* thread)  { return arch_memory_lock_.isHeldBy(thread);}
   void unlockArchMemory() { arch_memory_lock_.release(); }
   void setProcess(UserProcess* proc) { my_proc = proc; }
+
+
+
+
+
+  // ---------------------------------------------------------------------------
+  //                                 swapping
+  // ---------------------------------------------------------------------------
+
+  // checks swap-bits on physical pyge for given virtual address
+  bool checkSwap(size_t address);
+  // sets present = 0, swap = 1, ppn = swap_id
+  bool setPageToSwapOut();
+  // sets present = 1, swap = 0, ppn = ppn
+  bool setPageToSwapIn();
+
 private:
 /** 
  * Adds a page directory entry to the given page directory.
