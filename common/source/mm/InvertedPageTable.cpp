@@ -196,6 +196,7 @@ void InvertedPageTable::deduplicatePages()
         unlockIPT();
         if (checksum1 == checksum2)
         {
+          //Scheduler::instance()->printThreadList();
           debug(DEDUBLI_THREAD, "[deduplication found 2 equal pages!]\n");
           if(deduplicate(ddp1, ddp2))
             debug(DEDUBLI_THREAD, "deduplication of page %lx and page %lx worked\n", ddp1, ddp2);

@@ -93,12 +93,12 @@ void ProcessRegistry::processExit(UserProcess* user_proc)
   }
   else
   {
+    assert(false && "how did that process get removed already?");
     list_of_processes_lock_.release();
     return;
   }
   list_of_processes_lock_.release();
 
-    //assert(false && "how did that process get removed already?");
   counter_lock_.acquire();
 
   if (--progs_running_ == 0)
@@ -363,6 +363,15 @@ bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
   size_t count = 0;
   list_of_processes_lock_.acquire();
   ustl::map<size_t, UserProcess*>::iterator it; 
+  for (auto proc : procs)
+  {
+    if (list_of_processes_.find(proc.first->getPID()) == list_of_processes_.end())
+    {
+      list_of_processes_lock_.release();
+      debug(PROCESS_REG, "dangerous! will try to wait for proc thats now in here anymore\n");
+      return false;
+    }
+  }
   for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
   {
     if (procs.find(it->second) != procs.end())

@@ -45,6 +45,8 @@ public:
     void    unlockIPT()                { IPT_lock_.release(); }
     bool    checkIPT()                 { return IPT_lock_.isHeldBy(currentThread); }
 
+    Thread* whoHasLock() { return IPT_lock_.heldBy(); }
+
     //for Deduplication Thread
     void deduplicatePages();
     bool deduplicate(size_t page_1, size_t page_2);

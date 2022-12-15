@@ -575,8 +575,8 @@ size_t Syscall::pthread_join(size_t thread, void** value_ptr)
 
 size_t Syscall::pthread_self(){
 
-  if(currentUserProcess->getLoader()->printHeaders())
-    debug(X_USERPROCESS, "printing my sections worked!\n");
+  // if(currentUserProcess->getLoader()->printHeaders())
+  //   debug(X_USERPROCESS, "printing my sections worked!\n");
   return currentUserThread->getTID();
 }
 

@@ -160,8 +160,9 @@ UserProcess::~UserProcess()
 {
 
   debug(X_USERPROCESS, "PID [%ld]: destructor called by [%ld]\n", pid_, currentThread->getTID());
-  if(Scheduler::instance()->isCurrentlyCleaningUp())
-    Scheduler::instance()->yield();
+  ProcessRegistry::instance()->processExit(this);
+  // if(Scheduler::instance()->isCurrentlyCleaningUp())
+  //   Scheduler::instance()->yield();
   if (loader_ != 0)
   {
     delete loader_;
@@ -175,7 +176,6 @@ UserProcess::~UserProcess()
   delete working_dir_;
   working_dir_ = 0;
 
-  ProcessRegistry::instance()->processExit(this);
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
 }
 

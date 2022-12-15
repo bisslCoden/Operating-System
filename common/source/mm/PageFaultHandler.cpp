@@ -75,22 +75,31 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   {
     ustl::queue<size_t> ppns;
     PageManager::instance()->allocPagesAndAddQueue(4, &ppns);
+    if (!currentUserProcess->testThreadMutex(currentThread))
+      currentUserProcess->lockThreadMutex();
+    
+    if (currentUserProcess->checkKill())
+    {
+      currentUserProcess->unLockThreadMutex();
+      PageManager::instance()->freeRestOfPages(&ppns);
+      return;
+    }
+    
     if (PageManager::instance()->checkForCow(address, &ppns))
     {
       debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
       PageManager::instance()->freeRestOfPages(&ppns);
-      return;
+     // return;
     }
     else if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");
-      currentUserProcess->lockThreadMutex();
       UserThread* stack_owner = 0;
       if((stack_owner = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
       {
         debug(PAGEFAULT, "seems like our currentthread just wants a new Page for someone!\n");
         stack_owner->getNewStackPage(address, &ppns);  
-        currentUserProcess->unLockThreadMutex();    
+        //currentUserProcess->unLockThreadMutex();    
       }
       else
       {
@@ -107,15 +116,14 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
       }
     }
     else if (address < END_OF_HEAP && (address > currentUserProcess->getInitPBreak()))
-    {
-      currentUserProcess->lockThreadMutex();
+    { 
       currentUserProcess->lockPBreak();
       if (address <= currentUserProcess->getLoader()->getPBreak())
       {
         debug(PAGEFAULT, "looks like a heap pagefault!\n");
         currentUserProcess->getHeapPage(address, &ppns);
         currentUserProcess->unlockPBreak();
-        currentUserProcess->unLockThreadMutex();
+        //currentUserProcess->unLockThreadMutex();
       }
       else
       {
@@ -136,6 +144,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     {
       currentThread->loader_->loadPage(address, &ppns);
     }
+    currentUserProcess->unLockThreadMutex();
     PageManager::instance()->freeRestOfPages(&ppns);
   }
   else

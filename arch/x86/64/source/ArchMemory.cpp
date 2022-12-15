@@ -499,10 +499,12 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
   if (!IPT->checkIPT())
     IPT->lockIPT();
   
-  ustl::map<UserProcess*, size_t> procs;
-  procs.emplace(my_proc, 0);
-  procs.emplace(child_proc, 0);
-  ProcessRegistry::instance()->lockMultArchmem(procs);
+  if (!checkArchMemory(currentThread))
+    lockArchMemory();
+  
+  if (!child_proc->getLoader()->arch_memory_.checkArchMemory(currentThread))
+    child_proc->getLoader()->arch_memory_.lockArchMemory();
+  
   IPTFlags* flags;
   
   PageMapLevel4Entry *pml4_src  = (PageMapLevel4Entry*) getIdentAddressOfPPN(page_map_level_4_);
@@ -593,7 +595,9 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
       }
     }
   }
-  ProcessRegistry::instance()->unlockMultArchmem(procs);
+  unlockArchMemory();
+  child_proc->getLoader()->arch_memory_.unlockArchMemory();
+  //ProcessRegistry::instance()->unlockMultArchmem(procs);
   IPT->unlockIPT();
 }
 

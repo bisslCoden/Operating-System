@@ -327,7 +327,14 @@ bool PageManager::checkForCow(size_t address, ustl::queue<size_t>* ppns)
   }
   current_archmem->unlockArchMemory();
 
+
   InvertedPageTable* IPT = InvertedPageTable::instance();
+  Thread* holder = IPT->whoHasLock();
+  if(holder)
+  {
+    debug(X_PAGEFAULT, "chances are high we re in cow.. now trying to lock ipt which is currently held by %s TID %ld\n", holder->getName(), 
+    holder->getTID());
+  }
   if (!IPT->checkIPT())
     IPT->lockIPT();
   
@@ -350,6 +357,7 @@ bool PageManager::checkForCow(size_t address, ustl::queue<size_t>* ppns)
   if (m.pt[m.pti].writeable && m.pt[m.pti].present && !m.pt[m.pti].cow)
   {
     //seems like everything is okay.....
+    debug(X_PAGEFAULT, "why did we get a pagefault here!? everything seems to be allright...\n");
     current_archmem->unlockArchMemory();
     IPT->unlockIPT();
     return true;

@@ -294,8 +294,8 @@ void UserThread::sendCancelRequest()
 void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
 {
   // process_->lockThreadMutex();
-  if(process_->checkKill())
-    return;
+  // if(process_->checkKill())
+  //   return;
   my_pages_lock_.acquire();
   //size_t new_page = PageManager::instance()->allocPPN();
   //debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
@@ -315,12 +315,18 @@ void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
 void UserThread::freeMyPagesAndDie(bool actually_die)
 {
   // kill now if KILLED_ is already true
-  if (process_->checkKill() && actually_die)
-    this->kill();
+
   
   ustl::queue<size_t> ppns;
   PageManager::instance()->allocPagesAndAddQueue(5, &ppns);
   // 
+  process_->threads_lock_.acquire();
+  if (process_->checkKill() && actually_die)
+  {
+    PageManager::instance()->freeRestOfPages(&ppns);
+    process_->threads_lock_.release();
+    this->kill();
+  }
   DYING_ = true;
   my_pages_lock_.acquire();
   InvertedPageTable::instance()->lockIPT();
@@ -333,6 +339,7 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
   InvertedPageTable::instance()->unlockIPT();
   loader_->arch_memory_.unlockArchMemory();
   my_pages_lock_.release();
+  process_->threads_lock_.release();
 
   debug(USERTHREAD, "now freeing the %ld pages i didnt need\n", ppns.size());
   PageManager::instance()->freeRestOfPages(&ppns);
