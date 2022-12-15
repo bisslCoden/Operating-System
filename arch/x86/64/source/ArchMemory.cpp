@@ -240,10 +240,8 @@ bool ArchMemory::mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 
 ArchMemory::~ArchMemory()
 {
   debug(X_ARCHMEM, "~ArchMemory() called. will now lock\n archmem, ");
+
   InvertedPageTable* IPT = InvertedPageTable::instance();
-  
-  if (!IPT->checkIPT())
-    IPT->lockIPT();
   
   lockArchMemory();
   int ret;
@@ -338,8 +336,9 @@ ArchMemory::~ArchMemory()
     }
   }
   PageManager::instance()->freePPN(page_map_level_4_);
+  debug(X_USERPROCESS, "sucessfully exiting archmem destructorrr\n");
   unlockArchMemory();
-  IPT->unlockIPT();
+  //IPT->unlockIPT();
 
 }
 
@@ -599,6 +598,7 @@ void ArchMemory::setCowToArchmemPages(ArchMemory &destination, UserProcess* chil
   child_proc->getLoader()->arch_memory_.unlockArchMemory();
   //ProcessRegistry::instance()->unlockMultArchmem(procs);
   IPT->unlockIPT();
+  debug(X_USERPROCESS, "sucessfully exiting setcowto!\n");
 }
 
 size_t ArchMemory::allocDestAndCopySrc(size_t ppn_src, size_t ppn_desti)

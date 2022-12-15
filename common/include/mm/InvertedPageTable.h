@@ -41,7 +41,8 @@ public:
     IPTFlags* getFlags(size_t ppn);
     
     //locking from outside
-    void    lockIPT()                  { IPT_lock_.acquire(); }
+    void    lockIPT()     {  IPT_lock_.acquire(); }
+          
     void    unlockIPT()                { IPT_lock_.release(); }
     bool    checkIPT()                 { return IPT_lock_.isHeldBy(currentThread); }
 

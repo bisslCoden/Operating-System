@@ -82,6 +82,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     {
       currentUserProcess->unLockThreadMutex();
       PageManager::instance()->freeRestOfPages(&ppns);
+      Syscall::pthread_exit((void*)-1);
       return;
     }
     

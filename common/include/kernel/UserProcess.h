@@ -9,6 +9,7 @@
 #include "uvector.h"
 #include "KernelSemaphore.h"
 #include "Loader.h"
+//#include "InvertedPageTable.h"
 
 #define currentUserProcess currentUserThread->getProcess()
 
@@ -165,7 +166,7 @@ class UserProcess
     bool checkRetValLock(Thread* thread)  { return returnvalue_lock_.isHeldBy(thread);}
 
     // threads_lock_.acquire();
-    void lockThreadMutex()                {threads_lock_.acquire();}
+    void lockThreadMutex();
     // threads_lock_.release();
     void unLockThreadMutex()              {threads_lock_.release();}
     // true if threads_lock_ was aquired by thread

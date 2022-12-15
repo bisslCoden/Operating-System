@@ -335,6 +335,7 @@ bool PageManager::checkForCow(size_t address, ustl::queue<size_t>* ppns)
     debug(X_PAGEFAULT, "chances are high we re in cow.. now trying to lock ipt which is currently held by %s TID %ld\n", holder->getName(), 
     holder->getTID());
   }
+  debug(X_PAGEFAULT, "will try to lock IPT now\n");
   if (!IPT->checkIPT())
     IPT->lockIPT();
   

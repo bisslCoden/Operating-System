@@ -37,7 +37,7 @@ Scheduler::Scheduler()
   rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
-  //addNewThread(&dedup_thread_);
+ //< addNewThread(&dedup_thread_);
 }
 
 uint32 Scheduler::schedule()
@@ -203,14 +203,14 @@ void Scheduler::printThreadList()
   lockScheduling();
   debug(SCHEDULER, "Scheduler::printThreadList: %zd Threads in List\n", threads_.size());
   for (size_t c = 0; c < threads_.size(); ++c)
-    debug(SCHEDULER,  "Scheduler::printThreadList: threads_[%zd]: %p  [%zd] %s with PID %ld, with state: [%s] called %s, us: %d\n", 
+    debug(SCHEDULER,  "Scheduler::printThreadList: threads_[%zd]: %p  [%zd] %s with PID %ld, with state: [%s] called %s, us: %d sleeps on %s\n", 
                       c,      
                       threads_[c],       
                       threads_[c]->getTID(), 
                       ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? "UserThread" : "KernelThread"),
                       ((threads_[c]->getType() == Thread::TYPE::USER_THREAD) ? ((UserThread*)currentThread)->getProcess()->getPID() : 0),
                       Thread::threadStatePrintable[threads_[c]->state_],
-                      threads_[c]->getName(), threads_[c]->switch_to_userspace_
+                      threads_[c]->getName(), threads_[c]->switch_to_userspace_, threads_[c]->state_ == Sleeping ? threads_[c]->lock_waiting_on_->getName() : "nothing"
                       );
   unlockScheduling();
 }

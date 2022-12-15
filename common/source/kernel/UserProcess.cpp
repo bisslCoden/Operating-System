@@ -9,7 +9,7 @@
 #include "PageManager.h"
 #include "ArchThreads.h"
 #include "offsets.h"
-#include "VfsSyscall.h"
+#include "InvertedPageTable.h"
 #include "Scheduler.h"
 
 //syscall alle binary pages printen
@@ -158,7 +158,10 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
 
 UserProcess::~UserProcess()
 {
-
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+  
+  if (!IPT->checkIPT())
+    IPT->lockIPT();
   debug(X_USERPROCESS, "PID [%ld]: destructor called by [%ld]\n", pid_, currentThread->getTID());
   ProcessRegistry::instance()->processExit(this);
   // if(Scheduler::instance()->isCurrentlyCleaningUp())
@@ -167,16 +170,26 @@ UserProcess::~UserProcess()
   {
     delete loader_;
   }
-  
+  Scheduler::instance()->printThreadList();
   loader_ = 0;
 
+  debug(X_USERPROCESS, "annoying but test if vfs is prob\n");
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
+  debug(X_USERPROCESS, "vfs isnt prob\n");
+
   delete working_dir_;
   working_dir_ = 0;
-
+  debug(X_USERPROCESS, "I SHOULD UNLOCK IPT RIGHT FUCKING NOW....\n");
+  IPT->unlockIPT();
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
+}
+
+void UserProcess::lockThreadMutex()                
+{ 
+  assert(!InvertedPageTable::instance()->checkIPT() && "this is the wrong locking ! never lock IPT firssst");
+  threads_lock_.acquire(); 
 }
 
 

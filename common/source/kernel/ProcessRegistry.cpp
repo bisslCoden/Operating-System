@@ -377,8 +377,10 @@ bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
     if (procs.find(it->second) != procs.end())
     {
       if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+      {
         it->second->getLoader()->arch_memory_.lockArchMemory();
-      count++;
+        count++;
+      }
     }
   }
   if (count != i_want)
@@ -388,9 +390,13 @@ bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
       if (procs.find(it->second) != procs.end())
       {
         if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+        {
           it->second->getLoader()->arch_memory_.unlockArchMemory();
+          count--;
+        }
       }
     }
+    assert(count == 0);
     list_of_processes_lock_.release();
     return false;
   }

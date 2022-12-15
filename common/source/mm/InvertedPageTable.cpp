@@ -237,6 +237,7 @@ size_t InvertedPageTable::computeChecksum(size_t* start)
 }
 
 
+
 bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
 {
  // lockIPT();
@@ -280,6 +281,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
       progs.emplace(prog);
     }
     //this means all progs are there and their archmems are locked <3
+    debug(DEDUBLI_THREAD, "now I ll try to get locks for %ld procs\n", progs.size());
     prog_safe = ProcessRegistry::instance()->lockMultArchmem(progs);
     if (!prog_safe)
     {
