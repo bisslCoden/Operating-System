@@ -13,6 +13,7 @@
 #include "umap.h"
 #include "ustring.h"
 #include "Lock.h"
+#include "SwapThread.h"
 
 ArchThreadRegisters *currentThreadRegisters;
 Thread *currentThread;
@@ -37,6 +38,7 @@ Scheduler::Scheduler()
   rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
+  addNewThread(SwapThread::instance());
  //< addNewThread(&dedup_thread_);
 }
 

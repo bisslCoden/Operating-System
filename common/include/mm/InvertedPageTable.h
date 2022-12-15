@@ -18,7 +18,7 @@ struct IPTFlags
 
 //0x446: proc2 -> WAS_LAST
 
-struct InvertedPageTableEntry
+struct IPTE
 {
     ustl::multimap<UserProcess*, size_t> progs_mappings;
     IPTFlags my_flags;
@@ -36,7 +36,9 @@ public:
     //NOTE: LOCK IPT BEFORE ANY OF THESE
     void    addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFlags* flags = 0, size_t pml = 0);
     size_t  deleteRef(size_t ppn, UserProcess* proc, size_t vpn, size_t pml = 0);
-    InvertedPageTableEntry* getEntry(size_t ppn);
+    IPTE* getEntry(size_t ppn);
+    bool addEntry(size_t page_number, IPTE entry);
+    bool deleteEntry(size_t page_number);
     
     IPTFlags* getFlags(size_t ppn);
     
@@ -56,7 +58,7 @@ public:
 private:
     static InvertedPageTable* instance_;
     Mutex IPT_lock_;
-    ustl::map<size_t, InvertedPageTableEntry> IPT_;
+    ustl::map<size_t, IPTE> IPT_;
     InvertedPageTable(InvertedPageTable const&);
 
 };

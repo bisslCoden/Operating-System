@@ -27,7 +27,7 @@ void InvertedPageTable::addRef(size_t ppn, UserProcess* proc, size_t vpn, IPTFla
   
   if (IPT_.find(ppn) == IPT_.end())
   {
-    InvertedPageTableEntry new_entry;
+    IPTE new_entry;
     if (flags)
       new_entry.my_flags = { flags->cow, flags->shared, flags->swapped };
     else
@@ -118,7 +118,7 @@ size_t InvertedPageTable::deleteRef(size_t ppn, UserProcess* proc, size_t vpn, s
   }
 }
 
-InvertedPageTableEntry* InvertedPageTable::getEntry(size_t ppn)
+IPTE* InvertedPageTable::getEntry(size_t ppn)
 {
   if (IPT_.find(ppn) != IPT_.end())
     return &IPT_[ppn];
@@ -456,3 +456,24 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
 
 
 
+//------------------------------------------------------------------------------------------------
+//                                      SwapThread Functions
+//------------------------------------------------------------------------------------------------
+
+
+bool InvertedPageTable::addEntry(size_t page_number, IPTE entry)
+{
+  if (IPT_.find(page_number) != IPT_.end())
+    return false;
+ 
+  IPT_.insert(ustl::make_pair(page_number, entry));
+  return true;
+}
+
+bool InvertedPageTable::deleteEntry(size_t page_number)
+{
+  if (IPT_.find(page_number) == IPT_.end())
+    return false;
+  IPT_.erase(page_number);
+  return true;
+}
