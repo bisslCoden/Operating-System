@@ -625,7 +625,7 @@ int Syscall::execv(const char * user_path, char *const user_argv[])
   char*  path = (char*)user_path;
   char** argv = (char**)user_argv;
   ustl::queue<size_t> ppns;
-  PageManager::instance()->allocPagesAndAddQueue(5, &ppns);
+  PageManager::instance()->allocPagesAndAddQueue(9, &ppns);
   
   debug(SYSCALL, "execv() checking path.\n");
   if(!isExecPathValid(path))

@@ -174,6 +174,9 @@ UserProcess::~UserProcess()
   loader_ = 0;
 
   debug(X_USERPROCESS, "annoying but test if vfs is prob\n");
+ 
+  debug(X_USERPROCESS, "I SHOULD UNLOCK IPT RIGHT FUCKING NOW....\n");
+  IPT->unlockIPT();
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
@@ -181,8 +184,6 @@ UserProcess::~UserProcess()
 
   delete working_dir_;
   working_dir_ = 0;
-  debug(X_USERPROCESS, "I SHOULD UNLOCK IPT RIGHT FUCKING NOW....\n");
-  IPT->unlockIPT();
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
 }
 
@@ -484,7 +485,12 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc, ustl::
       debug(USERPROCESS, "execv() ERREOR in setup_fail triggered. returning -1.\n");
       VfsSyscall::close(new_fd);
       if (loader_)
+      {
+        InvertedPageTable::instance()->lockIPT();
         delete loader_;
+        InvertedPageTable::instance()->unlockIPT();
+
+      }
       
       fd_ = old_fd;
       loader_ = old_loader;
@@ -495,7 +501,10 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc, ustl::
 
     // new_fd and new_loader - old ones must be closed and freed afterwards!
     VfsSyscall::close(old_fd);
+    InvertedPageTable::instance()->lockIPT();
     delete old_loader; 
+    InvertedPageTable::instance()->unlockIPT();
+
 
     // exec success, we're ready for another exec call!
     waiting_exec_ = 0;
