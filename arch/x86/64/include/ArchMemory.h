@@ -5,6 +5,7 @@
 #include "paging-definitions.h"
 #include "Mutex.h"
 #include "umap.h"
+#include "uqueue.h"
 
 //vpn to adress shift by 12 or divide through Page size
 //userbreak ends 0x8000000
@@ -39,7 +40,7 @@ class Loader;
 class ArchMemory
 {
 public:
-    ArchMemory();
+    ArchMemory(size_t ppn_pml4);
 
 /** 
  *
@@ -51,15 +52,16 @@ public:
  * @param user_access PTE User/Supervisor Flag, governing the binary Paging
  * Privilege Mechanism
  */
-  __attribute__((warn_unused_result)) bool mapPage(uint64 virtual_page, uint64 physical_page, uint64 user_access);
+  __attribute__((warn_unused_result)) bool mapPage(uint64 virtual_page, ustl::queue<size_t>* ppns, uint64 user_access);
 
 /**
  * removes the mapping to a virtual_page by marking its PTE Entry as non valid
- *
+ *  NOTE: LOCK IPT and ArchMem before using this function
+ * 
  * @param physical_page_directory_page Real Page where the PDE to work on resides
  * @param virtual_page which will be invalidated
  */
-  bool unmapPage(uint64 virtual_page);
+  bool unmapPage(uint64 virtual_page, ustl::queue<size_t>* ppns);
 
   ~ArchMemory();
 
@@ -125,6 +127,10 @@ public:
   static const size_t RESERVED_START = 0xFFFFFFFF80000ULL;
   static const size_t RESERVED_END = 0xFFFFFFFFC0000ULL;
 
+  bool checkforPMLCow(size_t vpn, ustl::queue<size_t>* ppns, bool unmap = false);
+
+  ustl::pair<size_t, size_t> cowUntil(size_t ppn, ustl::queue<size_t>* ppns, size_t level);
+
   /**
    * @brief sets/increases the PageManager*::cow_cnt_ 
    * 
@@ -138,7 +144,7 @@ public:
    * @param ppn_src the src
    * @return size_t the dest ppn
    */
-  size_t allocDestAndCopySrc(size_t ppn_src);
+  size_t allocDestAndCopySrc(size_t ppn_src,  size_t ppn_desti);
 
   void lockArchMemory()   { arch_memory_lock_.acquire(); }
   bool checkArchMemory(Thread* thread)  { return arch_memory_lock_.isHeldBy(thread);}
@@ -155,6 +161,7 @@ private:
  * @param physical_page_table_page physical page of the new page table.
  */
   template <typename T> static bool insert(pointer map_ptr, uint64 index, uint64 ppn, uint64 bzero, uint64 size, uint64 user_access, uint64 writeable);
+  template <typename T> size_t cowPML(pointer entrypt, size_t index, size_t level, ustl::queue<size_t>* ppns, size_t vpn = 0);
 
 /**
  * Removes a page directory entry from a given page directory if it is present

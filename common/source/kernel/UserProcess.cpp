@@ -1,6 +1,5 @@
 #include "ProcessRegistry.h"
 #include "UserProcess.h"
-#include "UserThread.h"
 #include "kprintf.h"
 #include "Console.h"
 #include "Loader.h"
@@ -10,7 +9,7 @@
 #include "PageManager.h"
 #include "ArchThreads.h"
 #include "offsets.h"
-#include "VfsSyscall.h"
+#include "InvertedPageTable.h"
 #include "Scheduler.h"
 
 //syscall alle binary pages printen
@@ -27,24 +26,37 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
     offsetlist_lock_("UserProcess::offsets"),
     waiting_exec_(0),
     waiting_exec_lock_("UserProcess::waiting_exec_lock_"), 
-    waitpid_sem_("Userprocess::waitpid_sem_")
+    waitpid_sem_("Userprocess::waitpid_sem_"),
+    PBreak_mutex_("Userprocess::PBreak_mutex_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
   debug(USERPROCESS, "entering constructor of %s\n", name_.c_str());
   debug(USERPROCESS, "fs_info present. pointer in there is: %p\n", fs_info_);
-
-  if(!setupLoader(fd_))
+  size_t ppn = PageManager::instance()->allocPPN();
+  if(!setupLoader(fd_, ppn))
   {
     *returnto = 1;
     return;
   }
+  if (!initPBreak())
+  {
+    debug(USERPROCESS, "Binary is too large for a heap to fit in.. kill proc\n");
+    *returnto = 1;
+    return;
+  }
+  initial_PBreak_ = loader_->getPBreak();
+  
 
   size_t returnto_th = -1;
   debug(X_USERPROCESS, "%s: Loader finished. Loader lies at (%p)\n", name_.c_str(), loader_);
   setChildStatus(0);
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(4, &ppns);
 
-  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th);
+  UserThread* first_thread = new UserThread(this, working_dir_, name_.c_str(), terminal_number, &returnto_th, &ppns);
+
+  PageManager::instance()->freeRestOfPages(&ppns);
 
   //assert(first_thread && "UserThread constructor failed");
   if (returnto_th != 0)
@@ -62,7 +74,7 @@ UserProcess::UserProcess(ustl::string filename, FileSystemInfo *fs_info, size_t*
   }
   threads_lock_.release();
   *returnto = 0; 
-  ProcessRegistry::instance()->addProcToList(this);
+  //ProcessRegistry::instance()->addProcToList(this);
   first_thread_ = first_thread;
   //Scheduler::instance()->addNewThread(first_thread);
   return;
@@ -83,7 +95,8 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   offsetlist_lock_("UserProcess::offsets"),
   waiting_exec_(0),
   waiting_exec_lock_("UserProcess::waiting_exec_lock_"),
-  waitpid_sem_("Userprocess::waitpid_sem_")
+  waitpid_sem_("Userprocess::waitpid_sem_"),
+  PBreak_mutex_("Userprocess::PBreak_mutex_")
 {
   *returnto = 5;
   waitpid_sem_.init(0);
@@ -98,12 +111,22 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
     *returnto = 2;
     return;
   }
-
-  if (!setupLoader(fd_))
+  size_t ppn = PageManager::instance()->allocPPN(); 
+  if (!setupLoader(fd_, ppn))
   {
     *returnto = 1;
+    //PageManager::instance()->freePPN();
     return;
   }
+  if (parent->loader_->getPBreak() > END_OF_HEAP || parent->loader_->getPBreak() < parent->loader_->getBSSEnd())
+  {
+    debug(USERPROCESS, "waaait what?! parent had corrupted heap!!!\n");
+    *returnto = 1;
+  }
+  
+  loader_->setPBreak(parent->loader_->getPBreak());
+  initial_PBreak_ = parent->initial_PBreak_;
+
   debug(USERPROCESS, "UserProcess() fork: sucessfully setupLoader()\n");
   
   currentUserThread->loader_->arch_memory_.setCowToArchmemPages(loader_->arch_memory_, this);
@@ -128,7 +151,6 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
   //?
  // Scheduler::instance()->printThreadList();
  first_thread_ = thread;
- ProcessRegistry::instance()->addProcToList(this);
   *returnto = 0;
   return;
 }
@@ -136,25 +158,38 @@ UserProcess::UserProcess(UserProcess *parent, size_t* returnto) :
 
 UserProcess::~UserProcess()
 {
-
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+  
+  if (!IPT->checkIPT())
+    IPT->lockIPT();
   debug(X_USERPROCESS, "PID [%ld]: destructor called by [%ld]\n", pid_, currentThread->getTID());
-  if(Scheduler::instance()->isCurrentlyCleaningUp())
-    Scheduler::instance()->yield();
+  ProcessRegistry::instance()->processExit(this);
+  // if(Scheduler::instance()->isCurrentlyCleaningUp())
+  //   Scheduler::instance()->yield();
   if (loader_ != 0)
   {
     delete loader_;
   }
-  
+  Scheduler::instance()->printThreadList();
   loader_ = 0;
 
+  debug(X_USERPROCESS, "annoying but test if vfs is prob\n");
   if (fd_ > 0)
     VfsSyscall::close(fd_);
 
+  debug(X_USERPROCESS, "vfs isnt prob\n");
+
   delete working_dir_;
   working_dir_ = 0;
-
-  ProcessRegistry::instance()->processExit(this);
+  debug(X_USERPROCESS, "I SHOULD UNLOCK IPT RIGHT FUCKING NOW....\n");
+  IPT->unlockIPT();
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
+}
+
+void UserProcess::lockThreadMutex()                
+{ 
+  assert(!InvertedPageTable::instance()->checkIPT() && "this is the wrong locking ! never lock IPT firssst");
+  threads_lock_.acquire(); 
 }
 
 
@@ -331,7 +366,7 @@ size_t UserProcess::getNrOfThreads()
   return number;
 }
 
-UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, int32 joinstate = PTHREAD_CREATE_JOINABLE)
+UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size_t wrapper, ustl::queue<size_t>* ppns, int32 joinstate = PTHREAD_CREATE_DETACHED)
 {
   UserThread* thread = 0;
   size_t return_to = 6;
@@ -343,7 +378,7 @@ UserThread* UserProcess::createNewThread(size_t start_routine, size_t args, size
   }
   threads_lock_.release();
 
-  thread = new UserThread(wrapper, &return_to);
+  thread = new UserThread(wrapper, &return_to, ppns);
   
   threads_lock_.acquire();
 
@@ -428,7 +463,7 @@ bool UserProcess::getRetVal(size_t tid, void** value)
   return false;
 }
 
-int UserProcess::execv(const char* path, char *const argv[], size_t argc)
+int UserProcess::execv(const char* path, char *const argv[], size_t argc, ustl::queue<size_t>* ppns)
 {
   debug(X_USERPROCESS, "execv() called. opening fd of %s and setting up loader\n", path);
 
@@ -440,7 +475,9 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
     ssize_t new_fd = VfsSyscall::open(path, O_RDONLY);
 
     // setup_fail makes use of short circuit evaluation (true || X -> true. X will not be executed).
-    bool setup_fail = !setupLoader(new_fd) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc) == -1);
+    size_t loader_ppn = ppns->front();
+    ppns->pop();
+    bool setup_fail = !setupLoader(new_fd, loader_ppn) || !removeOldProcessInformation() || (currentUserThread->execv(argv, argc, ppns) == -1);
 
     if(setup_fail)
     {
@@ -474,22 +511,24 @@ int UserProcess::execv(const char* path, char *const argv[], size_t argc)
   return 0;
 }
 
-bool UserProcess::setupLoader(ssize_t fd)
+bool UserProcess::setupLoader(ssize_t fd, size_t ppn)
 {
   // faulty fd
   if(fd < 0)
   {
     debug(X_USERPROCESS, "setuploader(%ld) failed because... fd value\n", fd);
+    PageManager::instance()->freePPN(ppn);
     return false;
   }
 
   // set fd_, new_loader -> check new loader, get ready to rumble if possible
   fd_ = fd;
-  Loader* new_loader = new Loader(fd_);
+  Loader* new_loader = new Loader(fd_, ppn);
   if(!new_loader || !new_loader->loadExecutableAndInitProcess())
   {
     debug(LOADER, "setuploader() failed because %s\n", (new_loader) ? "couldnt load executable" : "couldnt create archmem");
     loader_ = 0;
+    PageManager::instance()->freePPN(ppn);
     return false;
   }
 
@@ -562,4 +601,88 @@ size_t UserProcess::getClockSum()
     sum += Scheduler::instance()->getRDTSC() - i->second->getLastStart();
   }
   return sum;
+}
+
+bool UserProcess::initPBreak()
+{
+  size_t rand, offset, addressnooffset;
+  addressnooffset = loader_->getBSSEnd();
+  addressnooffset += (5 * PAGE_SIZE);
+  addressnooffset = addressnooffset >> 12;
+  addressnooffset = addressnooffset<< 12;
+  debug(USERPROCESS, "%lx is adress no offset\n", addressnooffset);
+  if (addressnooffset > END_OF_HEAP)
+  {
+    //we cannot get a heap sry...
+    return false;
+  }
+  else if (addressnooffset > BEGIN_HEAP_AT_LEAST)
+  {
+    //guess you ll just have a smaller heap
+    loader_->setPBreak(addressnooffset);
+    return true;
+  }
+  offset = 0;
+  
+  while (!offset)
+  {
+    rand = Scheduler::instance()->getRDTSC();
+    offset = rand % ((BEGIN_HEAP_AT_LEAST - addressnooffset) / PAGE_SIZE);
+    //just to double check
+    if ((addressnooffset + (offset * PAGE_SIZE)) > BEGIN_HEAP_AT_LEAST)
+      offset = 0;
+  }
+  loader_->setPBreak(addressnooffset + (offset * PAGE_SIZE));
+  debug(USERPROCESS, "set PBreak to %lx\n", loader_->getPBreak());
+  return true;
+}
+
+void UserProcess::getHeapPage(size_t address, ustl::queue<size_t>* ppns)
+{
+  //seems like we need a heap page!
+  assert(threads_lock_.isHeldBy(currentThread));
+  assert(PBreak_mutex_.isHeldBy(currentThread));
+  
+  if (checkKill())
+    return;
+  
+  InvertedPageTable::instance()->lockIPT();
+  loader_->arch_memory_.lockArchMemory();
+  ArchMemoryMapping m = loader_->arch_memory_.resolveMapping(address / PAGE_SIZE);
+  //need to resolve this step by step so we dont get pagefaults
+  if (m.pml4[m.pml4i].present && m.pdpt[m.pdpti].pd.present && m.pd[m.pdi].pt.present && m.pt[m.pti].present)
+  {
+    debug(USERPROCESS, "Page already present!\n");
+    InvertedPageTable::instance()->unlockIPT();
+    loader_->arch_memory_.unlockArchMemory();
+    return;
+  }
+  debug(USERPROCESS, "Page NOT present: getting a new one!\n");
+  
+ //size_t ppn = PageManager::instance()->allocPPN();
+  if (!loader_->arch_memory_.mapPage((address / PAGE_SIZE), ppns, 1))
+  {
+    debug(USERPROCESS, "getnewpage(): RIP. asserting.\n");
+    assert(false);
+  }
+}
+
+void UserProcess::checkBrkFree(size_t brk_prev, size_t brk_now, ustl::queue<size_t>* ppns)
+{
+  InvertedPageTable* IPT = InvertedPageTable::instance();
+  size_t vpn_start, vpn_end;
+  vpn_start = brk_now / PAGE_SIZE;
+  vpn_end = brk_prev / PAGE_SIZE;
+  IPT->lockIPT();
+  loader_->arch_memory_.lockArchMemory();
+  for (size_t iter = vpn_start + 1; iter <= vpn_end; iter++)
+  {
+    ArchMemoryMapping m = loader_->arch_memory_.resolveMapping(iter);
+    if (m.pml4[m.pml4i].present && m.pdpt[m.pdpti].pd.present && m.pd[m.pdi].pt.present && m.pt[m.pti].present)
+    {
+      loader_->arch_memory_.unmapPage(iter, ppns);
+    }
+  }
+  IPT->unlockIPT();
+  loader_->arch_memory_.unlockArchMemory();
 }

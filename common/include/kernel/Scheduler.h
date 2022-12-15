@@ -7,6 +7,7 @@
 #include "UserThread.h"
 #include "Syscall.h"
 #include "ArchMemory.h"
+#include "DeduplicationThread.h"
 
 class Thread;
 class Mutex;
@@ -88,4 +89,5 @@ class Scheduler
 
     IdleThread idle_thread_;
     CleanupThread cleanup_thread_;
+    DeduplicationThread dedup_thread_;
 };

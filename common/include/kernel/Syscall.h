@@ -140,6 +140,13 @@ class Syscall
   static size_t getRDTSC();
 
 
+  static int brk(size_t end_data_segment);
+
+/**
+ * function stub
+ * posix compatible signature - do not change the signature!
+ */
+  static size_t sbrk(int increment);
 
 
 

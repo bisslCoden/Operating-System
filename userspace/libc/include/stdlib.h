@@ -38,6 +38,16 @@ extern "C" {
  */
 #define NULL 0
 
+#define MAGIC_NUMBER 2479253685
+//#define PAGE_SIZE 4096
+
+typedef struct metadata{
+  size_t magic_number;
+  size_t size;
+  int free;
+  struct metadata* next;
+  void* user_start;
+} metadata;
 
 /**
  * parses the given string and returns its value as integer

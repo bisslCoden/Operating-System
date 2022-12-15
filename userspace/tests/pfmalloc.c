@@ -5,6 +5,7 @@
 #include "assert.h"
 #include "unistd.h"
 #include "semaphore.h"
+#include "stdlib.h"
 
 #define NUM_THREADS1 4
 #define NUM_THREADS2 2
@@ -40,8 +41,10 @@ size_t recursive_routine(void* count){
     }
     else 
     {
+      void* new_mem = malloc(40000);
       printf("[recursive_routine] forking\n");
       fork();
+      free(new_mem);
       return recursive_routine(count-1); 
     }
     return 99999;
@@ -49,7 +52,7 @@ size_t recursive_routine(void* count){
 
 size_t large_routine(args2* params)
 {
-    int arr[ARRSIZE];
+    int* arr = malloc(ARRSIZE * sizeof(int));
     pid_t pid = fork();
     printf("now filling large array..\n");
     for (size_t i = 0; i < ARRSIZE; i++)
@@ -65,18 +68,21 @@ size_t large_routine(args2* params)
     return arr[ARRSIZE -1];
 }
 
-void detached_routine()
+void detached_routine(void* memblock)
 {
     pthread_detach(pthread_self());
     for (size_t i = NUM_THREADS1 + NUM_THREADS2; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; i++)
     {
         assert(pthread_create(&tids[i], NULL, (void* (*)(void*))&recursive_routine, (void*) NUM_REC_FORKS) == 0 && "couldnt create anymore threads daaamn!\n");
     }
-    for (size_t i = NUM_THREADS1 + NUM_THREADS2; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; i++)
-    {
-        assert(pthread_join(tids[i], (void**) &returnvalues[i]) == 0 && "couldnt join my child daaamn!\n");
-        printf("[detached_routine] joined kid %ld and got val %d\n", i, returnvalues[i]);
-    }
+    // for (size_t i = NUM_THREADS1 + NUM_THREADS2; i < NUM_THREADS1 + NUM_THREADS2 + NUM_THREADS3; i++)
+    // {
+    //     assert(pthread_join(tids[i], (void**) &returnvalues[i]) == 0 && "couldnt join my child daaamn!\n");
+    //     printf("[detached_routine] joined kid %ld and got val %d\n", i, returnvalues[i]);
+    // }
+    int* place = (int*) memblock;
+    *place = *place + 1;
+    printf("[detached_routine] added one to malloc\n");
     return;
 }
 
@@ -97,9 +103,11 @@ int main()
     paramsnow.b = i + 2;
     assert(pthread_create(&tids[i], NULL, (void* (*)(void*))&large_routine, (void*) &paramsnow) == 0 && "couldnt create anymore threads daaamn!\n");
   }
+  int* main_mem = (int*) malloc(sizeof(int));
+  *main_mem = 0;
 
   for(size_t i = NUM_THREADS1; i < NUM_THREADS1 + NUM_THREADS2; ++i){
-    assert(pthread_create(&tids[i], NULL, (void* (*)(void*))&detached_routine, NULL) == 0 && "couldnt create anymore threads daaamn!\n");
+    assert(pthread_create(&tids[i], NULL, (void* (*)(void*))&detached_routine, (void*) main_mem) == 0 && "couldnt create anymore threads daaamn!\n");
   }
 
   sched_yield();
@@ -107,23 +115,22 @@ int main()
   sched_yield();
 
   int ret = 0;
-  for(size_t i = 0; i < NUM_THREADS1 + NUM_THREADS2; ++i){
+  for(size_t i = 0; i < NUM_THREADS1; ++i){
     ret = pthread_join(tids[i], (void**) &returnvalues[i]);
     if (ret != 0)
     {
       printf("[main]: could not join [%ld]... %s\n", i, (i >= NUM_THREADS1) ? "thats okay he detached" : "which is NOT okay!");
       returnvalues[i] = -1;
     }
-    else
-        printf("[main] joined [%ld] got %d\n", i , returnvalues[i]);
   }
-
+  printf("[main] read %d in detached\n", *main_mem);
+  main_mem = (int*) realloc((void*) main_mem, 100000);
   if (child != 0)
   {
     printf("[main] waiting for little other main to finish\n");
     child = waitpid(child, 0, 0);
   }
 
-  printf("[main]: successfully exiting the programm!\n");
+  printf("[main]: successfully exiting the programm and read %d in detached!\n", *main_mem);
   return 0;
 }

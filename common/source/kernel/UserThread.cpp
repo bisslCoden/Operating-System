@@ -19,7 +19,7 @@ UserThread::UserThread( UserProcess* process,
                         FileSystemInfo* working_dir, 
                         ustl::string name, 
                         uint32 terminal_number, 
-                        size_t* returnto) :
+                        size_t* returnto, ustl::queue<size_t>* ppns) :
   Thread( working_dir, name, USER_THREAD, 
           ProcessRegistry::instance()->createID()), 
   process_(process),
@@ -33,7 +33,7 @@ UserThread::UserThread( UserProcess* process,
   // loader and stack setup
   loader_ = process_->getLoader();
   mystack_.page_offset_ = process_->getRandomPageOffset();
-  setupStack();
+  setupStack(ppns);
 
   // check if process already got killed
   process_->lockThreadMutex();
@@ -72,7 +72,7 @@ UserThread::UserThread( UserProcess* process,
 
 // pthread_create
 UserThread::UserThread( size_t wrapper, 
-                        size_t* returnto, 
+                        size_t* returnto, ustl::queue<size_t>* ppns,
                         uint32_t terminal_number) :
   Thread( currentUserThread->working_dir_, currentUserThread->name_, USER_THREAD, 
           ProcessRegistry::instance()->createID()),
@@ -87,7 +87,7 @@ UserThread::UserThread( size_t wrapper,
   // loader and stack setup
   loader_ = process_->getLoader();
   mystack_.page_offset_ = getProcess()->getRandomPageOffset();
-  setupStack();
+  setupStack(ppns);
 
   // check if process already got killed
   process_->lockThreadMutex();
@@ -189,6 +189,8 @@ void UserThread::reDirectToDeath()
     return;
 }
 
+//474387766000
+//150854471140
 
 bool UserThread::schedulable()
 {
@@ -215,48 +217,52 @@ bool UserThread::schedulable()
     else if(getTimeToWake() > (Scheduler::instance()->getRDTSC() * 10))
     {
       // my_pages_lock_.release();
+      debug(SLEEP, "[%ld] I should still sleep: %ld, %ld\n", tid_, getTimeToWake(), Scheduler::instance()->getRDTSC() * 10);
       was_scheduled_ = 0;
       return false;
     }
-
-    //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
-    if (mystack_.UserMutex == USERMUTEX_INVALID)
-    {
-
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
-      return true;
-    }
-
-    size_t sleepy = *mystack_.UserMutex;
-    if(sleepy == SLEEPING_KS)
-    {
-      //get the right flag back
-      // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
-      // my_pages_lock_.release();
-      was_scheduled_ = 0;
-      debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
-      return false;
-    }
-    else if (sleepy == AWAKE_KS)
-    {
-      // my_pages_lock_.release();
-      was_scheduled_ = 1;
-      setLastStart(Scheduler::instance()->getRDTSC());
-      debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
-      return true;
-    }
-    else
-    {
-      // my_pages_lock_.release();
-      debug(X_USERTHREAD, "thread: [%ld] sleepy : %ld\n", tid_, sleepy);
-      assert(false && "Sleep flag was neither sleeping nor awake?\n");
-    }
-//    debug(X_THREADSTACK, "schedulable finished!\n");
+    return true;
   }
-  was_scheduled_ = 0;
   return false;
 }
+// F*ck the userspace mutexes now ... they bring no points and only lead to problems...
+//     //debug(X_THREADSTACK, "Tid[%ld] sleepy = %ld\n", getTID(), sleepy);
+//     if (mystack_.UserMutex == USERMUTEX_INVALID)
+//     {
+
+//       was_scheduled_ = 1;
+//       setLastStart(Scheduler::instance()->getRDTSC());
+//       return true;
+//     }
+
+//     size_t sleepy = *mystack_.UserMutex;
+//     if(sleepy == SLEEPING_KS)
+//     {
+//       //get the right flag back
+//       // __atomic_exchange_n(mystack_.UserMutex, SLEEPING_KS, ustl::memory_order_seq_cst);
+//       // my_pages_lock_.release();
+//       was_scheduled_ = 0;
+//       debug(X_USERTHREAD, "[%ld] sleeping in US\n", tid_);
+//       return false;
+//     }
+//     else if (sleepy == AWAKE_KS)
+//     {
+//       // my_pages_lock_.release();
+//       was_scheduled_ = 1;
+//       setLastStart(Scheduler::instance()->getRDTSC());
+//       debug(X_USERTHREAD, "[%ld] awake in US\n", tid_);
+//       return true;
+//     }
+//     else
+//     {
+//       // my_pages_lock_.release();
+//       debug(X_USERTHREAD, "thread: [%ld] sleepy : %ld\n", tid_, sleepy);
+//       assert(false && "Sleep flag was neither sleeping nor awake?\n");
+//     }
+// //    debug(X_THREADSTACK, "schedulable finished!\n");
+//   }
+//   was_scheduled_ = 0;
+//}
 
 
 void UserThread::setCancelState(int state)
@@ -285,14 +291,15 @@ void UserThread::sendCancelRequest()
 }
 
 
-void UserThread::getNewStackPage(size_t adress)
+void UserThread::getNewStackPage(size_t adress, ustl::queue<size_t>* ppns)
 {
-  if(process_->checkKill())
-    return;
+  // process_->lockThreadMutex();
+  // if(process_->checkKill())
+  //   return;
   my_pages_lock_.acquire();
-  size_t new_page = PageManager::instance()->allocPPN();
-  debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
-  if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), new_page, 1))
+  //size_t new_page = PageManager::instance()->allocPPN();
+  //debug(X_USERTHREAD, "[%ld] got my page: %lx\n", tid_, new_page);
+  if (!loader_->arch_memory_.mapPage((adress / PAGE_SIZE), ppns, 1))
   {
     //might need change in the future
     debug(USERTHREAD, "getnewpage(): RIP. asserting.\n");
@@ -300,6 +307,7 @@ void UserThread::getNewStackPage(size_t adress)
   }
   my_pages_.push_back(adress / PAGE_SIZE);
   my_pages_lock_.release();
+  // process_->unLockThreadMutex();
   return;
 }
 
@@ -307,20 +315,34 @@ void UserThread::getNewStackPage(size_t adress)
 void UserThread::freeMyPagesAndDie(bool actually_die)
 {
   // kill now if KILLED_ is already true
-  if (process_->checkKill() && actually_die)
-    this->kill();
+
   
+  ustl::queue<size_t> ppns;
+  PageManager::instance()->allocPagesAndAddQueue(5, &ppns);
   // 
+  process_->threads_lock_.acquire();
+  if (process_->checkKill() && actually_die)
+  {
+    PageManager::instance()->freeRestOfPages(&ppns);
+    process_->threads_lock_.release();
+    this->kill();
+  }
   DYING_ = true;
   my_pages_lock_.acquire();
+  InvertedPageTable::instance()->lockIPT();
   loader_->arch_memory_.lockArchMemory();
   for (size_t i = 0; i < my_pages_.size(); i++)
   {
     debug(X_USERTHREAD, "[%ld] tried to free a page!\n", tid_);
-    assert(loader_->arch_memory_.unmapPage(my_pages_[i]) && "couldnt cleanup my own pages?");
+    assert(loader_->arch_memory_.unmapPage(my_pages_[i], &ppns) && "couldnt cleanup my own pages?");
   }
+  InvertedPageTable::instance()->unlockIPT();
   loader_->arch_memory_.unlockArchMemory();
   my_pages_lock_.release();
+  process_->threads_lock_.release();
+
+  debug(USERTHREAD, "now freeing the %ld pages i didnt need\n", ppns.size());
+  PageManager::instance()->freeRestOfPages(&ppns);
 
   // kill now
   if(actually_die)
@@ -330,7 +352,7 @@ void UserThread::freeMyPagesAndDie(bool actually_die)
 }
 
 
-bool UserThread::setupStack()
+bool UserThread::setupStack(ustl::queue<size_t>* ppns)
 {
   debug(X_USERTHREAD, "setupStack(): TID[%ld] my offset is: %lx\n", tid_, mystack_.page_offset_);
 
@@ -344,16 +366,17 @@ bool UserThread::setupStack()
   size_t endguard = (stackend - PAGE_SIZE) / PAGE_SIZE;
   size_t vpn_for_stack = stack_start_ptr / PAGE_SIZE; 
  
-  size_t ppn_for_stack = PageManager::instance()->allocPPN();
-  assert(vpn_for_stack && ppn_for_stack);
-  if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppn_for_stack, 1))
+  //size_t ppn_for_stack = PageManager::instance()->allocPPN();
+  assert(vpn_for_stack && !ppns->empty());
+  size_t ppn_for_stack = ppns->front();
+  if(!loader_->arch_memory_.mapPage(vpn_for_stack, ppns, 1))
   {
     debug(USERTHREAD, "setupStack(): RIP. asserting.\n");
     assert(false);
-    PageManager::instance()->freePPN(ppn_for_stack);
+    //PageManager::instance()->freePPN(ppn_for_stack);
     return false;
   }
-  debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, ppn_for_stack);
+  //debug(X_USERTHREAD, "setupStack(): mapPage(vpn_for_stack = %lx, ppn_for_stack = %lx)\n", vpn_for_stack, pp);
 
   my_pages_lock_.acquire();
   my_pages_.push_back(vpn_for_stack);
@@ -380,11 +403,12 @@ bool UserThread::setupStack()
   return true;
 }
 
-bool UserThread::reuseStack(StackInfo* old_stackinfo)
+bool UserThread::reuseStack(StackInfo* old_stackinfo, ustl::queue<size_t>* ppns)
 {
-  size_t ppn = PageManager::instance()->allocPPN();
+  // size_t ppn = PageManager::instance()->allocPPN();
   debug(X_USERTHREAD, "want to map my old stackpage startin at %lx (vpn %ld)\n", old_stackinfo->userstack_start_, old_stackinfo->userstack_start_ / PAGE_SIZE);
-  if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppn, 1))
+  size_t ppn = ppns->front();
+  if(!loader_->arch_memory_.mapPage(old_stackinfo->userstack_start_ / PAGE_SIZE, ppns, 1))
     return false;
   
   my_pages_lock_.acquire();
@@ -413,7 +437,7 @@ bool UserThread::reuseStack(StackInfo* old_stackinfo)
 }
 
 
-int UserThread::execv(char* const argv[], size_t argc)
+int UserThread::execv(char* const argv[], size_t argc, ustl::queue<size_t>* ppns)
 {
   
   if(!((argv && argc) || (!argv && !argc)))
@@ -434,9 +458,9 @@ int UserThread::execv(char* const argv[], size_t argc)
   // args: copy from argv[] (kernel_argv) into fresh archmem ONLY IF NECESSARY
   if(argc)
   {
-    size_t ppn = PageManager::instance()->allocPPN();
+    //size_t ppn = ppn;
     size_t vpn = (USER_BREAK - 8)/ PAGE_SIZE; // the virtual page we use to pass the args
-    assert(loader_->arch_memory_.mapPage(vpn, ppn, 1) && "why tf was this mapped? This is exec place");
+    assert(loader_->arch_memory_.mapPage(vpn, ppns, 1) && "why tf was this mapped? This is exec place");
     size_t new_argv = USER_BREAK - PAGE_SIZE; // the virtual address
     char** argv_arr = (char**) new_argv; // the virtual address casted
     size_t str_offset = argc * sizeof(char*) + sizeof(size_t); // + sizeof(size_t) for null termination
@@ -474,7 +498,7 @@ int UserThread::execv(char* const argv[], size_t argc)
 
   // setup stack 
   debug(X_USERTHREAD, "execv(): reuseStack() + setting user_registers_.\n");
-  assert(reuseStack(&mystack_));
+  assert(reuseStack(&mystack_, ppns));
   mystack_.UserMutex = USERMUTEX_INVALID; // why not place this in reuse stack?
   // set registers
   user_registers_->rsp = (size_t) mystack_.userstack_start_;

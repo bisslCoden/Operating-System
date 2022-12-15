@@ -1,14 +1,14 @@
 #include "unistd.h"
 #include "../../../common/include/kernel/syscall-definitions.h"
 #include "sys/syscall.h"
-
+#include "stdio.h"
 /**
  * function stub
  * posix compatible signature - do not change the signature!
  */
 int brk(void *end_data_segment)
 {
-  return -1;
+  return (int) __syscall(sc_brk, (size_t) end_data_segment, 0x00, 0x00, 0x00, 0x00);
 }
 
 /**
@@ -17,7 +17,9 @@ int brk(void *end_data_segment)
  */
 void* sbrk(intptr_t increment)
 {
-  return (void*) -1;
+  void* retu = (void*) __syscall(sc_sbrk, (size_t) increment, 0x00, 0x00, 0x00, 0x00);
+  //printf("[sbrk] got %p from syscall\n", retu);
+  return retu;
 }
 
 

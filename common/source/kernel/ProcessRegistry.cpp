@@ -7,7 +7,8 @@
 #include "VirtualFileSystem.h"
 #include "ArchThreads.h"
 #include "offsets.h"
-
+#include "PageManager.h"
+#include "uqueue.h"
 
 ProcessRegistry* ProcessRegistry::instance_ = 0;
 
@@ -92,12 +93,12 @@ void ProcessRegistry::processExit(UserProcess* user_proc)
   }
   else
   {
+    assert(false && "how did that process get removed already?");
     list_of_processes_lock_.release();
     return;
   }
   list_of_processes_lock_.release();
 
-    //assert(false && "how did that process get removed already?");
   counter_lock_.acquire();
 
   if (--progs_running_ == 0)
@@ -162,6 +163,8 @@ size_t ProcessRegistry::processFork()
     delete process;
     return -1;
   }
+
+  ProcessRegistry::instance()->addProcToList(process);
   process->addToThreadList(process->first_thread_);
   Scheduler::instance()->addNewThread(process->first_thread_);
   process->unLockThreadMutex();
@@ -205,6 +208,7 @@ void ProcessRegistry::createProcess(const char* path)
     delete process;
     return;
   }
+  addProcToList(process);
   process->addToThreadList(process->first_thread_);
   Scheduler::instance()->addNewThread(process->first_thread_);
   process->unLockThreadMutex();
@@ -213,7 +217,8 @@ void ProcessRegistry::createProcess(const char* path)
   debug(PROCESS_REG, "PID [%ld] filename: %s | Created and added to ProcessRegistry::list_of_processes_\n", process->getPID(), path);
 }
 
-void ProcessRegistry::addProcToList(UserProcess* new_proc){
+void ProcessRegistry::addProcToList(UserProcess* new_proc)
+{
   list_of_processes_lock_.acquire();
   list_of_processes_.insert(ustl::make_pair(new_proc->getPID(), new_proc));
   processStart(); //should also be called if you fork a process
@@ -221,10 +226,12 @@ void ProcessRegistry::addProcToList(UserProcess* new_proc){
 }
 
 
-int ProcessRegistry::execv(const char* path, char *const argv[])
+int ProcessRegistry::execv(const char* path, char *const argv[], ustl::queue<size_t>* ppns)
 {
   debug(X_PROCESS_REG, "execv said: argv != NULL -> execvProcess(path, argv) called\n");
+
   int argc = areExecArgsValid(argv);
+
 
   if(argc == -1)
   {
@@ -234,7 +241,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
   else if(argc == 0)
   {
     debug(X_PROCESS_REG, "execv() found no arguments. proceeding without args\n");
-    return currentUserThread->getProcess()->execv(path, NULL, 0);
+    return currentUserThread->getProcess()->execv(path, NULL, 0, ppns);
   }
   else if(argc > 0)
   {
@@ -257,7 +264,7 @@ int ProcessRegistry::execv(const char* path, char *const argv[])
     }
 
     debug(X_USERTHREAD, "execv(): copied from old archmem into char* here[] finished\n");
-    return currentUserThread->getProcess()->execv(path, kernel_argv, argc);
+    return currentUserThread->getProcess()->execv(path, kernel_argv, argc, ppns);
   }
 
   assert(false && "Please forgive me for my sins, oh Great Almighty! HOW DID I END UP HERE?");
@@ -349,4 +356,67 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   }
   return return_pid;
 }
+
+bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
+{
+  size_t i_want = procs.size();
+  size_t count = 0;
+  list_of_processes_lock_.acquire();
+  ustl::map<size_t, UserProcess*>::iterator it; 
+  for (auto proc : procs)
+  {
+    if (list_of_processes_.find(proc.first->getPID()) == list_of_processes_.end())
+    {
+      list_of_processes_lock_.release();
+      debug(PROCESS_REG, "dangerous! will try to wait for proc thats now in here anymore\n");
+      return false;
+    }
+  }
+  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  {
+    if (procs.find(it->second) != procs.end())
+    {
+      if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+      {
+        it->second->getLoader()->arch_memory_.lockArchMemory();
+        count++;
+      }
+    }
+  }
+  if (count != i_want)
+  {
+    for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+    {
+      if (procs.find(it->second) != procs.end())
+      {
+        if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+        {
+          it->second->getLoader()->arch_memory_.unlockArchMemory();
+          count--;
+        }
+      }
+    }
+    assert(count == 0);
+    list_of_processes_lock_.release();
+    return false;
+  }
+  list_of_processes_lock_.release();
+  return true;
+}
+
+void ProcessRegistry::unlockMultArchmem(ustl::map<UserProcess*, size_t> procs)
+{
+  list_of_processes_lock_.acquire();
+  ustl::map<size_t, UserProcess*>::iterator it; 
+  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  {
+    if (procs.find(it->second) != procs.end())
+    {
+      if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+       it->second->getLoader()->arch_memory_.unlockArchMemory();
+    }
+  }
+  list_of_processes_lock_.release();
+}
+
 

@@ -12,10 +12,11 @@
 #include "Stabs2DebugInfo.h"
 #include "SWEBDebugInfo.h"
 #include <umemory.h>
+#include "offsets.h"
 #include "File.h"
 #include "FileDescriptor.h"
 
-Loader::Loader(ssize_t fd) : fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0)
+Loader::Loader(ssize_t fd, size_t pml4_ppn) : arch_memory_(pml4_ppn), fd_(fd), hdr_(0), phdrs_(), program_binary_lock_("Loader::program_binary_lock_"), userspace_debug_info_(0)
 {
 }
 
@@ -27,15 +28,16 @@ Loader::~Loader()
   hdr_ = nullptr;
 }
 
-void Loader::loadPage(pointer virtual_address)
+void Loader::loadPage(pointer virtual_address, ustl::queue<size_t>* ppns)
 {
   debug(LOADER, "Loader:loadPage: Request to load the page for address %p. currentThread: [%ld]\n", (void*)virtual_address, currentThread->getTID());
   const pointer virt_page_start_addr = virtual_address & ~(PAGE_SIZE - 1);
   const pointer virt_page_end_addr = virt_page_start_addr + PAGE_SIZE;
   bool found_page_content = false;
   // get a new page for the mapping
-  size_t ppn = PageManager::instance()->allocPPN();
-
+  size_t ppn = ppns->front();
+  
+  
   program_binary_lock_.acquire();
 
   // Iterate through all sections and load the ones intersecting into the page.
@@ -55,7 +57,7 @@ void Loader::loadPage(pointer virtual_address)
         {
           program_binary_lock_.release();
           debug(X_LOADER, "loadPage() calling freePPN(%ld)\n", ppn);
-          PageManager::instance()->freePPN(ppn);
+          PageManager::instance()->freeRestOfPages(ppns);
           debug(LOADER, "ERROR! Some parts of the content could not be loaded from the binary.\n");
           Syscall::exit(999);
         }
@@ -71,16 +73,16 @@ void Loader::loadPage(pointer virtual_address)
 
   if(!found_page_content)
   {
-    PageManager::instance()->freePPN(ppn);
+    PageManager::instance()->freeRestOfPages(ppns);
     debug(LOADER, "Loader::loadPage: ERROR! No section refers to the given address.\n");
     Syscall::exit(666);
   }
 
-  bool page_mapped = arch_memory_.mapPage(virt_page_start_addr / PAGE_SIZE, ppn, true);
+  bool page_mapped = arch_memory_.mapPage(virt_page_start_addr / PAGE_SIZE, ppns, true);
   if (!page_mapped)
   {
     debug(LOADER, "Loader::loadPage: The page has been mapped by someone else.\n");
-    PageManager::instance()->freePPN(ppn);
+    PageManager::instance()->freeRestOfPages(ppns);
   }
   debug(LOADER, "Loader::loadPage: Load request for address %p has been successfully finished.\n", (void*)virtual_address);
 }
@@ -102,6 +104,7 @@ bool Loader::readHeaders()
     debug(LOADER, "Loader::readHeaders: ERROR! The headers could not be load.\n");
     return false;
   }
+  
 
   //checking elf-magic-numbers, format (32/64bit) and a few more things
   if (!Elf::headerCorrect(hdr_))
@@ -175,7 +178,7 @@ bool Loader::loadDebugInfoIfAvailable()
   // the section names
   // in the simple case this section name section is only 0xFF00 bytes long, in that case
   // loading is simple. we only support this case for now
-
+  
   size_t section_name_section = hdr_->e_shstrndx;
   size_t section_name_size = section_headers[section_name_section].sh_size;
   ustl::vector<char> section_names(section_name_size);
@@ -304,3 +307,79 @@ bool Loader::prepareHeaders()
   }
   return phdrs_.size() > 0;
 }
+
+size_t Loader::getBSSEnd()
+{
+  program_binary_lock_.acquire();
+  
+  ustl::vector<Elf::Shdr> section_headers;
+  section_headers.resize(hdr_->e_shnum);
+  if (readFromBinary(reinterpret_cast<char*>(&section_headers[0]), hdr_->e_shoff, hdr_->e_shnum*sizeof(Elf::Shdr)))
+  {
+    debug(USERTRACE, "Failed to load section headers!\n");
+    program_binary_lock_.release();
+    return 0;
+  }
+  size_t section_name_section = hdr_->e_shstrndx;
+  size_t section_name_size = section_headers[section_name_section].sh_size;
+  ustl::vector<char> section_names(section_name_size);
+
+  if (readFromBinary(&section_names[0], section_headers[section_name_section].sh_offset, section_name_size ))
+  {
+    debug(USERTRACE, "Failed to load section name section\n");
+    program_binary_lock_.release();
+    return 0;
+  }
+
+  for (Elf::Shdr const &section: section_headers)
+  {
+    if (!strcmp(&section_names[section.sh_name], ".bss"))
+    {
+      debug(LOADER, "found bss which is %ld big and starts at adress %lx\n", section.sh_size, section.sh_addr);
+      program_binary_lock_.release();
+      return section.sh_addr + section.sh_offset;
+    }
+  }
+  program_binary_lock_.release();
+  return 0;
+}
+
+
+
+//just for fun i ll leave it in here
+bool Loader::printHeaders()
+{
+  program_binary_lock_.acquire();
+  ustl::vector<Elf::Shdr> section_headers;
+  section_headers.resize(hdr_->e_shnum);
+  if (readFromBinary(reinterpret_cast<char*>(&section_headers[0]), hdr_->e_shoff, hdr_->e_shnum*sizeof(Elf::Shdr)))
+  {
+    debug(USERTRACE, "Failed to load section headers!\n");
+    return false;
+  }
+
+
+  
+  // now that we have loaded the section headers, we want to find and load the section that contains
+  // the section names
+  // in the simple case this section name section is only 0xFF00 bytes long, in that case
+  // loading is simple. we only support this case for now
+  
+  size_t section_name_section = hdr_->e_shstrndx;
+  size_t section_name_size = section_headers[section_name_section].sh_size;
+  ustl::vector<char> section_names(section_name_size);
+
+  if (readFromBinary(&section_names[0], section_headers[section_name_section].sh_offset, section_name_size ))
+  {
+    debug(USERTRACE, "Failed to load section name section\n");
+    return false;
+  }
+
+  for (Elf::Shdr const &section: section_headers)
+  {
+    debug(LOADER, "section %s, its size is %ld bytes(?) and adress is %lx\n", &section_names[section.sh_name], section.sh_size, section.sh_addr);
+  }
+  program_binary_lock_.release();
+  return true;
+}
+

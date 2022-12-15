@@ -9,6 +9,7 @@
 #include "ArchThreads.h"
 #include "PageManager.h"
 #include "ArchMemory.h"
+#include "uqueue.h"
 
 extern "C" void arch_contextSwitch();
 
@@ -72,27 +73,66 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
   //test
   if (checkPageFaultIsValid(address, user, present, switch_to_us, writing))
   {
-    if (PageManager::instance()->checkForCow(address))
+    ustl::queue<size_t> ppns;
+    PageManager::instance()->allocPagesAndAddQueue(4, &ppns);
+    if (!currentUserProcess->testThreadMutex(currentThread))
+      currentUserProcess->lockThreadMutex();
+    
+    if (currentUserProcess->checkKill())
     {
-      debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
+      currentUserProcess->unLockThreadMutex();
+      PageManager::instance()->freeRestOfPages(&ppns);
+      Syscall::pthread_exit((void*)-1);
       return;
     }
-    if (switch_to_us && address > END_OF_STACKS)
+    
+    if (PageManager::instance()->checkForCow(address, &ppns))
+    {
+      debug(PAGEFAULT, "Copy on Write found + copied page. returning.\n");
+      PageManager::instance()->freeRestOfPages(&ppns);
+     // return;
+    }
+    else if (switch_to_us && address > END_OF_STACKS)
     {
       debug(PAGEFAULT, "checking for stack-extension....\n");
-      currentUserProcess->lockThreadMutex();
       UserThread* stack_owner = 0;
       if((stack_owner = currentUserThread->getProcess()->checkStackAdress(address)) != 0)
       {
         debug(PAGEFAULT, "seems like our currentthread just wants a new Page for someone!\n");
-        stack_owner->getNewStackPage(address);  
-        currentUserProcess->unLockThreadMutex();    
+        stack_owner->getNewStackPage(address, &ppns);  
+        //currentUserProcess->unLockThreadMutex();    
       }
       else
       {
         currentUserProcess->unLockThreadMutex();
         debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
             // the page-fault seems to be faulty, print out the thread stack traces
+        ArchThreads::printThreadRegisters(currentThread, true);
+        PageManager::instance()->freeRestOfPages(&ppns);
+        currentThread->printBacktrace(true);
+        if (currentThread->loader_)
+          Syscall::exit(9999);
+        else
+          currentThread->kill();
+      }
+    }
+    else if (address < END_OF_HEAP && (address > currentUserProcess->getInitPBreak()))
+    { 
+      currentUserProcess->lockPBreak();
+      if (address <= currentUserProcess->getLoader()->getPBreak())
+      {
+        debug(PAGEFAULT, "looks like a heap pagefault!\n");
+        currentUserProcess->getHeapPage(address, &ppns);
+        currentUserProcess->unlockPBreak();
+        //currentUserProcess->unLockThreadMutex();
+      }
+      else
+      {
+        currentUserProcess->unlockPBreak();
+        currentUserProcess->unLockThreadMutex();
+        debug(PAGEFAULT, "OH OH... Pagefault invalid!\n");
+            // the page-fault seems to be faulty, print out the thread stack traces
+        PageManager::instance()->freeRestOfPages(&ppns);
         ArchThreads::printThreadRegisters(currentThread, true);
         currentThread->printBacktrace(true);
         if (currentThread->loader_)
@@ -103,12 +143,15 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     }
     else
     {
-      currentThread->loader_->loadPage(address);
+      currentThread->loader_->loadPage(address, &ppns);
     }
+    currentUserProcess->unLockThreadMutex();
+    PageManager::instance()->freeRestOfPages(&ppns);
   }
   else
   {
     // the page-fault seems to be faulty, print out the thread stack traces
+    // PageManager::instance()->freeRestOfPages(&ppns);
     ArchThreads::printThreadRegisters(currentThread, true);
     currentThread->printBacktrace(true);
     if (currentThread->loader_)
