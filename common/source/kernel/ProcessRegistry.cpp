@@ -220,7 +220,7 @@ void ProcessRegistry::createProcess(const char* path)
 void ProcessRegistry::addProcToList(UserProcess* new_proc)
 {
   list_of_processes_lock_.acquire();
-  list_of_processes_.insert(ustl::make_pair(new_proc->getPID(), new_proc));
+  list_of_processes_.emplace(new_proc->getPID(), new_proc);
   processStart(); //should also be called if you fork a process
   list_of_processes_lock_.release();
 }
@@ -357,66 +357,89 @@ size_t ProcessRegistry::waitPid(size_t arg1, size_t* arg2, size_t arg3, UserProc
   return return_pid;
 }
 
-bool ProcessRegistry::lockMultArchmem(ustl::map<UserProcess*, size_t> procs)
+bool ProcessRegistry::lockMultArchmem(ustl::map<size_t, UserProcess*> procs)
 {
-  size_t i_want = procs.size();
-  size_t count = 0;
+  debug(PROCESS_REG, "lockmultiple archmems: %ld are to be locked\n", procs.size());
   list_of_processes_lock_.acquire();
-  ustl::map<size_t, UserProcess*>::iterator it; 
-  for (auto proc : procs)
+  for (auto prog : procs)
   {
-    if (list_of_processes_.find(proc.first->getPID()) == list_of_processes_.end())
+    if (list_of_processes_.find(prog.first) != list_of_processes_.end())
     {
+      prog.second->getLoader()->arch_memory_.lockArchMemory();
+    }
+    else
+    {
+      debug(PROCESS_REG, "lockmultiple archmems: %ld isnt in here yet or anymore\n", prog.second->getPID());
       list_of_processes_lock_.release();
-      debug(PROCESS_REG, "dangerous! will try to wait for proc thats now in here anymore\n");
       return false;
     }
   }
-  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
-  {
-    if (procs.find(it->second) != procs.end())
-    {
-      if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
-      {
-        it->second->getLoader()->arch_memory_.lockArchMemory();
-        count++;
-      }
-    }
-  }
-  if (count != i_want)
-  {
-    for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
-    {
-      if (procs.find(it->second) != procs.end())
-      {
-        if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
-        {
-          it->second->getLoader()->arch_memory_.unlockArchMemory();
-          count--;
-        }
-      }
-    }
-    assert(count == 0);
-    list_of_processes_lock_.release();
-    return false;
-  }
   list_of_processes_lock_.release();
   return true;
-}
+}  
+  // size_t i_want = procs.size();
+  // size_t count = 0;
+  // list_of_processes_lock_.acquire();
+  // ustl::map<size_t, UserProcess*>::iterator it; 
+  // for (auto proc : procs)
+  // {
+  //   if (list_of_processes_.find(proc.first->getPID()) == list_of_processes_.end())
+  //   {
+  //     list_of_processes_lock_.release();
+  //     debug(PROCESS_REG, "dangerous! will try to wait for proc thats now in here anymore\n");
+  //     return false;
+  //   }
+  // }
+  // for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  // {
+  //   if (procs.find(it->second) != procs.end())
+  //   {
+  //     if (!it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+  //     {
+  //       it->second->getLoader()->arch_memory_.lockArchMemory();
+  //       count++;
+  //     }
+  //   }
+  // }
+  // if (count != i_want)
+  // {
+  //   for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  //   {
+  //     if (procs.find(it->second) != procs.end())
+  //     {
+  //       if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
+  //       {
+  //         it->second->getLoader()->arch_memory_.unlockArchMemory();
+  //         count--;
+  //       }
+  //     }
+  //   }
+  //   assert(count == 0);
+  //   list_of_processes_lock_.release();
+  //   return false;
+  // }
+  // list_of_processes_lock_.release();
+  // return true;
 
-void ProcessRegistry::unlockMultArchmem(ustl::map<UserProcess*, size_t> procs)
+
+void ProcessRegistry::unlockMultArchmem(ustl::map<size_t, UserProcess*> procs)
 {
+  debug(PROCESS_REG, "lockmultiple archmems: %ld are to be locked\n", procs.size());
   list_of_processes_lock_.acquire();
-  ustl::map<size_t, UserProcess*>::iterator it; 
-  for (it = list_of_processes_.begin(); it != list_of_processes_.end(); it++)
+  for (auto prog : procs)
   {
-    if (procs.find(it->second) != procs.end())
+    if (list_of_processes_.find(prog.first) != list_of_processes_.end())
     {
-      if (it->second->getLoader()->arch_memory_.checkArchMemory(currentThread))
-       it->second->getLoader()->arch_memory_.unlockArchMemory();
+      prog.second->getLoader()->arch_memory_.unlockArchMemory();
+    }
+    else
+    {
+      debug(PROCESS_REG, "lockmultiple archmems: %ld isnt in here yet or anymore\n", prog.second->getPID());
+      list_of_processes_lock_.release();
+      assert(false);
     }
   }
   list_of_processes_lock_.release();
+  return;
 }
-
 

@@ -203,13 +203,13 @@ void InvertedPageTable::deduplicatePages()
           else
           {
             debug(DEDUBLI_THREAD, "somehow could not ddp page %lx and page %lx\n", ddp1, ddp2);
-          //  end = IPT_.end();
+            //end = IPT_.end();
             break;
           }
         }
         else 
         {
-      //    end = IPT_.end();
+          //end = IPT_.end();
           continue;
         }
       }
@@ -242,7 +242,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
 {
  // lockIPT();
   //add effected progs
-  ustl::map<UserProcess*, size_t> progs;
+  ustl::map<size_t, UserProcess*> progs;
   ArchMemoryMapping m;
   
   debug(DEDUBLI_THREAD, "Pages %lx and %lx are equal! we have %ld progs on first and %ld on second page\n", page_1, page_2, 
@@ -270,7 +270,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     for (auto prog : IPT_[page_1].progs_mappings)
     {
       debug(DEDUBLI_THREAD, "emplacing [%ld]\n", prog.first->getPID());
-      progs.emplace(prog);
+      progs.emplace(prog.first->getPID(), prog.first);
     }
     //0x7acad0e1e000
     //0x7acad0e1ef90
@@ -278,7 +278,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     for (auto prog : IPT_[page_2].progs_mappings)
     {
       debug(DEDUBLI_THREAD, "emplacing [%ld]\n", prog.first->getPID());
-      progs.emplace(prog);
+      progs.emplace(prog.first->getPID(), prog.first);
     }
     //this means all progs are there and their archmems are locked <3
     debug(DEDUBLI_THREAD, "now I ll try to get locks for %ld procs\n", progs.size());
@@ -296,7 +296,14 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   //need locks anyways...
   if (IPT_[page_1].page_map_level == 0)
   {
-    for (auto prog : progs)
+    for (auto prog : IPT_[page_1].progs_mappings)
+    {
+      m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+      PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+      //debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
+      pt_src[m.pti].writeable = 0;
+    }
+    for (auto prog : IPT_[page_2].progs_mappings)
     {
       m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
       PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
@@ -439,12 +446,20 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
     //damn... it changed
     if (IPT_[page_1].page_map_level == 0)
     {
-      for (auto prog : progs)
+      for (auto prog : IPT_[page_1].progs_mappings)
       {
         m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
         PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+        //debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
         pt_src[m.pti].writeable = 1;
-      } 
+      }
+      for (auto prog : IPT_[page_2].progs_mappings)
+      {
+        m = prog.first->getLoader()->arch_memory_.resolveMapping(prog.second);
+        PageTableEntry* pt_src = (PageTableEntry*) ArchMemory::getIdentAddressOfPPN(m.pd[m.pdi].pt.page_ppn);
+        //debug(DEDUBLI_THREAD, "changing page entry on: [%lx]\n", m.pd[m.pdi].pt.page_ppn);
+        pt_src[m.pti].writeable = 1;
+      }
     }
     
     ProcessRegistry::instance()->unlockMultArchmem(progs);

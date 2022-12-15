@@ -37,7 +37,7 @@ Scheduler::Scheduler()
   rdtsc_diff_sum = 0;
   addNewThread(&cleanup_thread_);
   addNewThread(&idle_thread_);
- //< addNewThread(&dedup_thread_);
+  addNewThread(&dedup_thread_);
 }
 
 uint32 Scheduler::schedule()
