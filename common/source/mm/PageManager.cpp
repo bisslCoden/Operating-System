@@ -217,6 +217,10 @@ uint32 PageManager::allocPPN(uint32 page_size)
   {
     debug(X_PAGEMANAGER, "allocPPN() said found == 0. requestSwapOut()... TID [%ld] already feeling tired\n", currentThread->getTID());
     SwapThread::instance()->requestSwapOutAndSleep(&found);
+    //we dont care if page was modified xD ... we just wokr up
+    memset((void*)ArchMemory::getIdentAddressOfPPN(found), 0, page_size);
+    assert(found && "PageManager::allocPPN: SwapThread's unlimited power and magical capabilities could not help that alloc");
+    return found;
   }
   assert(found && "PageManager::allocPPN: SwapThread's unlimited power and magical capabilities could not help that alloc");
 

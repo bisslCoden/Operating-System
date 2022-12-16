@@ -150,7 +150,7 @@ bool SwapManager::readFromDisk(uint32 swap_ID, uint32 ppn)
     return false;
 
   char* page = (char*) ArchMemory::getIdentAddressOfPPN(ppn);
-  device_->readData(swapID_to_spn_map_[swap_ID], PAGE_SIZE, page);
+  device_->readData(swapID_to_spn_map_[swap_ID] * device_->getBlockSize(), PAGE_SIZE, page);
   freeSPN(swapID_to_spn_map_[swap_ID]);
   swapID_to_spn_map_.erase(swap_ID);
   debug(SWAPMANAGER, "readfromdisk sucessfully finished!\n");

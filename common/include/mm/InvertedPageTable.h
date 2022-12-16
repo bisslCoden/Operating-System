@@ -6,6 +6,7 @@
 #include "umultimap.h"
 #include "uvector.h"
 #include "UserProcess.h"
+#include "PageReplacementAlgos.h"
 
 #define WAS_LAST 0x82426784
 
@@ -17,6 +18,8 @@ struct IPTFlags
 };
 
 //0x446: proc2 -> WAS_LAST
+
+class PageReplacementAlgos;
 
 struct IPTE
 {
@@ -54,8 +57,11 @@ public:
     void deduplicatePages();
     bool deduplicate(size_t page_1, size_t page_2);
     size_t computeChecksum(size_t* start);
+    //size_t getIPTSize()  { return IPT_.size(); };
+
 
 private:
+    friend class PageReplacementAlgos;
     static InvertedPageTable* instance_;
     Mutex IPT_lock_;
     ustl::map<size_t, IPTE> IPT_;

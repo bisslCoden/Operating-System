@@ -1,5 +1,6 @@
 #include "SwapThread.h"
 #include "debug.h"
+#include "PageReplacementAlgos.h"
 
 SwapThread* SwapThread::instance_ = 0;
 
@@ -213,21 +214,27 @@ uint32 SwapThread::swapOut()
   _ipt->lockIPT();   // lock ipt before or after PRA?
   
   // find a valid ppn to swap
-  uint32 ppn = 0; //pm->getPPN(); // wo funktion?
+  uint32 ppn = PageReplacementAlgos::randomPRA(); //pm->getPPN(); // wo funktion?
+  assert(ppn);
   uint32 swap_id = swap_cnt_++;
   IPTE* ipte = _ipt->getEntry(ppn);
-  debug(SWAPTHREAD, "swapOut(): got ppn %x from PRA\n", ppn);
+  assert(ipte->progs_mappings.size() != 0 && "how did that page end up here without a proc?");
+  debug(SWAPTHREAD, "swapOut(): got ppn %x from PRA which has %ld procs on it the first being %ld\n", ppn,ipte->progs_mappings.size(), ipte->progs_mappings[0].first->getPID());
   assert(ipte && "swapOut(): PRA ppn was not in IPT");
   assert(!ipte->my_flags.swapped && "ipte for that swap_id said swapped = 1");
 
   // lock archmems like in IPT::deduplicate() o,o
   bool prog_safe = false;
   ustl::map<size_t, UserProcess*> lock_process;
-  for (auto process : ipte->progs_mappings)
-    lock_process.push_back(ustl::make_pair(process.first->getPID(), process.first));
+
   while (!prog_safe)
   {
     lock_process.clear();
+    for (auto process : ipte->progs_mappings)
+    {
+      debug(SWAPTHREAD, "emplacing: [%ld]\n", process.first->getPID());
+      lock_process.emplace(process.first->getPID(), process.first);
+    }
     prog_safe = _pr->lockMultArchmem(lock_process);
     if (!prog_safe)
     {
@@ -280,11 +287,15 @@ uint32 SwapThread::swapIn(size_t swap_id)
   // lock archmems like in IPT::deduplicate() o,o
   bool prog_safe = false;
   ustl::map<size_t, UserProcess*> lock_process;
-  for (auto process : ipte->progs_mappings)
-    lock_process.push_back(ustl::make_pair(process.first->getPID(), process.first));
+
   while (!prog_safe)
   {
     lock_process.clear();
+    for (auto process : ipte->progs_mappings)
+    {
+      debug(SWAPTHREAD, "emplacing: [%ld]\n", process.first->getPID());
+      lock_process.emplace(process.first->getPID(), process.first);
+    }
     prog_safe = _pr->lockMultArchmem(lock_process);
     if (!prog_safe)
     {

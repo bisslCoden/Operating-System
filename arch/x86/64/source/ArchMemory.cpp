@@ -804,9 +804,11 @@ bool ArchMemory::checkSwap(size_t address)
   }
   size_t ppn = m.pt[m.pti].page_ppn;
   unlockArchMemory();
-
+  debug(PAGEFAULT, "checked and this seems like we need a little swapIN request letsgoooo!\n");
   // swap
+  currentUserProcess->unLockThreadMutex();
   SwapThread::instance()->requestSwapInAndSleep(ppn);
+  currentUserProcess->lockThreadMutex();
   return true;
 }
 
