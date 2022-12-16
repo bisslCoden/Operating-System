@@ -14,12 +14,12 @@ SwapThread::SwapThread() :
   Thread(0, "SwapThread", KERNEL_THREAD, 0),
   lock_requests_swap_in_("SwapThread::lock_requests_swap_in_"),
   lock_requests_swap_out_("SwapThread::lock_requests_swap_out_"),
-  lock_requests_swap_remove_entry_("SwapThread::lock_requests_swap_remove_entry_")
+  lock_requests_swap_remove_entry_("SwapThread::lock_requests_swap_remove_entry_"),
+  lock_sleep_swap_thread_("SwapThread::lock_sleep_swap_thread_"),
+  cond_sleep_swap_thread_(&lock_sleep_swap_thread_, "SwapThread::cond_sleep_swap_thread_")
 {
   swap_cnt_ = PageManager::instance()->getTotalNumPages() + SICHERHEITSABSTAND;
-  // maybe get the IPT
-  // maybe get the PRAs
-  // both when implemented
+  debug(SWAPTHREAD, "SwapThread(). initialized swap_cnt_ to %x\n", swap_cnt_);
 }
 
 
@@ -29,10 +29,11 @@ SwapThread::SwapThread() :
 
 void SwapThread::requestSwapOutAndSleep(uint32* found_ptr)
 {
-  debug(SWAPREQUEST, "requestSwapOutAndSleep(found_ptr = %lx) by [%ld] will push and sleep until i got a page\n", (size_t)found_ptr, currentThread->getTID());
+  debug(SWAPREQUEST, "requestSwapOutAndSleep(found_ptr = %lx) by [%ld] name: %s. Will push my request, wake SwapThread and sleep...\n", 
+    (size_t)found_ptr, currentThread->getTID(), currentThread->getName());
   assert(found_ptr && ((*found_ptr) == 0) && "wat?");
 
-  // Swap
+  // SwapThread better not 
   if(currentThread->getType() == KERNEL_THREAD)
   {
     assert(currentThread == this && "KernelThread calling requestSwapOutAndSleep was not SwapThread.");
@@ -44,47 +45,63 @@ void SwapThread::requestSwapOutAndSleep(uint32* found_ptr)
   }
 
   // create request
-  SwapOut request{};
-  request.found_ptr = found_ptr;
   Condition request_cond(&lock_requests_swap_out_ , "SwapThread::SwapOut::cond_swap_out");
-  request.cond_swap_out = &request_cond;
+  SwapOut request{};
+  request.found_ptr_ = found_ptr;
+  request.cond_request_swap_out_ = &request_cond;
 
-  // push request and sleep
-  debug(SWAPREQUEST, "requestSwapOutAndSleep(found_ptr = %lx) by [%ld] schleepp now\n", (size_t)found_ptr, currentThread->getTID());
-  lock_requests_swap_out_.acquire();
-  requests_swap_out_.push_back(request);
-  request.cond_swap_out->waitAndRelease();
+  // push request, signal swapthread and sleep
+  // (should we change the locking to: 1) lock request, push request, unlock request. 2) lock sleep, signal sleep, unlock sleep 3) lock requests, sleep on requests)?
+  debug(SWAPREQUEST, "TIP [%ld] with (found_ptr = %lx) by will signal SwapThread and go to sleep\n", 
+    currentThread->getTID(), (size_t)found_ptr); 
+  lock_requests_swap_out_.acquire();                  // 1 lock: request acquire
+  requests_swap_out_.push_back(request);              // push request
+  lock_sleep_swap_thread_.acquire();                  // 2 lock: swapthread sleep sleep
+  cond_sleep_swap_thread_.signal();                   // signal
+  lock_sleep_swap_thread_.release();                  // 2 lock: request release
+  request.cond_request_swap_out_->waitAndRelease();   // 1 lock: wait for cond on lock 1
 
   // awake again
-  debug(SWAPREQUEST, "requestSwapOut() by TID [%ld] will continue with found_ptr = %lx\n", currentThread->getTID(), (size_t)found_ptr);
-  assert(request.found_ptr && "requesSwapOut() woke up and found_ptr became 0!?!");
+  debug(SWAPREQUEST, "requestSwapOut() by TID [%ld] will continue with found_ptr = %lx\n", 
+    currentThread->getTID(), (size_t)found_ptr);
+  assert(request.found_ptr_ && "requesSwapOut() woke up and found_ptr became 0!?!");
 }
 
 
 void SwapThread::requestSwapInAndSleep(uint32 swap_id)
 {
-  debug(SWAPREQUEST, "requestSwapInAndSleep(ppn = %x) by [%ld] will push and sleep now.\n", swap_id, currentThread->getTID());
-  assert(currentThread != this && "ALAAAAAAAAAAAAAAAAAAAAAAAAAAAAARRRRRM I DONNT KNOW WHAT TO DOOOOO IN REQUEST SWAP IIIIINNNNNNN...???");
+  debug(SWAPREQUEST, "requestSwapInAndSleep(swap_id = %x) by [%ld] name: %s. Will push my request, wake SwapThread and sleep...\n", 
+    swap_id, currentThread->getTID(), currentThread->getName());
+  assert(currentThread->getTID() && "requestSwapInAndSleep() was called by a kernelthread?");
 
   // create request 
-  SwapIn request{};
-  request.swap_id = swap_id;
   Condition request_cond(&lock_requests_swap_in_, "SwapThread::SwapIn::cond_swap_in");
-  request.cond_swap_in = &request_cond;
+  SwapIn request{};
+  request.swap_id_ = swap_id;
+  request.cond_request_swap_in_ = &request_cond;
 
-  // push request and sleep 
-  lock_requests_swap_in_.acquire();
-  requests_swap_in_.push_back(request);
-  request.cond_swap_in->waitAndRelease();
-  
+  // push request, signal swapthread and sleep 
+  // (should we change the locking to: 1) lock request, push request, unlock request. 2) lock sleep, signal sleep, unlock sleep 3) lock requests, sleep on requests)?
+  debug(SWAPREQUEST, "requestSwapInAndSleep(swap_id = %x) by TID [%ld] will signal SwapThread and go to sleep\n", 
+    swap_id, currentThread->getTID()); 
+  lock_requests_swap_in_.acquire();                   // 1 lock: request acquire
+  requests_swap_in_.push_back(request);               // push request
+  lock_sleep_swap_thread_.acquire();                  // 2 lock: swapthread sleep sleep
+  cond_sleep_swap_thread_.signal();                   // signal
+  lock_sleep_swap_thread_.release();                  // 2 lock: request release
+  request.cond_request_swap_in_->waitAndRelease();    // 1 lock: wait for cond on lock 1
+
+  // awake again
   debug(SWAPREQUEST, "requestSwapInAndSleep(ppn = %x) by [%ld] woke up again\n", swap_id, currentThread->getTID());
 }
 
 
-void SwapThread::requestSwapRemoveEntry()
+void SwapThread::requestSwapRemoveEntry(uint32 swap_id)
 {
-  debug(SWAPREQUEST, "requestSwapRemoveEntry() by [%ld]\n", currentThread->getTID());
-  assert(false && "how about look at which things you uncomment? @SwapThread::requestsSolve()");
+  debug(SWAPREQUEST, "requestSwapRemoveEntry(swap_id = %x) by [%ld]. immediately pushing back.\n", swap_id, currentThread->getTID());
+  lock_requests_swap_remove_entry_.acquire();
+  requests_swap_remove_entry_.push_back(swap_id);
+  lock_requests_swap_remove_entry_.release();
 } 
 
 
@@ -97,14 +114,16 @@ void SwapThread::requestSwapRemoveEntry()
 
 void SwapThread::Run()
 {
-  debug(SWAPTHREAD, "Run() called.\n");
+  debug(SWAPTHREAD, "Run(): called.\n");
   while(true)
   {
-    // TODO sleep if scheduled without requests
     if(requestSolveSwap())
-      Scheduler::instance()->yield();
-    else 
-      debug(SWAPTHREAD, "Run() found solved 1 round of requests.\n");
+    {
+      debug(SWAPTHREAD, "Run(): No requests... bored... sleeping now\n");
+      lock_sleep_swap_thread_.acquire();
+      cond_sleep_swap_thread_.waitAndRelease();
+      debug(SWAPTHREAD, "Run(): Woke up again. Feeling quite good, well rested. \n");
+    }
   }
 }
 
@@ -112,7 +131,8 @@ void SwapThread::Run()
 bool SwapThread::requestSolveSwap()
 {
   // these 3 methods return true if empfty
-  bool empty1 = true; //requestSolveSwapRemoveEntry();
+  debug(SWAPTHREAD, "requestSolveSwap() entered\n");
+  bool empty1 = requestSolveSwapRemoveEntry();
   bool empty2 = requestSolveSwapIn();
   bool empty3 = requestSolveSwapOut();
 
@@ -125,13 +145,25 @@ bool SwapThread::requestSolveSwap()
 
 bool SwapThread::requestSolveSwapRemoveEntry()
 {
+  debug(SWAPTHREAD, "requestSolveSwapRemoveEntry() entered\n");
+
+  // return true if vector empfty
   lock_requests_swap_remove_entry_.acquire();
-  debug(SWAPTHREAD, "requestSolveSwapRemoveEntry() has size %ld\n", requests_swap_remove_entry_.size());
-  for(size_t i = 0; i < requests_swap_remove_entry_.size(); i++)
+  if(requests_swap_remove_entry_.size() == 0)
   {
-    debug(SWAPTHREAD, "TODO: delete entry? what did we even store? delete from where?\n");
+    lock_requests_swap_remove_entry_.release();
+    return true;
   }
-  assert(false && "requestSolveSwapRemoveEntry() was uncommented...");
+
+  // read every request and remove
+  // SwapManager*       _sm  = SwapManager::instance(); // ----> uncomment when removeFromDisk() available
+  InvertedPageTable* _ipt = InvertedPageTable::instance();
+  debug(SWAPTHREAD, "requestSolveSwapRemoveEntry() has size %ld\n", requests_swap_remove_entry_.size());
+  for(size_t swap_id : requests_swap_remove_entry_)
+  {
+    _ipt->deleteEntry(swap_id);
+    // _sm->removeFromDisk(swap_id); // ----> uncomment when available 
+  }
   lock_requests_swap_remove_entry_.release();
   return true;
 }
@@ -139,6 +171,8 @@ bool SwapThread::requestSolveSwapRemoveEntry()
 
 bool SwapThread::requestSolveSwapOut()
 {
+  debug(SWAPTHREAD, "requestSolveSwapOut() entered\n");
+
   // return true if vector empfty
   lock_requests_swap_out_.acquire();
   if(requests_swap_out_.size() == 0)
@@ -153,15 +187,17 @@ bool SwapThread::requestSolveSwapOut()
   requests_swap_out_.erase(requests_swap_out_.begin());
   lock_requests_swap_out_.release();
 
-  // this allocPPN() from SwapThread will land in swapOut()
+  // this allocPPN() from SwapThread will land in  swapOut()
   debug(SWAPTHREAD, "requestSolveSwapOut(): *(request->found_ptr) = allocPPN()\n");
-  *(request.found_ptr) = PageManager::instance()->allocPPN();
+  assert(request.found_ptr_ && "wtf?");
+  *(request.found_ptr_) = PageManager::instance()->allocPPN();
 
   // signal sleeping thread to wake
   lock_requests_swap_out_.acquire();
-  bool empty = requests_swap_in_.size() == 1;
-  debug(SWAPTHREAD, "requestSolveSwapOut(): swapped out and count ppn at %d. signaling cond thread\n", *(request.found_ptr));
-  request.cond_swap_out->signal();
+  bool empty = requests_swap_in_.size() == 0;
+  assert(request.found_ptr_ && "wtf?");
+  debug(SWAPTHREAD, "requestSolveSwapOut(): swapped out and count ppn at %d. signaling cond thread\n", *(request.found_ptr_));
+  request.cond_request_swap_out_->signal();
   lock_requests_swap_out_.release();
   return empty;
 }
@@ -169,6 +205,8 @@ bool SwapThread::requestSolveSwapOut()
 
 bool SwapThread::requestSolveSwapIn()
 {
+  debug(SWAPTHREAD, "requestSolveSwapIn() entered\n");
+
   // return true if vector empty.
   lock_requests_swap_in_.acquire();
   if(requests_swap_in_.size() == 0)
@@ -184,12 +222,12 @@ bool SwapThread::requestSolveSwapIn()
   lock_requests_swap_in_.release();
 
   // assert on failed swapIn()... could also return a value to PageFaultHandler
-  assert(swapIn(request.swap_id) && "swapIn(swap_id) failed with that swap_id");
+  assert(swapIn(request.swap_id_) && "swapIn(swap_id) failed with that swap_id");
   
   // wake waiting thread and return emptyness
   lock_requests_swap_in_.acquire();
   bool empty = requests_swap_in_.size() == 1;
-  request.cond_swap_in->signal();
+  request.cond_request_swap_in_->signal();
   lock_requests_swap_in_.release();
   return empty;
 }
@@ -205,8 +243,8 @@ bool SwapThread::requestSolveSwapIn()
 uint32 SwapThread::swapOut()
 {
   debug(SWAPTHREAD, "swapOut(): entered\n");
-  // PageManager*        _pm   = PageManager::instance();
-  // SwapManager*        _sm   = SwapManager::instance();
+  // PageManager*        _pm   = PageManager::instance(); // ----> uncomment if getPPN from PRA available
+  // SwapManager*        _sm   = SwapManager::instance(); // ----> uncomment if writeToDisk available 
   ProcessRegistry*    _pr   = ProcessRegistry::instance();
   InvertedPageTable*  _ipt  = InvertedPageTable::instance();
 
@@ -291,6 +329,7 @@ uint32 SwapThread::swapIn(size_t swap_id)
   // read from swap page
   uint32 ppn = _pm->allocPPN();
   // assert(_sm->readFromDisk(swap_id, ppn) && "could not read requested swap_id from SwapManager"); // readFromDisk return 0 on fail?
+  // ^^^^^^^^ uncomment when available
 
   // for every archmem that looks onto this page: set page bits
   for (auto process : ipte->progs_mappings)

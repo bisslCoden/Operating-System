@@ -9,26 +9,25 @@
 #include "ProcessRegistry.h"
 
 #define SWAPTHREAD_LOAD 8
-#define SICHERHEITSABSTAND 20
+// swap_id should start at 0x800 that way
+#define SICHERHEITSABSTAND 32
 
 // Pagefault needs disc -> ram.
 struct SwapIn
 {
-  Condition* cond_swap_in;
-  uint32 swap_id;
+  Condition* cond_request_swap_in_;
+  // the id with which we'll find the page on the swap disc
+  uint32 swap_id_;
 };
 
 // allocPPN() needs ram -> disk
 struct SwapOut
 {
-  Condition* cond_swap_out;
-  // pointer to variable found in 
-  uint32* found_ptr;
+  Condition* cond_request_swap_out_;
+  // pointer to variable "found" in allocPPN
+  uint32* found_ptr_;
 };
 
-// we probably won't need a struct here
-struct SwapRemove
-{};
 
 /* NO RAM for allocPPN(): swapOut(ram -> disk).
  * PAGEFAULT because swapOut(): swapIn(disc -> ram).
@@ -45,7 +44,7 @@ class SwapThread : public Thread
 
 
     // -------------------------------------------------------------------------
-    //                               requests
+    //                         UserThread requests
     // -------------------------------------------------------------------------
 
     /**
@@ -68,17 +67,18 @@ class SwapThread : public Thread
     void requestSwapOutAndSleep(uint32* found_ptr);
 
     /**
-     * @brief Will asssert if called. 
-     * Just delete? What did we even store? Delete from where?
+     * @brief request to delete a page on swap partition
+     * 
+     * @param swap_id the id to that page
      */
-    void requestSwapRemoveEntry();
+    void requestSwapRemoveEntry(uint32 swap_id);
 
 
 
 
   private:
     // -------------------------------------------------------------------------
-    //                            solve requests
+    //                            SwapThread solve requests
     // -------------------------------------------------------------------------
 
     /**
@@ -111,10 +111,6 @@ class SwapThread : public Thread
      */
     bool requestSolveSwapRemoveEntry();
 
-
-
-
-
     // -------------------------------------------------------------------------
     //                        actually swap something.
     // -------------------------------------------------------------------------
@@ -137,10 +133,8 @@ class SwapThread : public Thread
     
 
     // -------------------------------------------------------------------------
-    //                          el member variablos
+    //                              Thread requests
     // -------------------------------------------------------------------------
-
-    static SwapThread* instance_;
 
     /**
      * @brief A counter that increases with every swapOut().
@@ -163,9 +157,19 @@ class SwapThread : public Thread
     Mutex lock_requests_swap_out_;
     
     /**
-     * NOTHING
+     * holds swap_ids that shall be removed
      * + lock
      */
-    ustl::vector<SwapRemove> requests_swap_remove_entry_;
+    ustl::vector<uint32> requests_swap_remove_entry_;
     Mutex lock_requests_swap_remove_entry_;
+
+
+    // -------------------------------------------------------------------------
+    //                          SwapThread
+    // -------------------------------------------------------------------------
+
+    static SwapThread* instance_;
+
+    Mutex lock_sleep_swap_thread_;
+    Condition cond_sleep_swap_thread_;
 };
