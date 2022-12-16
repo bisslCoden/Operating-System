@@ -125,17 +125,25 @@ void SwapManager::freeSPN(size_t spn)
 //   }
 // }
 
-void SwapManager::writeToDisk(uint32 swap_ID, uint32 ppn)
+bool SwapManager::writeToDisk(uint32 swap_ID, uint32 ppn)
 {
+  debug(SWAPMANAGER, "WriteToDisk called with sid %lx and ppn %lx\n", swap_ID, ppn);
+  if (ppn == 0)
+  {
+    return false;
+  }
+  
   size_t spn = allocSPN();
   swapID_to_spn_map_.emplace(swap_ID, spn);
  
   device_->writeData((spn * device_->getBlockSize()),device_->getBlockSize(), (char*)ArchMemory::getIdentAddressOfPPN(ppn));
-  return;
+  debug(SWAPMANAGER, "WriteToDisk sucessfully finished!\n");
+  return true;
 }
 
 bool SwapManager::readFromDisk(uint32 swap_ID, uint32 ppn)
 {
+  debug(SWAPMANAGER, "ReadFromdisk called with sid %lx and ppn %lx\n", swap_ID, ppn);
   if (swapID_to_spn_map_.find(swap_ID) == swapID_to_spn_map_.end())
     return false;
   if(ppn == 0)
@@ -145,6 +153,7 @@ bool SwapManager::readFromDisk(uint32 swap_ID, uint32 ppn)
   device_->readData(swapID_to_spn_map_[swap_ID], PAGE_SIZE, page);
   freeSPN(swapID_to_spn_map_[swap_ID]);
   swapID_to_spn_map_.erase(swap_ID);
+  debug(SWAPMANAGER, "readfromdisk sucessfully finished!\n");
   return true;
 }
 

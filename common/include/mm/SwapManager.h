@@ -42,7 +42,7 @@ public:
   size_t allocSPN();
   void freeSPN(size_t spn);
 
-  void writeToDisk(uint32 swap_ID, uint32 ppn);
+  bool writeToDisk(uint32 swap_ID, uint32 ppn);
 
   bool readFromDisk(uint32 swap_ID, uint32 ppn);
 

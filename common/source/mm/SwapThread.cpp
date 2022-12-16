@@ -206,7 +206,7 @@ uint32 SwapThread::swapOut()
 {
   debug(SWAPTHREAD, "swapOut(): entered\n");
   // PageManager*        _pm   = PageManager::instance();
-  // SwapManager*        _sm   = SwapManager::instance();
+  SwapManager*        _sm   = SwapManager::instance();
   ProcessRegistry*    _pr   = ProcessRegistry::instance();
   InvertedPageTable*  _ipt  = InvertedPageTable::instance();
 
@@ -237,7 +237,7 @@ uint32 SwapThread::swapOut()
   }
 
   // write to disk
-  // assert(_sm->writeToDisk(swap_id, ppn)); // wo funktion?
+  assert(_sm->writeToDisk(swap_id, ppn)); // wo funktion?
 
   // for every archmem that looks onto this page: set page bits
   for (auto process : ipte->progs_mappings)
@@ -261,7 +261,7 @@ uint32 SwapThread::swapIn(size_t swap_id)
 {
   debug(SWAPTHREAD, "swapIn(swap_id = %lx): entered\n", swap_id);
   PageManager*        _pm   = PageManager::instance();
-  // SwapManager*        _sm   = SwapManager::instance();
+  SwapManager*        _sm   = SwapManager::instance();
   ProcessRegistry*    _pr   = ProcessRegistry::instance();
   InvertedPageTable*  _ipt  = InvertedPageTable::instance();
 
@@ -295,7 +295,7 @@ uint32 SwapThread::swapIn(size_t swap_id)
 
   // read from swap page
   uint32 ppn = _pm->allocPPN();
-  // assert(_sm->readFromDisk(swap_id, ppn) && "could not read requested swap_id from SwapManager"); // readFromDisk return 0 on fail?
+  assert(_sm->readFromDisk(swap_id, ppn) && "could not read requested swap_id from SwapManager"); // readFromDisk return 0 on fail?
 
   // for every archmem that looks onto this page: set page bits
   for (auto process : ipte->progs_mappings)
