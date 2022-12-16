@@ -34,9 +34,9 @@ void SwapThread::requestSwapOutAndSleep(uint32* found_ptr)
   assert(found_ptr && ((*found_ptr) == 0) && "wat?");
 
   // Swap
-  if(currentThread->getType() == KERNEL_THREAD)
+  if(currentThread == this)
   {
-    assert(currentThread == this && "KernelThread calling requestSwapOutAndSleep was not SwapThread.");
+    //assert(currentThread == this && "KernelThread calling requestSwapOutAndSleep was not SwapThread.");
     debug(SWAPREQUEST, "SwapThread's allocPPN() sent a requestSwapOut() Better freePPN(swapOut())\n");
     for(int i = 0; i < SWAPTHREAD_LOAD; i++)
       PageManager::instance()->freePPN(swapOut());
