@@ -162,9 +162,9 @@ public:
   // checks swap-bits on physical pyge for given virtual address
   bool checkSwap(size_t address);
   // sets present = 0, swap = 1, ppn = swap_id
-  bool setPageToSwapOut();
+  bool setPageToSwapOut(size_t swap_id, uint32 ppn, size_t vpn);
   // sets present = 1, swap = 0, ppn = ppn
-  bool setPageToSwapIn();
+  bool setPageToSwapIn(size_t swap_id, uint32 ppn, size_t vpn);
 
 private:
 /** 

@@ -40,4 +40,5 @@
 #define sc_ks_wait 902
 #define sc_ks_post 903
 
-
+#define sc_test_allocppn 1000
+#define sc_test_freeppn 1001

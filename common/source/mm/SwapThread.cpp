@@ -16,7 +16,7 @@ SwapThread::SwapThread() :
   lock_requests_swap_out_("SwapThread::lock_requests_swap_out_"),
   lock_requests_swap_remove_entry_("SwapThread::lock_requests_swap_remove_entry_")
 {
-  swap_cnt_ = PageManager::instance()->getTotalNumPages() + 1;
+  swap_cnt_ = PageManager::instance()->getTotalNumPages() + SICHERHEITSABSTAND;
   // maybe get the IPT
   // maybe get the PRAs
   // both when implemented
@@ -204,39 +204,54 @@ bool SwapThread::requestSolveSwapIn()
 
 uint32 SwapThread::swapOut()
 {
-  InvertedPageTable* ipt = InvertedPageTable::instance();
-  // PageManager* pm = PageManager::instance();
-  SwapManager* sm = SwapManager::instance();
+  debug(SWAPTHREAD, "swapOut(): entered\n");
+  // PageManager*        _pm   = PageManager::instance();
+  // SwapManager*        _sm   = SwapManager::instance();
+  ProcessRegistry*    _pr   = ProcessRegistry::instance();
+  InvertedPageTable*  _ipt  = InvertedPageTable::instance();
+
+  _ipt->lockIPT();   // lock ipt before or after PRA?
   
-  ipt->lockIPT();
-  
-  // we need to find a valid ppn from IPT to swap
-  uint32 ppn = 0; //pm->getPPN();; 
-  IPTE* entry = ipt->getEntry(ppn);
-
-
-
-
-  // lock archmems like in deduplicate.
-  
-  // for every archmem that looks onto this page: set page bits
-
-  // create swap page number, write to swap disk
+  // find a valid ppn to swap
+  uint32 ppn = 0; //pm->getPPN(); // wo funktion?
   uint32 swap_id = swap_cnt_++;
-  sm->writeToDisk(swap_id);
+  IPTE* ipte = _ipt->getEntry(ppn);
+  debug(SWAPTHREAD, "swapOut(): got ppn %x from PRA\n", ppn);
+  assert(ipte && "swapOut(): PRA ppn was not in IPT");
+  assert(!ipte->my_flags.swapped && "ipte for that swap_id said swapped = 1");
 
-  // unlock archmems
+  // lock archmems like in IPT::deduplicate() o,o
+  bool prog_safe = false;
+  ustl::map<size_t, UserProcess*> lock_process;
+  for (auto process : ipte->progs_mappings)
+    lock_process.push_back(ustl::make_pair(process.first->getPID(), process.first));
+  while (!prog_safe)
+  {
+    lock_process.clear();
+    prog_safe = _pr->lockMultArchmem(lock_process);
+    if (!prog_safe)
+    {
+      debug(SWAPTHREAD, "swapOut(): could not lockMultArchmem(processes)...yielding\n");
+      Scheduler::instance()->yield();
+    }
+  }
 
+  // write to disk
+  // assert(_sm->writeToDisk(swap_id, ppn)); // wo funktion?
 
+  // for every archmem that looks onto this page: set page bits
+  for (auto process : ipte->progs_mappings)
+    assert(process.first->getLoader()->arch_memory_.setPageToSwapOut(swap_id, ppn, process.second));
 
-
-  // remove ppn key entry from ipt & add under new key <swap page number>
-  entry->my_flags.swapped = true;
-  assert(ipt->deleteEntry(ppn) && "physical page number was not in ipt"); 
-  assert(ipt->addEntry(swap_id, *entry) && "swap page number already in ipt"); // this will not work because we use a pointer, right?
+  _pr->unlockMultArchmem(lock_process);
   
-  ipt->unlockIPT();
-
+  // remove ppn key entry from ipt & add under new key <swap page number>
+  ipte->my_flags.swapped = true;
+  IPTE tmp = *ipte;
+  assert(_ipt->deleteEntry(ppn) && "swapOut():physical page number was not in ipt"); 
+  assert(_ipt->addEntry(swap_id, tmp) && "swapOut():swap page number already in ipt"); // this will not work because we use a pointer, right?
+  
+  _ipt->unlockIPT();
 
   return ppn;
 }
@@ -244,24 +259,54 @@ uint32 SwapThread::swapOut()
 
 uint32 SwapThread::swapIn(size_t swap_id)
 {
-  debug(SWAPTHREAD, "swapIn() requested swap_id %lx\n", swap_id);
-  // SwapManager* sm = SwapManager::instance();
-  // PageManager* pm = PageManager::instance();
+  debug(SWAPTHREAD, "swapIn(swap_id = %lx): entered\n", swap_id);
+  PageManager*        _pm   = PageManager::instance();
+  // SwapManager*        _sm   = SwapManager::instance();
+  ProcessRegistry*    _pr   = ProcessRegistry::instance();
+  InvertedPageTable*  _ipt  = InvertedPageTable::instance();
+
+  _ipt->lockIPT();
 
   // find page?
-  // assert(sm->checkPresence(swap_id)); // do I have to enter swap_id or swap page number? paramerter's called swap_pn
+  IPTE* ipte = _ipt->getEntry(swap_id);
+  assert(ipte && "requested swap_id was not in IPT");
+  assert(ipte->my_flags.swapped && "ipte for that swap_id said swapped = 0");
   
-  // SwapManager writes onto allocated page
-  // uint32 ppn = pm->allocPPN();
-  // assert((sm->getPageContent(swap_id, ppn) == 0) && "reading requested swap_id from SwapManager"); // getPageContent should return something...
+  // lock archmems like in IPT::deduplicate() o,o
+  bool prog_safe = false;
+  ustl::map<size_t, UserProcess*> lock_process;
+  for (auto process : ipte->progs_mappings)
+    lock_process.push_back(ustl::make_pair(process.first->getPID(), process.first));
+  while (!prog_safe)
+  {
+    lock_process.clear();
+    prog_safe = _pr->lockMultArchmem(lock_process);
+    if (!prog_safe)
+    {
+      debug(SWAPTHREAD, "swapIn(swap_id = %lx): could not lockMultArchmem(processes)...yielding\n");
+      Scheduler::instance()->yield();
+    }
+  }
 
-  // change swap bits
+  // read from swap page
+  uint32 ppn = _pm->allocPPN();
+  // assert(_sm->readFromDisk(swap_id, ppn) && "could not read requested swap_id from SwapManager"); // readFromDisk return 0 on fail?
 
-
-
-  // add to ipt -> requestSwapOut()? currentThread = SwapThread: swapOut()
+  // for every archmem that looks onto this page: set page bits
+  for (auto process : ipte->progs_mappings)
+    assert(process.first->getLoader()->arch_memory_.setPageToSwapIn(swap_id, ppn, process.second) && "setPageToSwapIn() failed.");
   
-  return 0;
+  _pr->unlockMultArchmem(lock_process);
+  
+  // remove swap_id key entry from ipt & add under new key <swap page number>
+  ipte->my_flags.swapped = false;
+  IPTE tmp = *ipte;
+  assert(_ipt->deleteEntry(swap_id) && "physical page number was not in ipt"); 
+  assert(_ipt->addEntry(ppn, tmp) && "swap page number already in ipt"); // this will not work because we use a pointer, right?
+  
+  _ipt->unlockIPT();
+  
+  return ppn;
 }
 
 
