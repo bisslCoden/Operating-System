@@ -78,13 +78,13 @@ bool ArchMemory::unmapPage(uint64 virtual_page, ustl::queue<size_t>* ppns)
     {
       debug(X_USERTHREAD, "[%ld] ~unmapPage(): will call freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
       //PageManager::instance()->freePPN(m.page_ppn);
-      //REQUEST TO SWAPTHREAD
+      SwapThread::instance()->requestSwapRemoveEntry(m.page_ppn);
     }
     else if(ret == (int) WAS_LAST)
     {
       IPT->deleteRef(m.page_ppn, my_proc, virtual_page);
       //PageManager::instance()->freePPN(m.page_ppn);
-      //REQUEST TO SWAPTHREAD
+      SwapThread::instance()->requestSwapRemoveEntry(m.page_ppn);
     }
     else
       debug(X_USERTHREAD, "[%ld] ~unmapPage(): COULD NOT CALL freeform device freePPN(ppn = %lx)\n", currentThread->getTID(), m.page_ppn);
@@ -323,13 +323,13 @@ ArchMemory::~ArchMemory()
                   {
                     debug(X_USERPROCESS, "[%ld] ~ArchMemory(): will try to free swpn(spn = %lx)\n", my_proc->getPID(), swID);
                    // PageManager::instance()->freePPN(ppn);
-                   //REQUEST TO SWAPTHREAD
+                    SwapThread::instance()->requestSwapRemoveEntry(swID);
                   }
                   else if(ret == (int) WAS_LAST)
                   {
                     IPT->deleteRef(swID, my_proc, vpn);
                     //PageManager::instance()->freePPN(ppn);
-                    //REQUEST TO SWAPTHREAD
+                    SwapThread::instance()->requestSwapRemoveEntry(swID);
                   }
                   else
                   {

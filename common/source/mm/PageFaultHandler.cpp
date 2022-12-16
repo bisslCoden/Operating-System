@@ -96,7 +96,7 @@ inline void PageFaultHandler::handlePageFault(size_t address, bool user,
     else if(currentThread->loader_->arch_memory_.checkSwap(address)) // swap
     {
       debug(PAGEFAULT, "checkSwap() resolved! returning from handlePageFault8)\n");
-      return; // return?
+      //return; // return?
     }
     else if (switch_to_us && address > END_OF_STACKS)
     {
