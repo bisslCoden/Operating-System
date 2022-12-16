@@ -159,7 +159,7 @@ bool SwapThread::requestSolveSwapOut()
 
   // signal sleeping thread to wake
   lock_requests_swap_out_.acquire();
-  bool empty = requests_swap_in_.size() == 1;
+  bool empty = requests_swap_in_.size() == 0;
   debug(SWAPTHREAD, "requestSolveSwapOut(): swapped out and count ppn at %d. signaling cond thread\n", *(request.found_ptr));
   request.cond_swap_out->signal();
   lock_requests_swap_out_.release();
@@ -188,7 +188,7 @@ bool SwapThread::requestSolveSwapIn()
   
   // wake waiting thread and return emptyness
   lock_requests_swap_in_.acquire();
-  bool empty = requests_swap_in_.size() == 1;
+  bool empty = requests_swap_in_.size() == 0;
   request.cond_swap_in->signal();
   lock_requests_swap_in_.release();
   return empty;
@@ -269,7 +269,12 @@ uint32 SwapThread::swapIn(size_t swap_id)
 
   // find page?
   IPTE* ipte = _ipt->getEntry(swap_id);
-  assert(ipte && "requested swap_id was not in IPT");
+  if (!ipte)
+  {
+    debug(SWAPTHREAD, "looks like I have already dealt with that swap in and the page is back in already! returning...\n");
+    return 1;
+  }
+  
   assert(ipte->my_flags.swapped && "ipte for that swap_id said swapped = 0");
   
   // lock archmems like in IPT::deduplicate() o,o
@@ -302,7 +307,7 @@ uint32 SwapThread::swapIn(size_t swap_id)
   ipte->my_flags.swapped = false;
   IPTE tmp = *ipte;
   assert(_ipt->deleteEntry(swap_id) && "physical page number was not in ipt"); 
-  assert(_ipt->addEntry(ppn, tmp) && "swap page number already in ipt"); // this will not work because we use a pointer, right?
+  assert(_ipt->addEntry(ppn, tmp) && "ppn page number already in ipt"); // this will not work because we use a pointer, right?
   
   _ipt->unlockIPT();
   
