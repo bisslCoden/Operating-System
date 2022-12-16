@@ -788,9 +788,10 @@ bool ArchMemory::setPageToSwapOut(size_t swap_id, uint32 ppn, size_t vpn)
   // set bits if necessary
   if(in_physical)
   {
-    pte.swap = 1;
-    pte.present = 0;
-    pte.page_ppn = swap_id;
+    PageTableEntry* page_ptr = (PageTableEntry*)getIdentAddressOfPPN(m.pt_ppn);
+    page_ptr->swap = 1;
+    page_ptr->present = 0;
+    page_ptr->page_ppn = swap_id;
     debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) setting bits for swap\n", swap_id, ppn, vpn);
   }
   return (in_physical || swapped);
@@ -818,9 +819,10 @@ bool ArchMemory::setPageToSwapIn(size_t swap_id, uint32 ppn, size_t vpn)
   // set bits if necessary
   if(swapped)
   {
-    pte.swap = 0;
-    pte.present = 1;
-    pte.page_ppn = ppn;
+    PageTableEntry* page_ptr = (PageTableEntry*)getIdentAddressOfPPN(m.pt_ppn);
+    page_ptr->swap = 0;
+    page_ptr->present = 1;
+    page_ptr->page_ppn = ppn;
     debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) setting bits for swap\n", swap_id, ppn, vpn);
   }
   return (in_physical || swapped);

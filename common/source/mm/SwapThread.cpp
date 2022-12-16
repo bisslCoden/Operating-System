@@ -283,7 +283,7 @@ uint32 SwapThread::swapIn(size_t swap_id)
     prog_safe = _pr->lockMultArchmem(lock_process);
     if (!prog_safe)
     {
-      debug(SWAPTHREAD, "swapIn(swap_id = %lx): could not lockMultArchmem(processes)...yielding\n");
+      debug(SWAPTHREAD, "swapIn(swap_id = %lx): could not lockMultArchmem(processes)...yielding\n", swap_id);
       Scheduler::instance()->yield();
     }
   }
