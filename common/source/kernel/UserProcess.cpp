@@ -173,17 +173,21 @@ UserProcess::~UserProcess()
   //Scheduler::instance()->printThreadList();
   loader_ = 0;
 
-  debug(X_USERPROCESS, "annoying but test if vfs is prob\n");
  
   debug(X_USERPROCESS, "I SHOULD UNLOCK IPT RIGHT FUCKING NOW....\n");
   IPT->unlockIPT();
+  
+
+  debug(X_USERPROCESS, "annoying but test if vfs is prob\n");
+
   if (fd_ > 0)
     VfsSyscall::close(fd_);
+  
+  delete working_dir_;
+  working_dir_ = 0;
 
   debug(X_USERPROCESS, "vfs isnt prob\n");
 
-  delete working_dir_;
-  working_dir_ = 0;
   debug(X_USERPROCESS, "PID [%ld]: destructor done by [%ld]\n", pid_, currentThread->getTID());
 }
 

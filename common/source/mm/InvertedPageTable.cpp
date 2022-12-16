@@ -244,6 +244,8 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   //add effected progs
   ustl::map<size_t, UserProcess*> progs;
   ArchMemoryMapping m;
+  void* finalcheck1;
+  void* finalcheck2;
   
   debug(DEDUBLI_THREAD, "Pages %lx and %lx are equal! we have %ld progs on first and %ld on second page\n", page_1, page_2, 
   IPT_[page_1].progs_mappings.size(), IPT_[page_2].progs_mappings.size());
@@ -305,6 +307,12 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
       Scheduler::instance()->yield();
     }
   }
+  if (ppns.size() < progs.size() * 3)
+  {
+    debug(DEDUBLI_THREAD, "I might not have enough pages soooo lets just not do it\n");
+    goto fail;
+  }
+  
   
   debug(DEDUBLI_THREAD, "locking sucessful!\n");
   // -> now no more writes allowed from heeere... we only need to do this for lowest lvl bc for the higher levels writes
@@ -328,8 +336,8 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
   }
   
   //moment of truth...
-  void* finalcheck1 = (void*) ArchMemory::getIdentAddressOfPPN(page_1);
-  void* finalcheck2 = (void*) ArchMemory::getIdentAddressOfPPN(page_2);
+  finalcheck1 = (void*) ArchMemory::getIdentAddressOfPPN(page_1);
+  finalcheck2 = (void*) ArchMemory::getIdentAddressOfPPN(page_2);
   if (memcmp(finalcheck1, finalcheck2, PAGE_SIZE) == 0)
   {
     //yes! I can actually deduplicate something...
@@ -476,7 +484,7 @@ bool InvertedPageTable::deduplicate(size_t page_1, size_t page_2)
         pt_src[m.pti].writeable = 1;
       }
     }
-    
+  fail:
     ProcessRegistry::instance()->unlockMultArchmem(progs);
     unlockIPT();
     PageManager::instance()->freeRestOfPages(&ppns);

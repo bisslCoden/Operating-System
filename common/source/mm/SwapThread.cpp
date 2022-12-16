@@ -155,18 +155,22 @@ bool SwapThread::requestSolveSwap()
 bool SwapThread::requestSolveSwapRemoveEntry()
 {
   debug(SWAPTHREAD, "requestSolveSwapRemoveEntry() entered\n");
-
+  InvertedPageTable* _ipt = InvertedPageTable::instance();
+  if (!_ipt->checkIPT())
+    _ipt->lockIPT();
+  
   // return true if vector empfty
   lock_requests_swap_remove_entry_.acquire();
   if(requests_swap_remove_entry_.size() == 0)
   {
     lock_requests_swap_remove_entry_.release();
+    _ipt->unlockIPT();
     return true;
   }
 
   // read every request and remove
   SwapManager*       _sm  = SwapManager::instance(); // ----> uncomment when removeFromDisk() available
-  InvertedPageTable* _ipt = InvertedPageTable::instance();
+
   debug(SWAPTHREAD, "requestSolveSwapRemoveEntry() has size %ld\n", requests_swap_remove_entry_.size());
   for(size_t swap_id : requests_swap_remove_entry_)
   {
@@ -174,6 +178,7 @@ bool SwapThread::requestSolveSwapRemoveEntry()
     _sm->deleteFromDisk(swap_id); // ----> uncomment when available 
   }
   lock_requests_swap_remove_entry_.release();
+  _ipt->unlockIPT();
   return true;
 }
      
@@ -257,7 +262,8 @@ uint32 SwapThread::swapOut()
   ProcessRegistry*    _pr   = ProcessRegistry::instance();
   InvertedPageTable*  _ipt  = InvertedPageTable::instance();
 
-  _ipt->lockIPT();   // lock ipt before or after PRA?
+  if(!_ipt->checkIPT())
+    _ipt->lockIPT();   // lock ipt before or after PRA?
   
   // find a valid ppn to swap
   uint32 ppn = PageReplacementAlgos::randomPRA(); //pm->getPPN(); // wo funktion?
@@ -318,7 +324,8 @@ uint32 SwapThread::swapIn(size_t swap_id)
   ProcessRegistry*    _pr   = ProcessRegistry::instance();
   InvertedPageTable*  _ipt  = InvertedPageTable::instance();
 
-  _ipt->lockIPT();
+  if(!_ipt->checkIPT())
+    _ipt->lockIPT();
 
   // find page?
   IPTE* ipte = _ipt->getEntry(swap_id);
