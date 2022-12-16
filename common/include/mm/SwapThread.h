@@ -6,8 +6,10 @@
 #include "SwapManager.h"
 #include "Mutex.h"
 #include "PageManager.h"
+#include "ProcessRegistry.h"
 
 #define SWAPTHREAD_LOAD 8
+#define SICHERHEITSABSTAND 20
 
 // Pagefault needs disc -> ram.
 struct SwapIn

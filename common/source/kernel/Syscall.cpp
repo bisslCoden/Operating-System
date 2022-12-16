@@ -133,6 +133,12 @@ after:
     case sc_sbrk:
       return_value = sbrk((int)arg1);
       break;
+    case sc_test_allocppn:
+      return_value = PageManager::instance()->allocPPN();
+      break;
+    case sc_test_freeppn:
+      PageManager::instance()->freePPN(arg1);
+      break;
     default:
       kprintf("Syscall::syscall_exception: Unimplemented Syscall Number %zd\n", syscall_number);
   }

@@ -772,7 +772,7 @@ ustl::pair<size_t, size_t> ArchMemory::cowUntil(size_t ppn, ustl::queue<size_t>*
           pdpt[pdpti].pd.page_ppn = cowPML<PageDirPointerTablePageDirEntry>(getIdentAddressOfPPN(pml4[pml4i].page_ppn), pdpti, 2, ppns);
           assert(pdpt[pdpti].pd.page_ppn != 0 && "should be present aswell");
           page = pdpt[pdpti].pd.page_ppn;
-          debug(MULTICOW, "cowing pd resulted in %lx for pdpt and %lx for pd\n", pml4[pml4i].page_ppn, page);
+          debug(MULTICOW, "cowing pd resulted in %x for pdpt and %lx for pd\n", pml4[pml4i].page_ppn, page);
           return ustl::make_pair(page, pdi);
         }
       }
@@ -811,14 +811,64 @@ bool ArchMemory::checkSwap(size_t address)
 }
 
 
-bool ArchMemory::setPageToSwapOut()
+bool ArchMemory::setPageToSwapOut(size_t swap_id, uint32 ppn, size_t vpn)
 {
-  assert(false && "nonono");
-  return true;
+  debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx)\n", swap_id, ppn, vpn);
+  ArchMemoryMapping m = resolveMapping(vpn);
+  PageTableEntry pte = m.pt[m.pti];
+  
+  // swappable if ppn from pra is also written in process' archmem
+  bool in_physical = (m.page_ppn == ppn);
+  debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) said in_physical: %s\n", 
+    swap_id, ppn, vpn, in_physical ? "YES" : "NO");
+  
+  // seems like the requested page was already swapped. that's alright
+  bool swapped = (m.pt && (pte.swap == 1) && (pte.present == 0) && (pte.page_ppn != ppn));
+  debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) said swapped: %s\n", 
+    swap_id, ppn, vpn, swapped ? "YES" : "NO");
+  
+  // one of both cases must be true to ensure a correct swapOut()
+  assert((in_physical || swapped) && "setPageToSwapOut() was called for a page that was not in_physical or swapped");
+  
+  // set bits if necessary
+  if(in_physical)
+  {
+    PageTableEntry* page_ptr = (PageTableEntry*)getIdentAddressOfPPN(m.pt_ppn);
+    page_ptr[m.pti].swap = 1;
+    page_ptr[m.pti].present = 0;
+    page_ptr[m.pti].page_ppn = swap_id;
+    debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) setting bits for swap\n", swap_id, ppn, vpn);
+  }
+  return (in_physical || swapped);
 }
 
-bool ArchMemory::setPageToSwapIn()
+bool ArchMemory::setPageToSwapIn(size_t swap_id, uint32 ppn, size_t vpn)
 {
-  assert(false && "nonono");
-  return true;
+  debug(X_ARCHMEM, "setPageToSwapIn(swap_id = %ld, ppn = %x, vpn = %lx)\n", swap_id, ppn, vpn);
+  ArchMemoryMapping m = resolveMapping(vpn);
+  PageTableEntry pte = m.pt[m.pti];
+
+  // page in physical?
+  bool in_physical = (m.page_ppn == ppn);
+  debug(X_ARCHMEM, "setPageToSwapIn(swap_id = %ld, ppn = %x, vpn = %lx) said in_physical: %s\n", 
+    swap_id, ppn, vpn, in_physical ? "YES" : "NO");
+
+  // swapped
+  bool swapped = m.pt && (pte.swap == 1) && (pte.present == 0) && (pte.page_ppn == swap_id);
+  debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) said swapped: %s\n", 
+    swap_id, ppn, vpn, swapped ? "YES" : "NO");
+
+  // one of both cases must be true to ensure a correct swapIn()
+  assert((in_physical || swapped) && "setPageToSwapIN() was called for a page that was not in_physical or swapped");
+  
+  // set bits if necessary
+  if(swapped)
+  {
+    PageTableEntry* page_ptr = (PageTableEntry*)getIdentAddressOfPPN(m.pt_ppn);
+    page_ptr[m.pti].swap = 0;
+    page_ptr[m.pti].present = 1;
+    page_ptr[m.pti].page_ppn = ppn;
+    debug(X_ARCHMEM, "setPageToSwapOut(swap_id = %ld, ppn = %x, vpn = %lx) setting bits for swap\n", swap_id, ppn, vpn);
+  }
+  return (in_physical || swapped);
 }
