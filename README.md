@@ -1,16 +1,16 @@
-# sweb
-[![Build Status](https://travis-ci.org/IAIK/sweb.svg?branch=master)](https://travis-ci.org/IAIK/sweb)
+# SWEB Educational Operating System
 
-## SWEB Educational OS
-TU Graz educational Operating System built in C/C++. Contributed:
-- Multithreading functionalities (pthread syscalls)
-- Multiprocess functionalities (fork, exec)
-- Full Virtual Memory featuring Copy on Write, Deduplication, Cleanup
-- Swapping functionality (SwapThread, SwapManager)
-- Heap Management (Malloc, Calloc)
-- Userspace Locking functionalities (mutex)
+A C/C++-based educational operating system developed at TU Graz, focused on low-level systems programming and core operating system concepts. The project involved implementing key OS subsystems including process management, virtual memory, synchronization, and memory allocation.
 
-## Learning results:
-- Profound understanding of low-level OS architecture
-- 25.000+ lines of C/C++ code written
-- Understanding of Sheduling, Virtual Memory, Multithreading, Locking
+## Key Contributions
+- Implemented multithreading functionality, including pthread-related syscalls
+- Built multiprocessing features such as fork and exec
+- Developed a full virtual memory subsystem with Copy-on-Write, deduplication, and cleanup mechanisms
+- Implemented swapping functionality using SwapThread and SwapManager
+- Built heap management features including malloc and calloc
+- Added userspace synchronization primitives such as mutexes
+
+## What I Learned
+- Developed a strong understanding of low-level operating system architecture
+- Wrote and maintained 25,000+ lines of C/C++ code in a large systems codebase
+- Gained practical experience with scheduling, virtual memory, multithreading, synchronization, and memory management
