@@ -1,7 +1,7 @@
 # sweb
 [![Build Status](https://travis-ci.org/IAIK/sweb.svg?branch=master)](https://travis-ci.org/IAIK/sweb)
 
-#SWEB Educational OS
+##SWEB Educational OS
 TU Graz educational Operating System built in C/C++. Contributed:
 - Multithreading functionalities (pthread syscalls)
 - Multiprocess functionalities (fork, exec)
@@ -10,7 +10,7 @@ TU Graz educational Operating System built in C/C++. Contributed:
 - Heap Management (Malloc, Calloc)
 - Userspace Locking functionalities (mutex)
 
-#Learning results:
+##Learning results:
 - Profound understanding of low-level OS architecture
 - 30.000+ lines of C/C++ code written
 - Understanding of Sheduling, Virtual Memory, Multithreading, Locking
